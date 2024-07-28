@@ -1,6 +1,9 @@
 #pragma once
 
-struct GLFWwindow;
+#include "vulkan/vulkan.h"
+#include "GLFW/glfw3.h"
+
+#include "beva/beva.h"
 
 namespace beva_demo
 {
@@ -17,11 +20,14 @@ namespace beva_demo
         static constexpr int initial_height = 720;
 
         GLFWwindow* window;
+        VkInstance instance;
 
         void init_window();
         void init_vulkan();
         void main_loop();
         void cleanup();
+
+        void create_instance();
 
     };
 

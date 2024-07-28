@@ -105,6 +105,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\app.h" />
+    <ClInclude Include="src\lib\beva\beva.h" />
     <ClInclude Include="src\lib\glfw\glfw3.h" />
     <ClInclude Include="src\lib\glfw\glfw3native.h" />
     <ClInclude Include="src\lib\glm\common.hpp" />

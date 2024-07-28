@@ -6,7 +6,7 @@ int main()
 {
     try
     {
-        beva_demo::App app;
+        beva_demo::App app{};
         app.run();
     }
     catch (const std::exception& e)
