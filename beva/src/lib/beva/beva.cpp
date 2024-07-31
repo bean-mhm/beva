@@ -23,6 +23,30 @@ namespace beva
         return _vulkan_result.to_string();
     }
 
+    const char* AllocationScope_to_string(AllocationScope allocation_scope)
+    {
+        if (allocation_scope >= AllocationScope::_)
+        {
+            throw std::exception(
+                "invalid enum value, this should never happen"
+            );
+        }
+        return AllocationScope_string[(uint8_t)allocation_scope];
+    }
+
+    const char* InternalAllocationType_to_string(
+        InternalAllocationType allocation_type
+    )
+    {
+        if (allocation_type >= InternalAllocationType::_)
+        {
+            throw std::exception(
+                "invalid enum value, this should never happen"
+            );
+        }
+        return InternalAllocationType_string[(uint8_t)allocation_type];
+    }
+
     std::string Version::to_string() const
     {
         return std::format("{}.{}.{}.{}", variant, major, minor, patch);
@@ -38,7 +62,7 @@ namespace beva
         other._allocator = nullptr;
 
         vk_allocator = other.vk_allocator;
-        vk_allocator.pUserData = this;
+        vk_allocator.pUserData = _allocator.get();
         other.vk_allocator = VkAllocationCallbacks{ 0 };
 
         instance = other.instance;
@@ -76,13 +100,16 @@ namespace beva
         VkSystemAllocationScope vk_allocation_scope
     );
 
-    Result<Context> Context::create(const ContextConfig& config)
+    Result<Context> Context::create(
+        const ContextConfig& config,
+        const std::shared_ptr<Allocator>& allocator
+    )
     {
-        Context c(config);
+        Context c(config, allocator);
 
         // allocation callbacks
         {
-            c.vk_allocator.pUserData = &c;
+            c.vk_allocator.pUserData = c._allocator.get();
             c.vk_allocator.pfnAllocation = vk_allocation_callback;
             c.vk_allocator.pfnReallocation = vk_reallocation_callback;
             c.vk_allocator.pfnFree = vk_free_callback;
@@ -213,6 +240,7 @@ namespace beva
     void Context::set_allocator(const std::shared_ptr<Allocator>& allocator)
     {
         _allocator = allocator;
+        vk_allocator.pUserData = _allocator.get();
     }
 
     Context::~Context()
@@ -220,8 +248,11 @@ namespace beva
         vkDestroyInstance(instance, vk_allocator_ptr());
     }
 
-    Context::Context(const ContextConfig& config)
-        : _config(config)
+    Context::Context(
+        const ContextConfig& config,
+        const std::shared_ptr<Allocator>& allocator
+    )
+        : _config(config), _allocator(allocator)
     {}
 
     const VkAllocationCallbacks* Context::vk_allocator_ptr() const
@@ -247,14 +278,7 @@ namespace beva
             );
         }
 
-        Context& c = *(Context*)p_user_data;
-        if (c.allocator() == nullptr)
-        {
-            throw std::runtime_error(
-                "Vulkan allocation callback called but the context doesn't "
-                "have an allocator"
-            );
-        }
+        Allocator* allocator = (Allocator*)p_user_data;
 
         AllocationScope allocation_scope;
         switch (vk_allocation_scope)
@@ -279,7 +303,7 @@ namespace beva
             break;
         }
 
-        return c.allocator()->allocate(c, size, alignment, allocation_scope);
+        return allocator->allocate(size, alignment, allocation_scope);
     }
 
     static void* vk_reallocation_callback(
@@ -297,14 +321,7 @@ namespace beva
             );
         }
 
-        Context& c = *(Context*)p_user_data;
-        if (c.allocator() == nullptr)
-        {
-            throw std::runtime_error(
-                "Vulkan reallocation callback called but the context doesn't "
-                "have an allocator"
-            );
-        }
+        Allocator* allocator = (Allocator*)p_user_data;
 
         AllocationScope allocation_scope;
         switch (vk_allocation_scope)
@@ -329,8 +346,7 @@ namespace beva
             break;
         }
 
-        return c.allocator()->reallocate(
-            c,
+        return allocator->reallocate(
             p_original,
             size,
             alignment,
@@ -350,16 +366,8 @@ namespace beva
             );
         }
 
-        Context& c = *(Context*)p_user_data;
-        if (c.allocator() == nullptr)
-        {
-            throw std::runtime_error(
-                "Vulkan free callback called but the context doesn't have an "
-                "allocator"
-            );
-        }
-
-        c.allocator()->free(c, p_memory);
+        Allocator* allocator = (Allocator*)p_user_data;
+        allocator->free(p_memory);
     }
 
     static void vk_internal_allocation_notification(
@@ -377,14 +385,7 @@ namespace beva
             );
         }
 
-        Context& c = *(Context*)p_user_data;
-        if (c.allocator() == nullptr)
-        {
-            throw std::runtime_error(
-                "Vulkan internal allocation notification called but the "
-                "context doesn't have an allocator"
-            );
-        }
+        Allocator* allocator = (Allocator*)p_user_data;
 
         InternalAllocationType allocation_type;
         switch (vk_allocation_type)
@@ -420,8 +421,7 @@ namespace beva
             break;
         }
 
-        c.allocator()->internal_allocation_notification(
-            c,
+        allocator->internal_allocation_notification(
             size,
             allocation_type,
             allocation_scope
@@ -442,14 +442,7 @@ namespace beva
             );
         }
 
-        Context& c = *(Context*)p_user_data;
-        if (c.allocator() == nullptr)
-        {
-            throw std::runtime_error(
-                "Vulkan internal free notification called but the context "
-                "doesn't have an allocator"
-            );
-        }
+        Allocator* allocator = (Allocator*)p_user_data;
 
         InternalAllocationType allocation_type;
         switch (vk_allocation_type)
@@ -485,8 +478,7 @@ namespace beva
             break;
         }
 
-        c.allocator()->internal_free_notification(
-            c,
+        allocator->internal_free_notification(
             size,
             allocation_type,
             allocation_scope

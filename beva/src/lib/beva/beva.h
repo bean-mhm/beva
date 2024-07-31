@@ -70,8 +70,6 @@ namespace beva
         UndocumentedVkResult,
         _
     };
-    static constexpr size_t VulkanResultType_size =
-        (uint8_t)VulkanResultType::_;
 
     static constexpr const char* VulkanResultType_string[]
     {
@@ -506,6 +504,8 @@ namespace beva
 
     class Context;
 
+#pragma region memory allocation
+
     enum class AllocationScope : uint8_t
     {
         Command,
@@ -513,50 +513,72 @@ namespace beva
         Cache,
         Device,
         Instance,
-        Unknown
+        Unknown,
+        _
     };
+
+    static constexpr const char* AllocationScope_string[]
+    {
+        "Command",
+        "Object",
+        "Cache",
+        "Device",
+        "Instance",
+        "Unknown"
+    };
+
+    const char* AllocationScope_to_string(AllocationScope allocation_scope);
 
     enum class InternalAllocationType : uint8_t
     {
         Executable,
-        Unknown
+        Unknown,
+        _
     };
+
+    static constexpr const char* InternalAllocationType_string[]
+    {
+        "Executable",
+        "Unknown"
+    };
+
+    const char* InternalAllocationType_to_string(
+        InternalAllocationType allocation_type
+    );
 
     class Allocator
     {
     public:
         virtual void* allocate(
-            Context& context,
             size_t size,
             size_t alignment,
             AllocationScope allocation_scope
         ) = 0;
 
         virtual void* reallocate(
-            Context& context,
             void* original,
             size_t size,
             size_t alignment,
             AllocationScope allocation_scope
         ) = 0;
 
-        virtual void free(Context& context, void* memory) = 0;
+        virtual void free(void* memory) = 0;
 
         virtual void internal_allocation_notification(
-            Context& context,
             size_t size,
             InternalAllocationType allocation_type,
             AllocationScope allocation_scope
         ) = 0;
 
         virtual void internal_free_notification(
-            Context& context,
             size_t size,
             InternalAllocationType allocation_type,
             AllocationScope allocation_scope
         ) = 0;
 
     };
+
+#pragma endregion
 
     struct ExtensionProperties
     {
@@ -616,7 +638,15 @@ namespace beva
         Context() = delete;
         Context(Context&& other);
 
-        static Result<Context> create(const ContextConfig& config);
+        // it's best to keep at least one external reference to the allocator
+        // so that it doesn't die with the Context because the driver might
+        // still use the allocator even after the instance is destroyed and
+        // everything is seemingly cleaned up.
+        static Result<Context> create(
+            const ContextConfig& config,
+            const std::shared_ptr<Allocator>& allocator = nullptr
+        );
+
         static Result<std::vector<ExtensionProperties>> available_extensions(
             const std::string& layer_name = ""
         );
@@ -631,6 +661,10 @@ namespace beva
             return _allocator;
         }
 
+        // it's best to keep at least one external reference to the allocator
+        // so that it doesn't die with the Context because the driver might
+        // still use the allocator even after the instance is destroyed and
+        // everything is seemingly cleaned up.
         void set_allocator(
             const std::shared_ptr<Allocator>& allocator
         );
@@ -645,7 +679,10 @@ namespace beva
 
         VkInstance instance = nullptr;
 
-        Context(const ContextConfig& config);
+        Context(
+            const ContextConfig& config,
+            const std::shared_ptr<Allocator>& allocator
+        );
 
         const VkAllocationCallbacks* vk_allocator_ptr() const;
 
