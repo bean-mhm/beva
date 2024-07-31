@@ -16,14 +16,12 @@
 namespace beva_demo
 {
 
-    static constexpr VkAllocationCallbacks* vk_alloc = nullptr;
-
     static void glfw_error_callback(int error, const char* description);
 
     void App::run()
     {
         init_window();
-        init_vulkan();
+        init_context();
         main_loop();
         cleanup();
     }
@@ -54,9 +52,61 @@ namespace beva_demo
         }
     }
 
-    void App::init_vulkan()
+    void App::init_context()
     {
-        create_instance();
+        // print available extensions
+        {
+            auto available_extensions = beva::Context::available_extensions();
+            if (!available_extensions.ok())
+            {
+                throw std::runtime_error(
+                    available_extensions.error().to_string().c_str()
+                );
+            }
+
+            std::cout << available_extensions.value().size() << " extensions\n";
+            for (const auto& ext : available_extensions.value())
+            {
+                std::cout << std::format("{} ({})\n", ext.name, ext.spec_version);
+            }
+            std::cout << '\n';
+        }
+
+        std::vector<std::string> required_extensions;
+        {
+            // add extensions required by GLFW
+            uint32_t glfw_ext_count = 0;
+            const char** glfw_exts;
+            glfw_exts = glfwGetRequiredInstanceExtensions(&glfw_ext_count);
+            for (uint32_t i = 0; i < glfw_ext_count; i++)
+            {
+                required_extensions.emplace_back(glfw_exts[i]);
+            }
+        }
+
+        beva::ContextConfig config{
+            .app_name = "beva demo",
+                .app_version = beva::Version(1, 1, 0, 0),
+                .engine_name = "no engine",
+                .engine_version = beva::Version(1, 1, 0, 0),
+                .api_version = beva::ApiVersion::Vulkan1_0,
+                .required_extensions = required_extensions,
+                .will_enumerate_portability = false
+        };
+
+        beva::Result<beva::Context> a(beva::Error(VK_SUCCESS));
+
+        auto context_result = beva::Context::create(config);
+        if (!context_result.ok())
+        {
+            std::string s =
+                "failed to create context: "
+                + context_result.error().to_string();
+            throw std::runtime_error(s.c_str());
+        }
+        context = std::make_unique<beva::Context>(
+            std::move(context_result.value())
+        );
     }
 
     void App::main_loop()
@@ -74,56 +124,9 @@ namespace beva_demo
 
     void App::cleanup()
     {
-        vkDestroyInstance(instance, vk_alloc);
-
+        context = nullptr;
         glfwDestroyWindow(window);
         glfwTerminate();
-    }
-
-    void App::create_instance()
-    {
-        VkApplicationInfo app_info{};
-        app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-        app_info.pApplicationName = initial_title;
-        app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-        app_info.pEngineName = "No Engine";
-        app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        app_info.apiVersion = VK_API_VERSION_1_0;
-
-        VkInstanceCreateInfo create_info{};
-        create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-        create_info.pApplicationInfo = &app_info;
-
-        // extensions
-        {
-            std::vector<const char*> required_exts;
-
-            // add extensions required by GLFW
-            uint32_t glfw_ext_count = 0;
-            const char** glfw_exts;
-            glfw_exts = glfwGetRequiredInstanceExtensions(&glfw_ext_count);
-            for (uint32_t i = 0; i < glfw_ext_count; i++)
-            {
-                required_exts.emplace_back(glfw_exts[i]);
-            }
-
-            required_exts.emplace_back(
-                VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME
-            );
-
-            create_info.flags |=
-                VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-
-            create_info.enabledExtensionCount = (uint32_t)required_exts.size();
-            create_info.ppEnabledExtensionNames = required_exts.data();
-        }
-
-        create_info.enabledLayerCount = 0;
-
-        if (vkCreateInstance(&create_info, vk_alloc, &instance) != VK_SUCCESS)
-        {
-            throw std::runtime_error("failed to create Vulkan instance");
-        }
     }
 
     static void glfw_error_callback(int error, const char* description)
