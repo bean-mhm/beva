@@ -180,16 +180,14 @@ namespace beva
             layer_name_cstr = layer_name.c_str();
         }
 
-        std::vector<VkExtensionProperties> vk_extensions;
-
         uint32_t count = 0;
         vkEnumerateInstanceExtensionProperties(
             layer_name_cstr,
             &count,
             nullptr
         );
-        vk_extensions.resize(count);
 
+        std::vector<VkExtensionProperties> vk_extensions(count);
         VkResult vk_result = vkEnumerateInstanceExtensionProperties(
             layer_name_cstr,
             &count,
