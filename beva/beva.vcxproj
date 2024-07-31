@@ -99,6 +99,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\app.cpp" />
+    <ClCompile Include="src\lib\beva\beva.cpp" />
     <ClCompile Include="src\lib\glm\detail\glm.cpp" />
     <ClCompile Include="src\lib\glm\glm.cppm" />
     <ClCompile Include="src\main.cpp" />
