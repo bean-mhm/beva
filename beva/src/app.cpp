@@ -54,6 +54,32 @@ namespace beva_demo
 
     void App::init_context()
     {
+        // print available layers
+        {
+            auto available_layers = beva::Context::available_layers();
+            if (!available_layers.ok())
+            {
+                throw std::runtime_error(
+                    available_layers.error().to_string().c_str()
+                );
+            }
+
+            std::cout
+                << available_layers.value().size()
+                << " available layers\n";
+            for (const auto& layer : available_layers.value())
+            {
+                std::cout << std::format(
+                    "{} ({}, {}): {}\n",
+                    layer.name,
+                    layer.spec_version.to_string(),
+                    layer.implementation_version,
+                    layer.description
+                );
+            }
+            std::cout << '\n';
+        }
+
         // print available extensions
         {
             auto available_extensions = beva::Context::available_extensions();
@@ -64,15 +90,25 @@ namespace beva_demo
                 );
             }
 
-            std::cout << available_extensions.value().size() << " extensions\n";
+            std::cout
+                << available_extensions.value().size()
+                << " available extensions\n";
             for (const auto& ext : available_extensions.value())
             {
-                std::cout << std::format("{} ({})\n", ext.name, ext.spec_version);
+                std::cout << std::format(
+                    "{} ({})\n",
+                    ext.name,
+                    ext.spec_version
+                );
             }
             std::cout << '\n';
         }
 
-        std::vector<std::string> required_extensions;
+        std::vector<std::string> layers{
+            "VK_LAYER_KHRONOS_validation"
+        };
+
+        std::vector<std::string> extensions;
         {
             // add extensions required by GLFW
             uint32_t glfw_ext_count = 0;
@@ -80,21 +116,20 @@ namespace beva_demo
             glfw_exts = glfwGetRequiredInstanceExtensions(&glfw_ext_count);
             for (uint32_t i = 0; i < glfw_ext_count; i++)
             {
-                required_extensions.emplace_back(glfw_exts[i]);
+                extensions.emplace_back(glfw_exts[i]);
             }
         }
 
         beva::ContextConfig config{
-            .app_name = "beva demo",
+            .will_enumerate_portability = false,
+                .app_name = "beva demo",
                 .app_version = beva::Version(1, 1, 0, 0),
                 .engine_name = "no engine",
                 .engine_version = beva::Version(1, 1, 0, 0),
                 .api_version = beva::ApiVersion::Vulkan1_0,
-                .required_extensions = required_extensions,
-                .will_enumerate_portability = false
+                .layers = layers,
+                .extensions = extensions
         };
-
-        beva::Result<beva::Context> a(beva::Error(VK_SUCCESS));
 
         auto context_result = beva::Context::create(config);
         if (!context_result.ok())

@@ -580,24 +580,20 @@ namespace beva
 
 #pragma endregion
 
-    struct ExtensionProperties
-    {
-        std::string name;
-        uint32_t spec_version;
-    };
-
     struct Version
     {
-        uint8_t variant : 8;
-        uint8_t major : 8;
-        uint8_t minor : 8;
-        uint8_t patch : 8;
+        uint8_t variant : 8 = 0;
+        uint8_t major : 8 = 0;
+        uint8_t minor : 8 = 0;
+        uint8_t patch : 8 = 0;
+
+        Version() = default;
 
         constexpr Version(
-            uint8_t variant = 0,
-            uint8_t major = 0,
-            uint8_t minor = 0,
-            uint8_t patch = 0
+            uint8_t variant,
+            uint8_t major,
+            uint8_t minor,
+            uint8_t patch
         )
             : variant(variant), major(major), minor(minor), patch(patch)
         {}
@@ -614,8 +610,28 @@ namespace beva
         Vulkan1_3
     };
 
+    struct ExtensionProperties
+    {
+        std::string name;
+        uint32_t spec_version;
+    };
+
+    struct LayerProperties
+    {
+        std::string name;
+        Version spec_version;
+        uint32_t implementation_version;
+        std::string description;
+    };
+
     struct ContextConfig
     {
+        // enables the VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR flag
+        // which specifies that the instance will enumerate available Vulkan
+        // Portability-compliant physical devices and groups in addition to the
+        // Vulkan physical devices and groups that are enumerated by default.
+        bool will_enumerate_portability = false;
+
         std::string app_name;
         Version app_version;
 
@@ -623,13 +639,9 @@ namespace beva
         Version engine_version;
 
         ApiVersion api_version;
-        std::vector<std::string> required_extensions;
 
-        // enables the VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR flag
-        // which specifies that the instance will enumerate available Vulkan
-        // Portability-compliant physical devices and groups in addition to the
-        // Vulkan physical devices and groups that are enumerated by default.
-        bool will_enumerate_portability = false;
+        std::vector<std::string> layers;
+        std::vector<std::string> extensions;
     };
 
     class Context
@@ -646,6 +658,8 @@ namespace beva
             const ContextConfig& config,
             const std::shared_ptr<Allocator>& allocator = nullptr
         );
+
+        static Result<std::vector<LayerProperties>> available_layers();
 
         static Result<std::vector<ExtensionProperties>> available_extensions(
             const std::string& layer_name = ""

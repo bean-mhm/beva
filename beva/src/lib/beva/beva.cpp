@@ -118,6 +118,13 @@ namespace beva
             c.vk_allocator.pfnInternalFree = vk_internal_free_notification;
         }
 
+        VkInstanceCreateInfo create_info{};
+        create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+
+        if (c._config.will_enumerate_portability)
+            create_info.flags |=
+            VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+
         VkApplicationInfo app_info{};
         {
             app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -156,33 +163,41 @@ namespace beva
                 break;
             }
         }
-
-        VkInstanceCreateInfo create_info{};
-        create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         create_info.pApplicationInfo = &app_info;
 
-        // extensions
-        std::vector<const char*> required_extensions_cstr;
+        // layers
+        std::vector<const char*> layers_cstr;
         {
-            required_extensions_cstr.reserve(
-                c._config.required_extensions.size()
+            layers_cstr.reserve(
+                c._config.layers.size()
             );
-            for (const auto& ext : c._config.required_extensions)
+            for (const auto& layer : c._config.layers)
             {
-                required_extensions_cstr.push_back(ext.c_str());
+                layers_cstr.push_back(layer.c_str());
+            }
+
+            create_info.enabledLayerCount =
+                (uint32_t)layers_cstr.size();
+            create_info.ppEnabledLayerNames =
+                layers_cstr.data();
+        }
+
+        // extensions
+        std::vector<const char*> extensions_cstr;
+        {
+            extensions_cstr.reserve(
+                c._config.extensions.size()
+            );
+            for (const auto& ext : c._config.extensions)
+            {
+                extensions_cstr.push_back(ext.c_str());
             }
 
             create_info.enabledExtensionCount =
-                (uint32_t)required_extensions_cstr.size();
+                (uint32_t)extensions_cstr.size();
             create_info.ppEnabledExtensionNames =
-                required_extensions_cstr.data();
+                extensions_cstr.data();
         }
-
-        create_info.enabledLayerCount = 0;
-
-        if (c._config.will_enumerate_portability)
-            create_info.flags |=
-            VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
 
         // create instance
         VkResult vk_result = vkCreateInstance(
@@ -195,6 +210,43 @@ namespace beva
             return Error(vk_result);
         }
         return std::move(c);
+    }
+
+    Result<std::vector<LayerProperties>> Context::available_layers()
+    {
+        uint32_t count = 0;
+        vkEnumerateInstanceLayerProperties(
+            &count,
+            nullptr
+        );
+
+        std::vector<VkLayerProperties> vk_layers(count);
+        VkResult vk_result = vkEnumerateInstanceLayerProperties(
+            &count,
+            vk_layers.data()
+        );
+        if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
+        {
+            return Error(vk_result);
+        }
+
+        std::vector<LayerProperties> layers;
+        layers.reserve(vk_layers.size());
+        for (const auto& layer : vk_layers)
+        {
+            layers.push_back({
+                .name = layer.layerName,
+                .spec_version = Version(
+                    VK_API_VERSION_VARIANT(layer.specVersion),
+                    VK_API_VERSION_MAJOR(layer.specVersion),
+                    VK_API_VERSION_MINOR(layer.specVersion),
+                    VK_API_VERSION_PATCH(layer.specVersion)
+                ),
+                .implementation_version = layer.implementationVersion,
+                .description = layer.description
+                });
+        }
+        return layers;
     }
 
     Result<std::vector<ExtensionProperties>> Context::available_extensions(
