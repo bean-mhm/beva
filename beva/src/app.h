@@ -29,6 +29,7 @@ namespace beva_demo
 
         void init_window();
         void init_context();
+        void setup_debug_messenger();
         void main_loop();
         void cleanup();
 

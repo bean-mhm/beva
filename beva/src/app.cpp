@@ -22,6 +22,7 @@ namespace beva_demo
     {
         init_window();
         init_context();
+        setup_debug_messenger();
         main_loop();
         cleanup();
     }
@@ -98,45 +99,50 @@ namespace beva_demo
             throw std::runtime_error(s.c_str());
         }
         context = context_result.value();
+    }
 
-        if (debug_mode)
+    void App::setup_debug_messenger()
+    {
+        if (!debug_mode)
         {
-            beva::DebugMessageSeverityFlags severity_flags{
-                .verbose = false,
-                    .info = false,
-                    .warning = true,
-                    .error = true
-            };
-
-            beva::DebugMessageTypeFlags type_flags{
-                .general = true,
-                    .validation = true,
-                    .performance = true,
-                    .device_address_binding = true
-            };
-
-            auto debug_messenger_result = beva::DebugMessenger::create(
-                context,
-                severity_flags,
-                type_flags,
-                [](
-                    beva::DebugMessageSeverityFlags message_severity_flags,
-                    beva::DebugMessageTypeFlags message_type_flags,
-                    beva::DebugMessageData message_data
-                    )
-                {
-                    std::cout << message_data.message << '\n';
-                }
-            );
-            if (!debug_messenger_result.ok())
-            {
-                std::string s =
-                    "failed to create debug messenger: "
-                    + debug_messenger_result.error().to_string();
-                throw std::runtime_error(s.c_str());
-            }
-            debug_messenger = debug_messenger_result.value();
+            return;
         }
+
+        beva::DebugMessageSeverityFlags severity_flags{
+            .verbose = false,
+                .info = false,
+                .warning = true,
+                .error = true
+        };
+
+        beva::DebugMessageTypeFlags type_flags{
+            .general = true,
+                .validation = true,
+                .performance = true,
+                .device_address_binding = true
+        };
+
+        auto debug_messenger_result = beva::DebugMessenger::create(
+            context,
+            severity_flags,
+            type_flags,
+            [](
+                beva::DebugMessageSeverityFlags message_severity_flags,
+                beva::DebugMessageTypeFlags message_type_flags,
+                beva::DebugMessageData message_data
+                )
+            {
+                std::cout << message_data.message << '\n';
+            }
+        );
+        if (!debug_messenger_result.ok())
+        {
+            std::string s =
+                "failed to create debug messenger: "
+                + debug_messenger_result.error().to_string();
+            throw std::runtime_error(s.c_str());
+        }
+        debug_messenger = debug_messenger_result.value();
     }
 
     void App::main_loop()
