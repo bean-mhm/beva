@@ -54,69 +54,27 @@ namespace beva_demo
 
     void App::init_context()
     {
-        // print available layers
+        std::vector<std::string> layers;
+        if (debug_mode)
         {
-            auto available_layers = beva::Context::available_layers();
-            if (!available_layers.ok())
-            {
-                throw std::runtime_error(
-                    available_layers.error().to_string().c_str()
-                );
-            }
-
-            std::cout
-                << available_layers.value().size()
-                << " available layers\n";
-            for (const auto& layer : available_layers.value())
-            {
-                std::cout << std::format(
-                    "{} ({}, {}): {}\n",
-                    layer.name,
-                    layer.spec_version.to_string(),
-                    layer.implementation_version,
-                    layer.description
-                );
-            }
-            std::cout << '\n';
+            layers.push_back("VK_LAYER_KHRONOS_validation");
         }
-
-        // print available extensions
-        {
-            auto available_extensions = beva::Context::available_extensions();
-            if (!available_extensions.ok())
-            {
-                throw std::runtime_error(
-                    available_extensions.error().to_string().c_str()
-                );
-            }
-
-            std::cout
-                << available_extensions.value().size()
-                << " available extensions\n";
-            for (const auto& ext : available_extensions.value())
-            {
-                std::cout << std::format(
-                    "{} ({})\n",
-                    ext.name,
-                    ext.spec_version
-                );
-            }
-            std::cout << '\n';
-        }
-
-        std::vector<std::string> layers{
-            "VK_LAYER_KHRONOS_validation"
-        };
 
         std::vector<std::string> extensions;
         {
-            // add extensions required by GLFW
+            // extensions required by GLFW
             uint32_t glfw_ext_count = 0;
             const char** glfw_exts;
             glfw_exts = glfwGetRequiredInstanceExtensions(&glfw_ext_count);
             for (uint32_t i = 0; i < glfw_ext_count; i++)
             {
                 extensions.emplace_back(glfw_exts[i]);
+            }
+
+            // debug utils extension
+            if (debug_mode)
+            {
+                extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
             }
         }
 
@@ -139,9 +97,46 @@ namespace beva_demo
                 + context_result.error().to_string();
             throw std::runtime_error(s.c_str());
         }
-        context = std::make_unique<beva::Context>(
-            std::move(context_result.value())
-        );
+        context = context_result.value();
+
+        if (debug_mode)
+        {
+            beva::DebugMessageSeverityFlags severity_flags{
+                .verbose = false,
+                    .info = false,
+                    .warning = true,
+                    .error = true
+            };
+
+            beva::DebugMessageTypeFlags type_flags{
+                .general = true,
+                    .validation = true,
+                    .performance = true,
+                    .device_address_binding = true
+            };
+
+            auto debug_messenger_result = beva::DebugMessenger::create(
+                context,
+                severity_flags,
+                type_flags,
+                [](
+                    beva::DebugMessageSeverityFlags message_severity_flags,
+                    beva::DebugMessageTypeFlags message_type_flags,
+                    beva::DebugMessageData message_data
+                    )
+                {
+                    std::cout << message_data.message << '\n';
+                }
+            );
+            if (!debug_messenger_result.ok())
+            {
+                std::string s =
+                    "failed to create debug messenger: "
+                    + debug_messenger_result.error().to_string();
+                throw std::runtime_error(s.c_str());
+            }
+            debug_messenger = debug_messenger_result.value();
+        }
     }
 
     void App::main_loop()

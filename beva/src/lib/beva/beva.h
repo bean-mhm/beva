@@ -9,6 +9,7 @@
 #include <optional>
 #include <variant>
 #include <type_traits>
+#include <functional>
 #include <stdexcept>
 #include <cstdint>
 
@@ -18,9 +19,9 @@
 namespace beva
 {
 
-#pragma region errors and results
+#pragma region enums
 
-    enum class VulkanResultType : uint8_t
+    enum class ApiResultType : uint8_t
     {
         Success,
         NotReady,
@@ -71,7 +72,7 @@ namespace beva
         _
     };
 
-    static constexpr const char* VulkanResultType_string[]
+    static constexpr const char* ApiResultType_string[]
     {
         "Success: command successfully completed",
         "NotReady: a fence or query has not yet completed",
@@ -213,156 +214,156 @@ namespace beva
         "not compatible with this device.",
     };
 
-    class VulkanResult
+    class ApiResult
     {
     public:
-        constexpr VulkanResult(VkResult vk_result)
+        constexpr ApiResult(VkResult vk_result)
         {
             _undocumented_vk_result = vk_result;
             switch (vk_result)
             {
             case VK_NOT_READY:
-                _type = VulkanResultType::NotReady;
+                _type = ApiResultType::NotReady;
                 break;
             case VK_TIMEOUT:
-                _type = VulkanResultType::Timeout;
+                _type = ApiResultType::Timeout;
                 break;
             case VK_EVENT_SET:
-                _type = VulkanResultType::EventSet;
+                _type = ApiResultType::EventSet;
                 break;
             case VK_EVENT_RESET:
-                _type = VulkanResultType::EventReset;
+                _type = ApiResultType::EventReset;
                 break;
             case VK_INCOMPLETE:
-                _type = VulkanResultType::Incomplete;
+                _type = ApiResultType::Incomplete;
                 break;
             case VK_ERROR_OUT_OF_HOST_MEMORY:
-                _type = VulkanResultType::ErrorOutOfHostMemory;
+                _type = ApiResultType::ErrorOutOfHostMemory;
                 break;
             case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-                _type = VulkanResultType::ErrorOutOfDeviceMemory;
+                _type = ApiResultType::ErrorOutOfDeviceMemory;
                 break;
             case VK_ERROR_INITIALIZATION_FAILED:
-                _type = VulkanResultType::ErrorInitializationFailed;
+                _type = ApiResultType::ErrorInitializationFailed;
                 break;
             case VK_ERROR_DEVICE_LOST:
-                _type = VulkanResultType::ErrorDeviceLost;
+                _type = ApiResultType::ErrorDeviceLost;
                 break;
             case VK_ERROR_MEMORY_MAP_FAILED:
-                _type = VulkanResultType::ErrorMemoryMapFailed;
+                _type = ApiResultType::ErrorMemoryMapFailed;
                 break;
             case VK_ERROR_LAYER_NOT_PRESENT:
-                _type = VulkanResultType::ErrorLayerNotPresent;
+                _type = ApiResultType::ErrorLayerNotPresent;
                 break;
             case VK_ERROR_EXTENSION_NOT_PRESENT:
-                _type = VulkanResultType::ErrorExtensionNotPresent;
+                _type = ApiResultType::ErrorExtensionNotPresent;
                 break;
             case VK_ERROR_FEATURE_NOT_PRESENT:
-                _type = VulkanResultType::ErrorFeatureNotPresent;
+                _type = ApiResultType::ErrorFeatureNotPresent;
                 break;
             case VK_ERROR_INCOMPATIBLE_DRIVER:
-                _type = VulkanResultType::ErrorIncompatibleDriver;
+                _type = ApiResultType::ErrorIncompatibleDriver;
                 break;
             case VK_ERROR_TOO_MANY_OBJECTS:
-                _type = VulkanResultType::ErrorTooManyObjects;
+                _type = ApiResultType::ErrorTooManyObjects;
                 break;
             case VK_ERROR_FORMAT_NOT_SUPPORTED:
-                _type = VulkanResultType::ErrorFormatNotSupported;
+                _type = ApiResultType::ErrorFormatNotSupported;
                 break;
             case VK_ERROR_FRAGMENTED_POOL:
-                _type = VulkanResultType::ErrorFragmentedPool;
+                _type = ApiResultType::ErrorFragmentedPool;
                 break;
             case VK_ERROR_UNKNOWN:
-                _type = VulkanResultType::ErrorUnknown;
+                _type = ApiResultType::ErrorUnknown;
                 break;
             case VK_ERROR_OUT_OF_POOL_MEMORY:
-                _type = VulkanResultType::ErrorOutOfPoolMemory;
+                _type = ApiResultType::ErrorOutOfPoolMemory;
                 break;
             case VK_ERROR_INVALID_EXTERNAL_HANDLE:
-                _type = VulkanResultType::ErrorInvalidExternalHandle;
+                _type = ApiResultType::ErrorInvalidExternalHandle;
                 break;
             case VK_ERROR_FRAGMENTATION:
-                _type = VulkanResultType::ErrorFragmentation;
+                _type = ApiResultType::ErrorFragmentation;
                 break;
             case VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS:
-                _type = VulkanResultType::ErrorInvalidOpaqueCaptureAddress;
+                _type = ApiResultType::ErrorInvalidOpaqueCaptureAddress;
                 break;
             case VK_PIPELINE_COMPILE_REQUIRED:
-                _type = VulkanResultType::PipelineCompileRequired;
+                _type = ApiResultType::PipelineCompileRequired;
                 break;
             case VK_ERROR_SURFACE_LOST_KHR:
-                _type = VulkanResultType::ErrorSurfaceLostKhr;
+                _type = ApiResultType::ErrorSurfaceLostKhr;
                 break;
             case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR:
-                _type = VulkanResultType::ErrorNativeWindowInUseKhr;
+                _type = ApiResultType::ErrorNativeWindowInUseKhr;
                 break;
             case VK_SUBOPTIMAL_KHR:
-                _type = VulkanResultType::SuboptimalKhr;
+                _type = ApiResultType::SuboptimalKhr;
                 break;
             case VK_ERROR_OUT_OF_DATE_KHR:
-                _type = VulkanResultType::ErrorOutOfDateKhr;
+                _type = ApiResultType::ErrorOutOfDateKhr;
                 break;
             case VK_ERROR_INCOMPATIBLE_DISPLAY_KHR:
-                _type = VulkanResultType::ErrorIncompatibleDisplayKhr;
+                _type = ApiResultType::ErrorIncompatibleDisplayKhr;
                 break;
             case VK_ERROR_VALIDATION_FAILED_EXT:
-                _type = VulkanResultType::ErrorValidationFailedExt;
+                _type = ApiResultType::ErrorValidationFailedExt;
                 break;
             case VK_ERROR_INVALID_SHADER_NV:
-                _type = VulkanResultType::ErrorInvalidShaderNv;
+                _type = ApiResultType::ErrorInvalidShaderNv;
                 break;
             case VK_ERROR_IMAGE_USAGE_NOT_SUPPORTED_KHR:
-                _type = VulkanResultType::ErrorImageUsageNotSupportedKhr;
+                _type = ApiResultType::ErrorImageUsageNotSupportedKhr;
                 break;
             case VK_ERROR_VIDEO_PICTURE_LAYOUT_NOT_SUPPORTED_KHR:
                 _type =
-                    VulkanResultType::ErrorVideoPictureLayoutNotSupportedKhr;
+                    ApiResultType::ErrorVideoPictureLayoutNotSupportedKhr;
                 break;
             case VK_ERROR_VIDEO_PROFILE_OPERATION_NOT_SUPPORTED_KHR:
                 _type =
-                    VulkanResultType::ErrorVideoProfileOperationNotSupportedKhr;
+                    ApiResultType::ErrorVideoProfileOperationNotSupportedKhr;
                 break;
             case VK_ERROR_VIDEO_PROFILE_FORMAT_NOT_SUPPORTED_KHR:
                 _type =
-                    VulkanResultType::ErrorVideoProfileFormatNotSupportedKhr;
+                    ApiResultType::ErrorVideoProfileFormatNotSupportedKhr;
                 break;
             case VK_ERROR_VIDEO_PROFILE_CODEC_NOT_SUPPORTED_KHR:
-                _type = VulkanResultType::ErrorVideoProfileCodecNotSupportedKhr;
+                _type = ApiResultType::ErrorVideoProfileCodecNotSupportedKhr;
                 break;
             case VK_ERROR_VIDEO_STD_VERSION_NOT_SUPPORTED_KHR:
-                _type = VulkanResultType::ErrorVideoStdVersionNotSupportedKhr;
+                _type = ApiResultType::ErrorVideoStdVersionNotSupportedKhr;
                 break;
             case VK_ERROR_NOT_PERMITTED_KHR:
-                _type = VulkanResultType::ErrorNotPermittedKhr;
+                _type = ApiResultType::ErrorNotPermittedKhr;
                 break;
             case VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT:
-                _type = VulkanResultType::ErrorFullScreenExclusiveModeLostExt;
+                _type = ApiResultType::ErrorFullScreenExclusiveModeLostExt;
                 break;
             case VK_THREAD_IDLE_KHR:
-                _type = VulkanResultType::ThreadIdleKhr;
+                _type = ApiResultType::ThreadIdleKhr;
                 break;
             case VK_THREAD_DONE_KHR:
-                _type = VulkanResultType::ThreadDoneKhr;
+                _type = ApiResultType::ThreadDoneKhr;
                 break;
             case VK_OPERATION_DEFERRED_KHR:
-                _type = VulkanResultType::OperationDeferredKhr;
+                _type = ApiResultType::OperationDeferredKhr;
                 break;
             case VK_OPERATION_NOT_DEFERRED_KHR:
-                _type = VulkanResultType::OperationNotDeferredKhr;
+                _type = ApiResultType::OperationNotDeferredKhr;
                 break;
             case VK_ERROR_COMPRESSION_EXHAUSTED_EXT:
-                _type = VulkanResultType::ErrorCompressionExhaustedExt;
+                _type = ApiResultType::ErrorCompressionExhaustedExt;
                 break;
             case VK_ERROR_INCOMPATIBLE_SHADER_BINARY_EXT:
-                _type = VulkanResultType::ErrorIncompatibleShaderBinaryExt;
+                _type = ApiResultType::ErrorIncompatibleShaderBinaryExt;
                 break;
             default:
-                _type = VulkanResultType::UndocumentedVkResult;
+                _type = ApiResultType::UndocumentedVkResult;
                 break;
             }
         }
 
-        constexpr VulkanResultType type() const
+        constexpr ApiResultType type() const
         {
             return _type;
         }
@@ -375,31 +376,330 @@ namespace beva
         std::string to_string() const;
 
     private:
-        VulkanResultType _type;
+        ApiResultType _type;
         VkResult _undocumented_vk_result;
 
     };
+
+    enum class AllocationScope : uint8_t
+    {
+        Command,
+        Object,
+        Cache,
+        Device,
+        Instance,
+        Unknown,
+        _
+    };
+
+    static constexpr const char* AllocationScope_string[]
+    {
+        "Command",
+        "Object",
+        "Cache",
+        "Device",
+        "Instance",
+        "Unknown"
+    };
+
+    constexpr const char* AllocationScope_to_string(
+        AllocationScope allocation_scope
+    )
+    {
+        if (allocation_scope >= AllocationScope::_)
+        {
+            throw std::exception(
+                "invalid enum value, this should never happen"
+            );
+        }
+        return AllocationScope_string[(uint8_t)allocation_scope];
+    }
+
+    enum class InternalAllocationType : uint8_t
+    {
+        Executable,
+        Unknown,
+        _
+    };
+
+    static constexpr const char* InternalAllocationType_string[]
+    {
+        "Executable",
+        "Unknown"
+    };
+
+    constexpr const char* InternalAllocationType_to_string(
+        InternalAllocationType allocation_type
+    )
+    {
+        if (allocation_type >= InternalAllocationType::_)
+        {
+            throw std::exception(
+                "invalid enum value, this should never happen"
+            );
+        }
+        return InternalAllocationType_string[(uint8_t)allocation_type];
+    }
+
+    enum class ApiVersion
+    {
+        Vulkan1_0,
+        Vulkan1_1,
+        Vulkan1_2,
+        Vulkan1_3
+    };
+
+    enum class ObjectType : uint8_t
+    {
+        Unknown,
+        Instance,
+        PhysicalDevice,
+        Device,
+        Queue,
+        Semaphore,
+        CommandBuffer,
+        Fence,
+        DeviceMemory,
+        Buffer,
+        Image,
+        Event,
+        QueryPool,
+        BufferView,
+        ImageView,
+        ShaderModule,
+        PipelineCache,
+        PipelineLayout,
+        RenderPass,
+        Pipeline,
+        DescriptorSetLayout,
+        Sampler,
+        DescriptorPool,
+        DescriptorSet,
+        Framebuffer,
+        CommandPool,
+        SamplerYcbcrConversion,
+        DescriptorUpdateTemplate,
+        PrivateDataSlot,
+        Surface,
+        Swapchain,
+        Display,
+        DisplayMode,
+        DebugReportCallback,
+        VideoSession,
+        VideoSessionParameters,
+        CuModuleNvx,
+        CuFunctionNvx,
+        DebugMessenger,
+        AccelerationStructure,
+        ValidationCache,
+        AccelerationStructureNv,
+        PerformanceConfigurationIntel,
+        DeferredOperation,
+        IndirectCommandsLayoutNv,
+        BufferCollectionFuchsia,
+        Micromap,
+        OpticalFlowSessionNv,
+        Shader,
+        _
+    };
+
+    static constexpr const char* ObjectType_string[]
+    {
+        "Unknown",
+        "Instance",
+        "PhysicalDevice",
+        "Device",
+        "Queue",
+        "Semaphore",
+        "CommandBuffer",
+        "Fence",
+        "DeviceMemory",
+        "Buffer",
+        "Image",
+        "Event",
+        "QueryPool",
+        "BufferView",
+        "ImageView",
+        "ShaderModule",
+        "PipelineCache",
+        "PipelineLayout",
+        "RenderPass",
+        "Pipeline",
+        "DescriptorSetLayout",
+        "Sampler",
+        "DescriptorPool",
+        "DescriptorSet",
+        "Framebuffer",
+        "CommandPool",
+        "SamplerYcbcrConversion",
+        "DescriptorUpdateTemplate",
+        "PrivateDataSlot",
+        "Surface",
+        "Swapchain",
+        "Display",
+        "DisplayMode",
+        "DebugReportCallback",
+        "VideoSession",
+        "VideoSessionParameters",
+        "CuModuleNvx",
+        "CuFunctionNvx",
+        "DebugMessenger",
+        "AccelerationStructure",
+        "ValidationCache",
+        "AccelerationStructureNv",
+        "PerformanceConfigurationIntel",
+        "DeferredOperation",
+        "IndirectCommandsLayoutNv",
+        "BufferCollectionFuchsia",
+        "Micromap",
+        "OpticalFlowSessionNv",
+        "Shader"
+    };
+
+    constexpr const char* ObjectType_to_string(ObjectType object_type)
+    {
+        if (object_type >= ObjectType::_)
+        {
+            throw std::exception(
+                "invalid enum value, this should never happen"
+            );
+        }
+        return ObjectType_string[(uint8_t)object_type];
+    }
+
+    constexpr ObjectType ObjectType_from_VkObjectType(
+        VkObjectType vk_object_type
+    )
+    {
+        switch (vk_object_type)
+        {
+        case VK_OBJECT_TYPE_UNKNOWN:
+            return ObjectType::Unknown;
+        case VK_OBJECT_TYPE_INSTANCE:
+            return ObjectType::Instance;
+        case VK_OBJECT_TYPE_PHYSICAL_DEVICE:
+            return ObjectType::PhysicalDevice;
+        case VK_OBJECT_TYPE_DEVICE:
+            return ObjectType::Device;
+        case VK_OBJECT_TYPE_QUEUE:
+            return ObjectType::Queue;
+        case VK_OBJECT_TYPE_SEMAPHORE:
+            return ObjectType::Semaphore;
+        case VK_OBJECT_TYPE_COMMAND_BUFFER:
+            return ObjectType::CommandBuffer;
+        case VK_OBJECT_TYPE_FENCE:
+            return ObjectType::Fence;
+        case VK_OBJECT_TYPE_DEVICE_MEMORY:
+            return ObjectType::DeviceMemory;
+        case VK_OBJECT_TYPE_BUFFER:
+            return ObjectType::Buffer;
+        case VK_OBJECT_TYPE_IMAGE:
+            return ObjectType::Image;
+        case VK_OBJECT_TYPE_EVENT:
+            return ObjectType::Event;
+        case VK_OBJECT_TYPE_QUERY_POOL:
+            return ObjectType::QueryPool;
+        case VK_OBJECT_TYPE_BUFFER_VIEW:
+            return ObjectType::BufferView;
+        case VK_OBJECT_TYPE_IMAGE_VIEW:
+            return ObjectType::ImageView;
+        case VK_OBJECT_TYPE_SHADER_MODULE:
+            return ObjectType::ShaderModule;
+        case VK_OBJECT_TYPE_PIPELINE_CACHE:
+            return ObjectType::PipelineCache;
+        case VK_OBJECT_TYPE_PIPELINE_LAYOUT:
+            return ObjectType::PipelineLayout;
+        case VK_OBJECT_TYPE_RENDER_PASS:
+            return ObjectType::RenderPass;
+        case VK_OBJECT_TYPE_PIPELINE:
+            return ObjectType::Pipeline;
+        case VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT:
+            return ObjectType::DescriptorSetLayout;
+        case VK_OBJECT_TYPE_SAMPLER:
+            return ObjectType::Sampler;
+        case VK_OBJECT_TYPE_DESCRIPTOR_POOL:
+            return ObjectType::DescriptorPool;
+        case VK_OBJECT_TYPE_DESCRIPTOR_SET:
+            return ObjectType::DescriptorSet;
+        case VK_OBJECT_TYPE_FRAMEBUFFER:
+            return ObjectType::Framebuffer;
+        case VK_OBJECT_TYPE_COMMAND_POOL:
+            return ObjectType::CommandPool;
+        case VK_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION:
+            return ObjectType::SamplerYcbcrConversion;
+        case VK_OBJECT_TYPE_DESCRIPTOR_UPDATE_TEMPLATE:
+            return ObjectType::DescriptorUpdateTemplate;
+        case VK_OBJECT_TYPE_PRIVATE_DATA_SLOT:
+            return ObjectType::PrivateDataSlot;
+        case VK_OBJECT_TYPE_SURFACE_KHR:
+            return ObjectType::Surface;
+        case VK_OBJECT_TYPE_SWAPCHAIN_KHR:
+            return ObjectType::Swapchain;
+        case VK_OBJECT_TYPE_DISPLAY_KHR:
+            return ObjectType::Display;
+        case VK_OBJECT_TYPE_DISPLAY_MODE_KHR:
+            return ObjectType::DisplayMode;
+        case VK_OBJECT_TYPE_DEBUG_REPORT_CALLBACK_EXT:
+            return ObjectType::DebugReportCallback;
+        case VK_OBJECT_TYPE_VIDEO_SESSION_KHR:
+            return ObjectType::VideoSession;
+        case VK_OBJECT_TYPE_VIDEO_SESSION_PARAMETERS_KHR:
+            return ObjectType::VideoSessionParameters;
+        case VK_OBJECT_TYPE_CU_MODULE_NVX:
+            return ObjectType::CuModuleNvx;
+        case VK_OBJECT_TYPE_CU_FUNCTION_NVX:
+            return ObjectType::CuFunctionNvx;
+        case VK_OBJECT_TYPE_DEBUG_UTILS_MESSENGER_EXT:
+            return ObjectType::DebugMessenger;
+        case VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR:
+            return ObjectType::AccelerationStructure;
+        case VK_OBJECT_TYPE_VALIDATION_CACHE_EXT:
+            return ObjectType::ValidationCache;
+        case VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_NV:
+            return ObjectType::AccelerationStructureNv;
+        case VK_OBJECT_TYPE_PERFORMANCE_CONFIGURATION_INTEL:
+            return ObjectType::PerformanceConfigurationIntel;
+        case VK_OBJECT_TYPE_DEFERRED_OPERATION_KHR:
+            return ObjectType::DeferredOperation;
+        case VK_OBJECT_TYPE_INDIRECT_COMMANDS_LAYOUT_NV:
+            return ObjectType::IndirectCommandsLayoutNv;
+        case VK_OBJECT_TYPE_BUFFER_COLLECTION_FUCHSIA:
+            return ObjectType::BufferCollectionFuchsia;
+        case VK_OBJECT_TYPE_MICROMAP_EXT:
+            return ObjectType::Micromap;
+        case VK_OBJECT_TYPE_OPTICAL_FLOW_SESSION_NV:
+            return ObjectType::OpticalFlowSessionNv;
+        case VK_OBJECT_TYPE_SHADER_EXT:
+            return ObjectType::Shader;
+        default:
+            return ObjectType::Unknown;
+        }
+    }
+
+#pragma endregion
+
+#pragma region error handling
 
     class Error
     {
     public:
         constexpr Error()
-            : _vulkan_result(VK_SUCCESS)
+            : _api_result(VK_SUCCESS)
         {}
 
-        constexpr Error(VulkanResult vulkan_result)
-            : _vulkan_result(vulkan_result)
+        constexpr Error(ApiResult api_result)
+            : _api_result(api_result)
         {}
 
-        constexpr VulkanResult vulkan_result() const
+        constexpr ApiResult api_result() const
         {
-            return _vulkan_result;
+            return _api_result;
         }
 
         std::string to_string() const;
 
     private:
-        VulkanResult _vulkan_result;
+        ApiResult _api_result;
 
     };
 
@@ -502,50 +802,6 @@ namespace beva
 
 #pragma endregion
 
-    class Context;
-
-#pragma region memory allocation
-
-    enum class AllocationScope : uint8_t
-    {
-        Command,
-        Object,
-        Cache,
-        Device,
-        Instance,
-        Unknown,
-        _
-    };
-
-    static constexpr const char* AllocationScope_string[]
-    {
-        "Command",
-        "Object",
-        "Cache",
-        "Device",
-        "Instance",
-        "Unknown"
-    };
-
-    const char* AllocationScope_to_string(AllocationScope allocation_scope);
-
-    enum class InternalAllocationType : uint8_t
-    {
-        Executable,
-        Unknown,
-        _
-    };
-
-    static constexpr const char* InternalAllocationType_string[]
-    {
-        "Executable",
-        "Unknown"
-    };
-
-    const char* InternalAllocationType_to_string(
-        InternalAllocationType allocation_type
-    );
-
     class Allocator
     {
     public:
@@ -578,8 +834,6 @@ namespace beva
 
     };
 
-#pragma endregion
-
     struct Version
     {
         uint8_t variant : 8 = 0;
@@ -602,14 +856,6 @@ namespace beva
 
     };
 
-    enum class ApiVersion
-    {
-        Vulkan1_0,
-        Vulkan1_1,
-        Vulkan1_2,
-        Vulkan1_3
-    };
-
     struct ExtensionProperties
     {
         std::string name;
@@ -630,6 +876,9 @@ namespace beva
         // which specifies that the instance will enumerate available Vulkan
         // Portability-compliant physical devices and groups in addition to the
         // Vulkan physical devices and groups that are enumerated by default.
+        // you might want to enable the
+        // VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME extension when using
+        // this.
         bool will_enumerate_portability = false;
 
         std::string app_name;
@@ -648,13 +897,14 @@ namespace beva
     {
     public:
         Context() = delete;
+        Context(const Context& other) = delete;
         Context(Context&& other);
 
         // it's best to keep at least one external reference to the allocator
         // so that it doesn't die with the Context because the driver might
         // still use the allocator even after the instance is destroyed and
         // everything is seemingly cleaned up.
-        static Result<Context> create(
+        static Result<std::shared_ptr<Context>> create(
             const ContextConfig& config,
             const std::shared_ptr<Allocator>& allocator = nullptr
         );
@@ -685,13 +935,13 @@ namespace beva
 
         ~Context();
 
-    private:
+    protected:
         ContextConfig _config;
 
         std::shared_ptr<Allocator> _allocator = nullptr;
         VkAllocationCallbacks vk_allocator{ 0 };
 
-        VkInstance instance = nullptr;
+        VkInstance vk_instance = nullptr;
 
         Context(
             const ContextConfig& config,
@@ -699,6 +949,124 @@ namespace beva
         );
 
         const VkAllocationCallbacks* vk_allocator_ptr() const;
+
+        friend class DebugMessenger;
+
+    };
+
+    struct DebugMessageSeverityFlags
+    {
+        // diagnostic message
+        bool verbose : 1;
+
+        // informational message like the creation of a resource
+        bool info : 1;
+
+        // message about behavior that is not necessarily an error, but very
+        // likely a bug in your application
+        bool warning : 1;
+
+        // message about behavior that is invalid and may cause crashes
+        bool error : 1;
+    };
+
+    struct DebugMessageTypeFlags
+    {
+        // some event has happened that is unrelated to the specification or
+        // performance
+        bool general : 1;
+
+        // something has happened that violates the specification or indicates a
+        // possible mistake
+        bool validation : 1;
+
+        // potential non-optimal use of Vulkan
+        bool performance : 1;
+
+        // the implementation has modified the set of GPU-visible virtual
+        // addresses associated with a Vulkan object
+        bool device_address_binding : 1;
+    };
+
+    struct DebugLabel
+    {
+        std::string name;
+        std::array<float, 4> color;
+    };
+
+    struct DebugObjectInfo
+    {
+        ObjectType type;
+        uint64_t handle;
+        std::string name;
+    };
+
+    struct DebugMessageData
+    {
+        std::string message_id_name;
+        int32_t message_id_number;
+        std::string message;
+        std::vector<DebugLabel> queue_labels;
+        std::vector<DebugLabel> cmd_buf_labels;
+        std::vector<DebugObjectInfo> objects;
+    };
+
+    using DebugCallback = std::function<void(
+        DebugMessageSeverityFlags,
+        DebugMessageTypeFlags,
+        DebugMessageData
+        )>;
+
+    // requires extension VK_EXT_DEBUG_UTILS_EXTENSION_NAME
+    class DebugMessenger
+    {
+    public:
+        DebugMessenger(const DebugMessenger& other) = delete;
+        DebugMessenger(DebugMessenger&& other);
+
+        static Result<std::shared_ptr<DebugMessenger>> create(
+            const std::shared_ptr<Context>& context,
+            DebugMessageSeverityFlags message_severity_flags,
+            DebugMessageTypeFlags message_type_flags,
+            const DebugCallback& callback
+        );
+
+        constexpr const std::shared_ptr<Context>& context() const
+        {
+            return _context;
+        }
+
+        constexpr DebugMessageSeverityFlags message_severity_flags() const
+        {
+            return _message_severity_flags;
+        }
+
+        constexpr DebugMessageTypeFlags message_type_flags() const
+        {
+            return _message_type_flags;
+        }
+
+        constexpr const DebugCallback& callback() const
+        {
+            return _callback;
+        }
+
+        ~DebugMessenger();
+
+    protected:
+        std::shared_ptr<Context> _context;
+        VkDebugUtilsMessengerEXT vk_debug_messenger;
+
+        DebugMessageSeverityFlags _message_severity_flags;
+        DebugMessageTypeFlags _message_type_flags;
+        DebugCallback _callback;
+
+        DebugMessenger(
+            const std::shared_ptr<Context>& context,
+            DebugMessageSeverityFlags message_severity_flags,
+            DebugMessageTypeFlags message_type_flags,
+            const DebugCallback& callback
+        );
 
     };
 

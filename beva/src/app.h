@@ -21,8 +21,11 @@ namespace beva_demo
         static constexpr int initial_width = 960;
         static constexpr int initial_height = 720;
 
+        static constexpr bool debug_mode = true;
+
         GLFWwindow* window;
-        std::unique_ptr<beva::Context> context = nullptr;
+        std::shared_ptr<beva::Context> context = nullptr;
+        std::shared_ptr<beva::DebugMessenger> debug_messenger = nullptr;
 
         void init_window();
         void init_context();
