@@ -19,8 +19,34 @@
 namespace beva
 {
 
-#pragma region enums
+    template<typename T, size_t size>
+    std::array<T, size> raw_arr_to_std(T* raw_arr)
+    {
+        std::array<T, size> arr;
+        std::copy(raw_arr, raw_arr + size, arr.data());
+        return arr;
+    }
 
+#pragma region enums and flags
+
+    // enum must have a value named _ at the end. enum must be based on uint8_t.
+    // there must be a static constexpr const char* array named EnumName_string
+    // representing the enum values as strings.
+#define BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(EnumName) \
+    constexpr const char* EnumName##_to_string( \
+        EnumName v \
+    ) \
+    { \
+        if (v >= EnumName::_) \
+        { \
+            throw std::exception( \
+                "invalid enum value, this should never happen" \
+            ); \
+        } \
+        return EnumName##_string[(uint8_t)v]; \
+    }
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkResult.html
     enum class ApiResultType : uint8_t
     {
         Success,
@@ -381,6 +407,7 @@ namespace beva
 
     };
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSystemAllocationScope.html
     enum class AllocationScope : uint8_t
     {
         Command,
@@ -402,19 +429,9 @@ namespace beva
         "Unknown"
     };
 
-    constexpr const char* AllocationScope_to_string(
-        AllocationScope allocation_scope
-    )
-    {
-        if (allocation_scope >= AllocationScope::_)
-        {
-            throw std::exception(
-                "invalid enum value, this should never happen"
-            );
-        }
-        return AllocationScope_string[(uint8_t)allocation_scope];
-    }
+    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(AllocationScope);
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkInternalAllocationType.html
     enum class InternalAllocationType : uint8_t
     {
         Executable,
@@ -428,27 +445,138 @@ namespace beva
         "Unknown"
     };
 
-    constexpr const char* InternalAllocationType_to_string(
-        InternalAllocationType allocation_type
-    )
-    {
-        if (allocation_type >= InternalAllocationType::_)
-        {
-            throw std::exception(
-                "invalid enum value, this should never happen"
-            );
-        }
-        return InternalAllocationType_string[(uint8_t)allocation_type];
-    }
+    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(InternalAllocationType);
 
-    enum class ApiVersion
+
+    enum class VulkanApiVersion
     {
         Vulkan1_0,
         Vulkan1_1,
         Vulkan1_2,
-        Vulkan1_3
+        Vulkan1_3,
+        _
     };
 
+    static constexpr const char* VulkanApiVersion_string[]
+    {
+        "Vulkan 1.0",
+        "Vulkan 1.1",
+        "Vulkan 1.2",
+        "Vulkan 1.3"
+    };
+
+    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(VulkanApiVersion);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceType.html
+    enum class PhysicalDeviceType : uint8_t
+    {
+        Other,
+        IntegratedGpu,
+        DiscreteGpu,
+        VirtualGpu,
+        Cpu,
+        _
+    };
+
+    static constexpr const char* PhysicalDeviceType_string[]
+    {
+        "Other",
+        "Integrated GPU",
+        "Discrete GPU",
+        "Virtual GPU",
+        "CPU"
+    };
+
+    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(PhysicalDeviceType);
+
+    constexpr PhysicalDeviceType PhysicalDeviceType_from_VkPhysicalDeviceType(
+        VkPhysicalDeviceType vk_physical_device_type
+    )
+    {
+        switch (vk_physical_device_type)
+        {
+        case VK_PHYSICAL_DEVICE_TYPE_OTHER:
+            return PhysicalDeviceType::Other;
+        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+            return PhysicalDeviceType::IntegratedGpu;
+        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+            return PhysicalDeviceType::DiscreteGpu;
+        case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+            return PhysicalDeviceType::VirtualGpu;
+        case VK_PHYSICAL_DEVICE_TYPE_CPU:
+            return PhysicalDeviceType::Cpu;
+        default:
+            return PhysicalDeviceType::Other;
+        }
+    }
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSampleCountFlagBits.html
+    struct SampleCountFlags
+    {
+        bool _1 : 1;
+        bool _2 : 1;
+        bool _4 : 1;
+        bool _8 : 1;
+        bool _16 : 1;
+        bool _32 : 1;
+        bool _64 : 1;
+
+        SampleCountFlags() = default;
+
+    private:
+        constexpr SampleCountFlags(VkSampleCountFlags vk_flags)
+            : _1(vk_flags& VK_SAMPLE_COUNT_1_BIT),
+            _2(vk_flags& VK_SAMPLE_COUNT_2_BIT),
+            _4(vk_flags& VK_SAMPLE_COUNT_4_BIT),
+            _8(vk_flags& VK_SAMPLE_COUNT_8_BIT),
+            _16(vk_flags& VK_SAMPLE_COUNT_16_BIT),
+            _32(vk_flags& VK_SAMPLE_COUNT_32_BIT),
+            _64(vk_flags& VK_SAMPLE_COUNT_64_BIT)
+        {}
+
+        friend class Context;
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSampleCountFlagBits.html
+    enum class SampleCount : uint8_t
+    {
+        _1,
+        _2,
+        _4,
+        _8,
+        _16,
+        _32,
+        _64,
+        _
+    };
+
+    static constexpr const char* SampleCount_string[]
+    {
+        "1",
+        "2",
+        "4",
+        "8",
+        "16",
+        "32",
+        "64"
+    };
+
+    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(SampleCount);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueueFlagBits.html
+    struct QueueFlags
+    {
+        bool graphics : 1;
+        bool compute : 1;
+        bool transfer : 1;
+        bool sparse_binding : 1;
+        bool protected_ : 1;
+        bool video_decode : 1;
+        bool optical_flow_nv : 1;
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkObjectType.html
     enum class ObjectType : uint8_t
     {
         Unknown,
@@ -556,16 +684,7 @@ namespace beva
         "Shader"
     };
 
-    constexpr const char* ObjectType_to_string(ObjectType object_type)
-    {
-        if (object_type >= ObjectType::_)
-        {
-            throw std::exception(
-                "invalid enum value, this should never happen"
-            );
-        }
-        return ObjectType_string[(uint8_t)object_type];
-    }
+    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(ObjectType);
 
     constexpr ObjectType ObjectType_from_VkObjectType(
         VkObjectType vk_object_type
@@ -675,6 +794,64 @@ namespace beva
             return ObjectType::Unknown;
         }
     }
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessageSeverityFlagBitsEXT.html
+    struct DebugMessageSeverityFlags
+    {
+        bool verbose : 1;
+        bool info : 1;
+        bool warning : 1;
+        bool error : 1;
+    };
+
+    // // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessageTypeFlagBitsEXT.html
+    struct DebugMessageTypeFlags
+    {
+        bool general : 1;
+        bool validation : 1;
+        bool performance : 1;
+        bool device_address_binding : 1;
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessageSeverityFlagBitsEXT.html
+    enum class DebugMessageSeverity : uint8_t
+    {
+        Verbose,
+        Info,
+        Warning,
+        Error,
+        _
+    };
+
+    static constexpr const char* DebugMessageSeverity_string[]
+    {
+        "Verbose",
+        "Info",
+        "Warning",
+        "Error"
+    };
+
+    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(DebugMessageSeverity);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessageTypeFlagBitsEXT.html
+    enum class DebugMessageType : uint8_t
+    {
+        General,
+        Validation,
+        Performance,
+        DeviceAddressBinding,
+        _
+    };
+
+    static constexpr const char* DebugMessageType_string[]
+    {
+        "General",
+        "Validation",
+        "Performance",
+        "Device Address Binding"
+    };
+
+    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(DebugMessageType);
 
 #pragma endregion
 
@@ -802,6 +979,7 @@ namespace beva
 
 #pragma endregion
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkAllocationCallbacks.html
     class Allocator
     {
     public:
@@ -834,6 +1012,7 @@ namespace beva
 
     };
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_MAKE_API_VERSION.html
     struct Version
     {
         uint8_t variant : 8 = 0;
@@ -852,22 +1031,313 @@ namespace beva
             : variant(variant), major(major), minor(minor), patch(patch)
         {}
 
+        constexpr Version(uint32_t encoded)
+            : variant(VK_API_VERSION_VARIANT(encoded)),
+            major(VK_API_VERSION_MAJOR(encoded)),
+            minor(VK_API_VERSION_MINOR(encoded)),
+            patch(VK_API_VERSION_PATCH(encoded))
+        {}
+
         std::string to_string() const;
 
     };
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtensionProperties.html
     struct ExtensionProperties
     {
         std::string name;
         uint32_t spec_version;
     };
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkLayerProperties.html
     struct LayerProperties
     {
         std::string name;
         Version spec_version;
         uint32_t implementation_version;
         std::string description;
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
+    struct PhysicalDeviceLimits
+    {
+        uint32_t max_image_dimension1d;
+        uint32_t max_image_dimension2d;
+        uint32_t max_image_dimension3d;
+        uint32_t max_image_dimension_cube;
+        uint32_t max_image_array_layers;
+        uint32_t max_texel_buffer_elements;
+        uint32_t max_uniform_buffer_range;
+        uint32_t max_storage_buffer_range;
+        uint32_t max_push_constants_size;
+        uint32_t max_memory_allocation_count;
+        uint32_t max_sampler_allocation_count;
+        uint64_t buffer_image_granularity;
+        uint64_t sparse_address_space_size;
+        uint32_t max_bound_descriptor_sets;
+        uint32_t max_per_stage_descriptor_samplers;
+        uint32_t max_per_stage_descriptor_uniform_buffers;
+        uint32_t max_per_stage_descriptor_storage_buffers;
+        uint32_t max_per_stage_descriptor_sampled_images;
+        uint32_t max_per_stage_descriptor_storage_images;
+        uint32_t max_per_stage_descriptor_input_attachments;
+        uint32_t max_per_stage_resources;
+        uint32_t max_descriptor_set_samplers;
+        uint32_t max_descriptor_set_uniform_buffers;
+        uint32_t max_descriptor_set_uniform_buffers_dynamic;
+        uint32_t max_descriptor_set_storage_buffers;
+        uint32_t max_descriptor_set_storage_buffers_dynamic;
+        uint32_t max_descriptor_set_sampled_images;
+        uint32_t max_descriptor_set_storage_images;
+        uint32_t max_descriptor_set_input_attachments;
+        uint32_t max_vertex_input_attributes;
+        uint32_t max_vertex_input_bindings;
+        uint32_t max_vertex_input_attribute_offset;
+        uint32_t max_vertex_input_binding_stride;
+        uint32_t max_vertex_output_components;
+        uint32_t max_tessellation_generation_level;
+        uint32_t max_tessellation_patch_size;
+        uint32_t max_tessellation_control_per_vertex_input_components;
+        uint32_t max_tessellation_control_per_vertex_output_components;
+        uint32_t max_tessellation_control_per_patch_output_components;
+        uint32_t max_tessellation_control_total_output_components;
+        uint32_t max_tessellation_evaluation_input_components;
+        uint32_t max_tessellation_evaluation_output_components;
+        uint32_t max_geometry_shader_invocations;
+        uint32_t max_geometry_input_components;
+        uint32_t max_geometry_output_components;
+        uint32_t max_geometry_output_vertices;
+        uint32_t max_geometry_total_output_components;
+        uint32_t max_fragment_input_components;
+        uint32_t max_fragment_output_attachments;
+        uint32_t max_fragment_dual_src_attachments;
+        uint32_t max_fragment_combined_output_resources;
+        uint32_t max_compute_shared_memory_size;
+        std::array<uint32_t, 3> max_compute_work_group_count;
+        uint32_t max_compute_work_group_invocations;
+        std::array<uint32_t, 3> max_compute_work_group_size;
+        uint32_t sub_pixel_precision_bits;
+        uint32_t sub_texel_precision_bits;
+        uint32_t mipmap_precision_bits;
+        uint32_t max_draw_indexed_index_value;
+        uint32_t max_draw_indirect_count;
+        float max_sampler_lod_bias;
+        float max_sampler_anisotropy;
+        uint32_t max_viewports;
+        std::array<uint32_t, 2> max_viewport_dimensions;
+        std::array<float, 2> viewport_bounds_range;
+        uint32_t viewport_sub_pixel_bits;
+        size_t min_memory_map_alignment;
+        uint64_t min_texel_buffer_offset_alignment;
+        uint64_t min_uniform_buffer_offset_alignment;
+        uint64_t min_storage_buffer_offset_alignment;
+        int32_t min_texel_offset;
+        uint32_t max_texel_offset;
+        int32_t min_texel_gather_offset;
+        uint32_t max_texel_gather_offset;
+        float min_interpolation_offset;
+        float max_interpolation_offset;
+        uint32_t sub_pixel_interpolation_offset_bits;
+        uint32_t max_framebuffer_width;
+        uint32_t max_framebuffer_height;
+        uint32_t max_framebuffer_layers;
+        SampleCountFlags framebuffer_color_sample_counts;
+        SampleCountFlags framebuffer_depth_sample_counts;
+        SampleCountFlags framebuffer_stencil_sample_counts;
+        SampleCountFlags framebuffer_no_attachments_sample_counts;
+        uint32_t max_color_attachments;
+        SampleCountFlags sampled_image_color_sample_counts;
+        SampleCountFlags sampled_image_integer_sample_counts;
+        SampleCountFlags sampled_image_depth_sample_counts;
+        SampleCountFlags sampled_image_stencil_sample_counts;
+        SampleCountFlags storage_image_sample_counts;
+        uint32_t max_sample_mask_words;
+        bool timestamp_compute_and_graphics;
+        float timestamp_period;
+        uint32_t max_clip_distances;
+        uint32_t max_cull_distances;
+        uint32_t max_combined_clip_and_cull_distances;
+        uint32_t discrete_queue_priorities;
+        std::array<float, 2> point_size_range;
+        std::array<float, 2> line_width_range;
+        float point_size_granularity;
+        float line_width_granularity;
+        bool strict_lines;
+        bool standard_sample_locations;
+        uint64_t optimal_buffer_copy_offset_alignment;
+        uint64_t optimal_buffer_copy_row_pitch_alignment;
+        uint64_t non_coherent_atom_size;
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceSparseProperties.html
+    struct PhysicalDeviceSparseProperties
+    {
+        bool residency_standard2d_block_shape : 1;
+        bool residency_standard2d_multisample_block_shape : 1;
+        bool residency_standard3d_block_shape : 1;
+        bool residency_aligned_mip_size : 1;
+        bool residency_non_resident_strict : 1;
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceProperties.html
+    struct PhysicalDeviceProperties
+    {
+        Version api_version;
+        uint32_t driver_version;
+        uint32_t vendor_id;
+        uint32_t device_id;
+        PhysicalDeviceType device_type;
+        std::string device_name;
+        std::array<uint8_t, VK_UUID_SIZE> pipeline_cache_uuid;
+        PhysicalDeviceLimits limits;
+        PhysicalDeviceSparseProperties sparse_properties;
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceFeatures.html
+    struct PhysicalDeviceFeatures
+    {
+        bool robust_buffer_access : 1;
+        bool full_draw_index_uint32 : 1;
+        bool image_cube_array : 1;
+        bool independent_blend : 1;
+        bool geometry_shader : 1;
+        bool tessellation_shader : 1;
+        bool sample_rate_shading : 1;
+        bool dual_src_blend : 1;
+        bool logic_op : 1;
+        bool multi_draw_indirect : 1;
+        bool draw_indirect_first_instance : 1;
+        bool depth_clamp : 1;
+        bool depth_bias_clamp : 1;
+        bool fill_mode_non_solid : 1;
+        bool depth_bounds : 1;
+        bool wide_lines : 1;
+        bool large_points : 1;
+        bool alpha_to_one : 1;
+        bool multi_viewport : 1;
+        bool sampler_anisotropy : 1;
+        bool texture_compression_etc2 : 1;
+        bool texture_compression_astc_ldr : 1;
+        bool texture_compression_bc : 1;
+        bool occlusion_query_precise : 1;
+        bool pipeline_statistics_query : 1;
+        bool vertex_pipeline_stores_and_atomics : 1;
+        bool fragment_stores_and_atomics : 1;
+        bool shader_tessellation_and_geometry_point_size : 1;
+        bool shader_image_gather_extended : 1;
+        bool shader_storage_image_extended_formats : 1;
+        bool shader_storage_image_multisample : 1;
+        bool shader_storage_image_read_without_format : 1;
+        bool shader_storage_image_write_without_format : 1;
+        bool shader_uniform_buffer_array_dynamic_indexing : 1;
+        bool shader_sampled_image_array_dynamic_indexing : 1;
+        bool shader_storage_buffer_array_dynamic_indexing : 1;
+        bool shader_storage_image_array_dynamic_indexing : 1;
+        bool shader_clip_distance : 1;
+        bool shader_cull_distance : 1;
+        bool shader_float64 : 1;
+        bool shader_int64 : 1;
+        bool shader_int16 : 1;
+        bool shader_resource_residency : 1;
+        bool shader_resource_min_lod : 1;
+        bool sparse_binding : 1;
+        bool sparse_residency_buffer : 1;
+        bool sparse_residency_image2d : 1;
+        bool sparse_residency_image3d : 1;
+        bool sparse_residency2_samples : 1;
+        bool sparse_residency4_samples : 1;
+        bool sparse_residency8_samples : 1;
+        bool sparse_residency16_samples : 1;
+        bool sparse_residency_aliased : 1;
+        bool variable_multisample_rate : 1;
+        bool inherited_queries : 1;
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent3D.html
+    struct Extent3D
+    {
+        uint32_t width;
+        uint32_t height;
+        uint32_t depth;
+
+        Extent3D() = default;
+
+    private:
+        constexpr Extent3D(const VkExtent3D& vk_extent_3d)
+            : width(vk_extent_3d.width),
+            height(vk_extent_3d.height),
+            depth(vk_extent_3d.depth)
+        {}
+
+        friend class Context;
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueueFamilyProperties.html
+    struct QueueFamily
+    {
+        QueueFlags queue_flags;
+        uint32_t queue_count;
+        uint32_t timestamp_valid_bits;
+        Extent3D min_image_transfer_granularity;
+    };
+
+    // index of the first queue family that supports the corresponding flag
+    struct QueueFamilyIndices
+    {
+        std::optional<uint32_t> graphics;
+        std::optional<uint32_t> compute;
+        std::optional<uint32_t> transfer;
+        std::optional<uint32_t> sparse_binding;
+        std::optional<uint32_t> protected_;
+        std::optional<uint32_t> video_decode;
+        std::optional<uint32_t> optical_flow_nv;
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDevice.html
+    class PhysicalDevice
+    {
+    public:
+        PhysicalDevice() = delete;
+
+        constexpr const PhysicalDeviceProperties& properties() const
+        {
+            return _properties;
+        }
+
+        constexpr const PhysicalDeviceFeatures& features() const
+        {
+            return _features;
+        }
+
+        constexpr const std::vector<QueueFamily>& queue_families() const
+        {
+            return _queue_families;
+        }
+
+        constexpr const QueueFamilyIndices& queue_family_indices() const
+        {
+            return _queue_family_indices;
+        }
+
+    private:
+        VkPhysicalDevice vk_physical_device;
+
+        PhysicalDeviceProperties _properties;
+        PhysicalDeviceFeatures _features;
+        std::vector<QueueFamily> _queue_families;
+        QueueFamilyIndices _queue_family_indices;
+
+        PhysicalDevice(
+            VkPhysicalDevice vk_physical_device,
+            const PhysicalDeviceProperties& properties,
+            const PhysicalDeviceFeatures& features,
+            const std::vector<QueueFamily>& queue_families,
+            const QueueFamilyIndices& queue_family_indices
+        );
+
+        friend class Context;
+
     };
 
     struct ContextConfig
@@ -887,7 +1357,7 @@ namespace beva
         std::string engine_name;
         Version engine_version;
 
-        ApiVersion api_version;
+        VulkanApiVersion vulkan_api_version;
 
         std::vector<std::string> layers;
         std::vector<std::string> extensions;
@@ -933,6 +1403,11 @@ namespace beva
             const std::shared_ptr<Allocator>& allocator
         );
 
+        constexpr const std::vector<PhysicalDevice>& physical_devices() const
+        {
+            return _physical_devices;
+        }
+
         ~Context();
 
     protected:
@@ -943,6 +1418,8 @@ namespace beva
 
         VkInstance vk_instance = nullptr;
 
+        std::vector<PhysicalDevice> _physical_devices;
+
         Context(
             const ContextConfig& config,
             const std::shared_ptr<Allocator>& allocator
@@ -950,42 +1427,10 @@ namespace beva
 
         const VkAllocationCallbacks* vk_allocator_ptr() const;
 
+        Result<> add_physical_devices();
+
         friend class DebugMessenger;
 
-    };
-
-    struct DebugMessageSeverityFlags
-    {
-        // diagnostic message
-        bool verbose : 1;
-
-        // informational message like the creation of a resource
-        bool info : 1;
-
-        // message about behavior that is not necessarily an error, but very
-        // likely a bug in your application
-        bool warning : 1;
-
-        // message about behavior that is invalid and may cause crashes
-        bool error : 1;
-    };
-
-    struct DebugMessageTypeFlags
-    {
-        // some event has happened that is unrelated to the specification or
-        // performance
-        bool general : 1;
-
-        // something has happened that violates the specification or indicates a
-        // possible mistake
-        bool validation : 1;
-
-        // potential non-optimal use of Vulkan
-        bool performance : 1;
-
-        // the implementation has modified the set of GPU-visible virtual
-        // addresses associated with a Vulkan object
-        bool device_address_binding : 1;
     };
 
     struct DebugLabel
@@ -1012,9 +1457,9 @@ namespace beva
     };
 
     using DebugCallback = std::function<void(
-        DebugMessageSeverityFlags,
-        DebugMessageTypeFlags,
-        DebugMessageData
+        DebugMessageSeverity,
+        DebugMessageType,
+        const beva::DebugMessageData&
         )>;
 
     // requires extension VK_EXT_DEBUG_UTILS_EXTENSION_NAME

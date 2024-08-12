@@ -23,6 +23,12 @@ namespace beva_demo
         init_window();
         init_context();
         setup_debug_messenger();
+
+        for (const auto& physical_device : context->physical_devices())
+        {
+            std::cout << physical_device.properties().device_name << '\n';
+        }
+
         main_loop();
         cleanup();
     }
@@ -85,7 +91,7 @@ namespace beva_demo
                 .app_version = beva::Version(1, 1, 0, 0),
                 .engine_name = "no engine",
                 .engine_version = beva::Version(1, 1, 0, 0),
-                .api_version = beva::ApiVersion::Vulkan1_0,
+                .vulkan_api_version = beva::VulkanApiVersion::Vulkan1_0,
                 .layers = layers,
                 .extensions = extensions
         };
@@ -127,9 +133,9 @@ namespace beva_demo
             severity_flags,
             type_flags,
             [](
-                beva::DebugMessageSeverityFlags message_severity_flags,
-                beva::DebugMessageTypeFlags message_type_flags,
-                beva::DebugMessageData message_data
+                beva::DebugMessageSeverity message_severity,
+                beva::DebugMessageType message_type,
+                const beva::DebugMessageData& message_data
                 )
             {
                 std::cout << message_data.message << '\n';
