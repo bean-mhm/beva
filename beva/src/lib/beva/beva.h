@@ -19,7 +19,7 @@
 namespace beva
 {
 
-    template<typename T, size_t size>
+    template<size_t size, typename T>
     std::array<T, size> raw_arr_to_std(T* raw_arr)
     {
         std::array<T, size> arr;
@@ -29,9 +29,12 @@ namespace beva
 
 #pragma region enums and flags
 
-    // enum must have a value named _ at the end. enum must be based on uint8_t.
-    // there must be a static constexpr const char* array named EnumName_string
-    // representing the enum values as strings.
+    // defines a string conversion function for an enum that meets the following
+    // requirements:
+    // - enum must have a value named _ at the end
+    // - enum must be based on uint8_t
+    // - there must be a static constexpr const char* array named
+    //   EnumName_string representing the enum values as strings.
 #define BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(EnumName) \
     constexpr const char* EnumName##_to_string( \
         EnumName v \
@@ -447,7 +450,6 @@ namespace beva
 
     BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(InternalAllocationType);
 
-
     enum class VulkanApiVersion
     {
         Vulkan1_0,
@@ -796,7 +798,7 @@ namespace beva
     }
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessageSeverityFlagBitsEXT.html
-    struct DebugMessageSeverityFlags
+    struct DebugMessageSeverityFilter
     {
         bool verbose : 1;
         bool info : 1;
@@ -805,7 +807,7 @@ namespace beva
     };
 
     // // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessageTypeFlagBitsEXT.html
-    struct DebugMessageTypeFlags
+    struct DebugMessageTypeFilter
     {
         bool general : 1;
         bool validation : 1;
@@ -1196,61 +1198,61 @@ namespace beva
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceFeatures.html
     struct PhysicalDeviceFeatures
     {
-        bool robust_buffer_access : 1;
-        bool full_draw_index_uint32 : 1;
-        bool image_cube_array : 1;
-        bool independent_blend : 1;
-        bool geometry_shader : 1;
-        bool tessellation_shader : 1;
-        bool sample_rate_shading : 1;
-        bool dual_src_blend : 1;
-        bool logic_op : 1;
-        bool multi_draw_indirect : 1;
-        bool draw_indirect_first_instance : 1;
-        bool depth_clamp : 1;
-        bool depth_bias_clamp : 1;
-        bool fill_mode_non_solid : 1;
-        bool depth_bounds : 1;
-        bool wide_lines : 1;
-        bool large_points : 1;
-        bool alpha_to_one : 1;
-        bool multi_viewport : 1;
-        bool sampler_anisotropy : 1;
-        bool texture_compression_etc2 : 1;
-        bool texture_compression_astc_ldr : 1;
-        bool texture_compression_bc : 1;
-        bool occlusion_query_precise : 1;
-        bool pipeline_statistics_query : 1;
-        bool vertex_pipeline_stores_and_atomics : 1;
-        bool fragment_stores_and_atomics : 1;
-        bool shader_tessellation_and_geometry_point_size : 1;
-        bool shader_image_gather_extended : 1;
-        bool shader_storage_image_extended_formats : 1;
-        bool shader_storage_image_multisample : 1;
-        bool shader_storage_image_read_without_format : 1;
-        bool shader_storage_image_write_without_format : 1;
-        bool shader_uniform_buffer_array_dynamic_indexing : 1;
-        bool shader_sampled_image_array_dynamic_indexing : 1;
-        bool shader_storage_buffer_array_dynamic_indexing : 1;
-        bool shader_storage_image_array_dynamic_indexing : 1;
-        bool shader_clip_distance : 1;
-        bool shader_cull_distance : 1;
-        bool shader_float64 : 1;
-        bool shader_int64 : 1;
-        bool shader_int16 : 1;
-        bool shader_resource_residency : 1;
-        bool shader_resource_min_lod : 1;
-        bool sparse_binding : 1;
-        bool sparse_residency_buffer : 1;
-        bool sparse_residency_image2d : 1;
-        bool sparse_residency_image3d : 1;
-        bool sparse_residency2_samples : 1;
-        bool sparse_residency4_samples : 1;
-        bool sparse_residency8_samples : 1;
-        bool sparse_residency16_samples : 1;
-        bool sparse_residency_aliased : 1;
-        bool variable_multisample_rate : 1;
-        bool inherited_queries : 1;
+        bool robust_buffer_access : 1 = false;
+        bool full_draw_index_uint32 : 1 = false;
+        bool image_cube_array : 1 = false;
+        bool independent_blend : 1 = false;
+        bool geometry_shader : 1 = false;
+        bool tessellation_shader : 1 = false;
+        bool sample_rate_shading : 1 = false;
+        bool dual_src_blend : 1 = false;
+        bool logic_op : 1 = false;
+        bool multi_draw_indirect : 1 = false;
+        bool draw_indirect_first_instance : 1 = false;
+        bool depth_clamp : 1 = false;
+        bool depth_bias_clamp : 1 = false;
+        bool fill_mode_non_solid : 1 = false;
+        bool depth_bounds : 1 = false;
+        bool wide_lines : 1 = false;
+        bool large_points : 1 = false;
+        bool alpha_to_one : 1 = false;
+        bool multi_viewport : 1 = false;
+        bool sampler_anisotropy : 1 = false;
+        bool texture_compression_etc2 : 1 = false;
+        bool texture_compression_astc_ldr : 1 = false;
+        bool texture_compression_bc : 1 = false;
+        bool occlusion_query_precise : 1 = false;
+        bool pipeline_statistics_query : 1 = false;
+        bool vertex_pipeline_stores_and_atomics : 1 = false;
+        bool fragment_stores_and_atomics : 1 = false;
+        bool shader_tessellation_and_geometry_point_size : 1 = false;
+        bool shader_image_gather_extended : 1 = false;
+        bool shader_storage_image_extended_formats : 1 = false;
+        bool shader_storage_image_multisample : 1 = false;
+        bool shader_storage_image_read_without_format : 1 = false;
+        bool shader_storage_image_write_without_format : 1 = false;
+        bool shader_uniform_buffer_array_dynamic_indexing : 1 = false;
+        bool shader_sampled_image_array_dynamic_indexing : 1 = false;
+        bool shader_storage_buffer_array_dynamic_indexing : 1 = false;
+        bool shader_storage_image_array_dynamic_indexing : 1 = false;
+        bool shader_clip_distance : 1 = false;
+        bool shader_cull_distance : 1 = false;
+        bool shader_float64 : 1 = false;
+        bool shader_int64 : 1 = false;
+        bool shader_int16 : 1 = false;
+        bool shader_resource_residency : 1 = false;
+        bool shader_resource_min_lod : 1 = false;
+        bool sparse_binding : 1 = false;
+        bool sparse_residency_buffer : 1 = false;
+        bool sparse_residency_image2d : 1 = false;
+        bool sparse_residency_image3d : 1 = false;
+        bool sparse_residency2_samples : 1 = false;
+        bool sparse_residency4_samples : 1 = false;
+        bool sparse_residency8_samples : 1 = false;
+        bool sparse_residency16_samples : 1 = false;
+        bool sparse_residency_aliased : 1 = false;
+        bool variable_multisample_rate : 1 = false;
+        bool inherited_queries : 1 = false;
     };
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent3D.html
@@ -1363,6 +1365,9 @@ namespace beva
         std::vector<std::string> extensions;
     };
 
+    // manages a VkInstance and custom allocators, provides utility functions,
+    // and is used by other classes
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkInstance.html
     class Context
     {
     public:
@@ -1370,10 +1375,9 @@ namespace beva
         Context(const Context& other) = delete;
         Context(Context&& other);
 
-        // it's best to keep at least one external reference to the allocator
-        // so that it doesn't die with the Context because the driver might
-        // still use the allocator even after the instance is destroyed and
-        // everything is seemingly cleaned up.
+        // * it's best to keep at least one external reference to the allocator
+        //   so that it doesn't die with the Context because the driver might
+        //   still use the allocator even after the instance is destroyed.
         static Result<std::shared_ptr<Context>> create(
             const ContextConfig& config,
             const std::shared_ptr<Allocator>& allocator = nullptr
@@ -1395,10 +1399,9 @@ namespace beva
             return _allocator;
         }
 
-        // it's best to keep at least one external reference to the allocator
-        // so that it doesn't die with the Context because the driver might
-        // still use the allocator even after the instance is destroyed and
-        // everything is seemingly cleaned up.
+        // * it's best to keep at least one external reference to the allocator
+        //   so that it doesn't die with the Context because the driver might
+        //   still use the allocator even after the instance is destroyed.
         void set_allocator(
             const std::shared_ptr<Allocator>& allocator
         );
@@ -1433,12 +1436,14 @@ namespace beva
 
     };
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsLabelEXT.html
     struct DebugLabel
     {
         std::string name;
         std::array<float, 4> color;
     };
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsObjectNameInfoEXT.html
     struct DebugObjectInfo
     {
         ObjectType type;
@@ -1446,6 +1451,7 @@ namespace beva
         std::string name;
     };
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessengerCallbackDataEXT.html
     struct DebugMessageData
     {
         std::string message_id_name;
@@ -1456,13 +1462,15 @@ namespace beva
         std::vector<DebugObjectInfo> objects;
     };
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/PFN_vkDebugUtilsMessengerCallbackEXT.html
     using DebugCallback = std::function<void(
         DebugMessageSeverity,
         DebugMessageType,
         const beva::DebugMessageData&
         )>;
 
-    // requires extension VK_EXT_DEBUG_UTILS_EXTENSION_NAME
+    // * requires extension VK_EXT_DEBUG_UTILS_EXTENSION_NAME
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessengerEXT.html
     class DebugMessenger
     {
     public:
@@ -1471,8 +1479,8 @@ namespace beva
 
         static Result<std::shared_ptr<DebugMessenger>> create(
             const std::shared_ptr<Context>& context,
-            DebugMessageSeverityFlags message_severity_flags,
-            DebugMessageTypeFlags message_type_flags,
+            DebugMessageSeverityFilter message_severity_filter,
+            DebugMessageTypeFilter message_type_filter,
             const DebugCallback& callback
         );
 
@@ -1481,14 +1489,14 @@ namespace beva
             return _context;
         }
 
-        constexpr DebugMessageSeverityFlags message_severity_flags() const
+        constexpr DebugMessageSeverityFilter message_severity_filter() const
         {
-            return _message_severity_flags;
+            return _message_severity_filter;
         }
 
-        constexpr DebugMessageTypeFlags message_type_flags() const
+        constexpr DebugMessageTypeFilter message_type_filter() const
         {
-            return _message_type_flags;
+            return _message_type_filter;
         }
 
         constexpr const DebugCallback& callback() const
@@ -1502,14 +1510,14 @@ namespace beva
         std::shared_ptr<Context> _context;
         VkDebugUtilsMessengerEXT vk_debug_messenger;
 
-        DebugMessageSeverityFlags _message_severity_flags;
-        DebugMessageTypeFlags _message_type_flags;
+        DebugMessageSeverityFilter _message_severity_filter;
+        DebugMessageTypeFilter _message_type_filter;
         DebugCallback _callback;
 
         DebugMessenger(
             const std::shared_ptr<Context>& context,
-            DebugMessageSeverityFlags message_severity_flags,
-            DebugMessageTypeFlags message_type_flags,
+            DebugMessageSeverityFilter message_severity_filter,
+            DebugMessageTypeFilter message_type_filter,
             const DebugCallback& callback
         );
 

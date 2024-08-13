@@ -114,14 +114,14 @@ namespace beva_demo
             return;
         }
 
-        beva::DebugMessageSeverityFlags severity_flags{
+        beva::DebugMessageSeverityFilter severity_filter{
             .verbose = false,
                 .info = false,
                 .warning = true,
                 .error = true
         };
 
-        beva::DebugMessageTypeFlags type_flags{
+        beva::DebugMessageTypeFilter type_filter{
             .general = true,
                 .validation = true,
                 .performance = true,
@@ -130,8 +130,8 @@ namespace beva_demo
 
         auto debug_messenger_result = beva::DebugMessenger::create(
             context,
-            severity_flags,
-            type_flags,
+            severity_filter,
+            type_filter,
             [](
                 beva::DebugMessageSeverity message_severity,
                 beva::DebugMessageType message_type,

@@ -544,14 +544,14 @@ namespace beva
                 .max_compute_shared_memory_size =
                 vk_properties.limits.maxComputeSharedMemorySize,
 
-                .max_compute_work_group_count = raw_arr_to_std<uint32_t, 3>(
+                .max_compute_work_group_count = raw_arr_to_std<3>(
                     vk_properties.limits.maxComputeWorkGroupCount
                 ),
 
                 .max_compute_work_group_invocations =
                 vk_properties.limits.maxComputeWorkGroupInvocations,
 
-                .max_compute_work_group_size = raw_arr_to_std<uint32_t, 3>(
+                .max_compute_work_group_size = raw_arr_to_std<3>(
                     vk_properties.limits.maxComputeWorkGroupSize
                 ),
 
@@ -577,11 +577,11 @@ namespace beva
 
                 .max_viewports = vk_properties.limits.maxViewports,
 
-                .max_viewport_dimensions = raw_arr_to_std<uint32_t, 2>(
+                .max_viewport_dimensions = raw_arr_to_std<2>(
                     vk_properties.limits.maxViewportDimensions
                 ),
 
-                .viewport_bounds_range = raw_arr_to_std<float, 2>(
+                .viewport_bounds_range = raw_arr_to_std<2>(
                     vk_properties.limits.viewportBoundsRange
                 ),
 
@@ -694,11 +694,11 @@ namespace beva
                 .discrete_queue_priorities =
                 vk_properties.limits.discreteQueuePriorities,
 
-                .point_size_range = raw_arr_to_std<float, 2>(
+                .point_size_range = raw_arr_to_std<2>(
                     vk_properties.limits.pointSizeRange
                 ),
 
-                .line_width_range = raw_arr_to_std<float, 2>(
+                .line_width_range = raw_arr_to_std<2>(
                     vk_properties.limits.lineWidthRange
                 ),
 
@@ -750,7 +750,7 @@ namespace beva
                     vk_properties.deviceType
                 ),
                 .device_name = vk_properties.deviceName,
-                .pipeline_cache_uuid = raw_arr_to_std<uint8_t, VK_UUID_SIZE>(
+                .pipeline_cache_uuid = raw_arr_to_std<VK_UUID_SIZE>(
                     vk_properties.pipelineCacheUUID
                 ),
                 .limits = limits,
@@ -1044,16 +1044,16 @@ namespace beva
         vk_debug_messenger = other.vk_debug_messenger;
         other.vk_debug_messenger = nullptr;
 
-        _message_severity_flags = other._message_severity_flags;
-        other._message_severity_flags = DebugMessageSeverityFlags{
+        _message_severity_filter = other._message_severity_filter;
+        other._message_severity_filter = DebugMessageSeverityFilter{
             .verbose = false,
             .info = false,
             .warning = false,
             .error = false
         };
 
-        _message_type_flags = other._message_type_flags;
-        other._message_type_flags = DebugMessageTypeFlags{
+        _message_type_filter = other._message_type_filter;
+        other._message_type_filter = DebugMessageTypeFilter{
             .general = false,
             .validation = false,
             .performance = false,
@@ -1073,16 +1073,16 @@ namespace beva
 
     Result<std::shared_ptr<DebugMessenger>> DebugMessenger::create(
         const std::shared_ptr<Context>& context,
-        DebugMessageSeverityFlags message_severity_flags,
-        DebugMessageTypeFlags message_type_flags,
+        DebugMessageSeverityFilter message_severity_filter,
+        DebugMessageTypeFilter message_type_filter,
         const DebugCallback& callback
     )
     {
         std::shared_ptr<DebugMessenger> messenger =
             std::make_shared<DebugMessenger_public_ctor>(
                 context,
-                message_severity_flags,
-                message_type_flags,
+                message_severity_filter,
+                message_type_filter,
                 callback
             );
 
@@ -1091,44 +1091,44 @@ namespace beva
             VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
 
         create_info.messageSeverity = 0;
-        if (messenger->_message_severity_flags.verbose)
+        if (messenger->_message_severity_filter.verbose)
         {
             create_info.messageSeverity |=
                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT;
         }
-        if (messenger->_message_severity_flags.info)
+        if (messenger->_message_severity_filter.info)
         {
             create_info.messageSeverity |=
                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT;
         }
-        if (messenger->_message_severity_flags.warning)
+        if (messenger->_message_severity_filter.warning)
         {
             create_info.messageSeverity |=
                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
         }
-        if (messenger->_message_severity_flags.error)
+        if (messenger->_message_severity_filter.error)
         {
             create_info.messageSeverity |=
                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
         }
 
         create_info.messageType = 0;
-        if (messenger->_message_type_flags.general)
+        if (messenger->_message_type_filter.general)
         {
             create_info.messageType |=
                 VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT;
         }
-        if (messenger->_message_type_flags.validation)
+        if (messenger->_message_type_filter.validation)
         {
             create_info.messageType |=
                 VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
         }
-        if (messenger->_message_type_flags.performance)
+        if (messenger->_message_type_filter.performance)
         {
             create_info.messageType |=
                 VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
         }
-        if (messenger->_message_type_flags.device_address_binding)
+        if (messenger->_message_type_filter.device_address_binding)
         {
             create_info.messageType |=
                 VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT;
@@ -1161,13 +1161,13 @@ namespace beva
 
     DebugMessenger::DebugMessenger(
         const std::shared_ptr<Context>& context,
-        DebugMessageSeverityFlags message_severity_flags,
-        DebugMessageTypeFlags message_type_flags,
+        DebugMessageSeverityFilter message_severity_filter,
+        DebugMessageTypeFilter message_type_filter,
         const DebugCallback& callback
     )
         : _context(context),
-        _message_severity_flags(message_severity_flags),
-        _message_type_flags(message_type_flags),
+        _message_severity_filter(message_severity_filter),
+        _message_type_filter(message_type_filter),
         _callback(callback)
     {}
 
@@ -1420,8 +1420,10 @@ namespace beva
         else if (message_severity &
             VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT)
             severity = DebugMessageSeverity::Verbose;
+        else
+            severity = DebugMessageSeverity::Verbose;
 
-        DebugMessageType type;
+        DebugMessageType type = DebugMessageType::General;
         if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT)
             type = DebugMessageType::Validation;
         else if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)
@@ -1430,6 +1432,8 @@ namespace beva
             VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT)
             type = DebugMessageType::DeviceAddressBinding;
         else if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT)
+            type = DebugMessageType::General;
+        else
             type = DebugMessageType::General;
 
         std::vector<DebugLabel> queue_labels;
