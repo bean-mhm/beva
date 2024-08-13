@@ -21,7 +21,8 @@ namespace bv
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Queue);
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Device);
 
-    // forward declarations
+#pragma region forward declarations
+
     static void* vk_allocation_callback(
         void* p_user_data,
         size_t size,
@@ -58,7 +59,10 @@ namespace bv
         void* p_user_data
     );
 
-    // manually loaded Vulkan functions
+#pragma endregion
+
+#pragma region Vulkan function loaders for extensions
+
     static VkResult CreateDebugUtilsMessengerEXT(
         VkInstance instance,
         const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
@@ -94,6 +98,8 @@ namespace bv
             func(instance, debugMessenger, pAllocator);
         }
     }
+
+#pragma endregion
 
     std::string ApiResult::to_string() const
     {
