@@ -3,6 +3,24 @@
 namespace bv
 {
 
+    // define a derived class named ClassName_public_ctor that lets us use the
+    // previously private constructors as public ones so that they can be used
+    // in std::make_shared() or whatever else.
+#define DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(ClassName) \
+    class ClassName##_public_ctor : public ClassName \
+    { \
+    public: \
+        template<typename... Args> ClassName##_public_ctor(Args&&... args) \
+            : ClassName(std::forward<Args>(args)...) \
+        {} \
+    };
+
+    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(PhysicalDevice);
+    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Context);
+    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DebugMessenger);
+    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Queue);
+    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Device);
+
     // forward declarations
     static void* vk_allocation_callback(
         void* p_user_data,
@@ -94,12 +112,380 @@ namespace bv
 
     std::string Error::to_string() const
     {
-        return _api_result.to_string();
+        std::string s = message;
+        if (api_result.has_value())
+        {
+            if (!message.empty())
+            {
+                s += ": ";
+            }
+            s += api_result.value().to_string();
+        }
+        return s;
     }
 
     std::string Version::to_string() const
     {
         return std::format("{}.{}.{}.{}", variant, major, minor, patch);
+    }
+
+    PhysicalDeviceFeatures
+        PhysicalDeviceFeatures_from_VkPhysicalDeviceFeatures(
+            VkPhysicalDeviceFeatures vk_physical_device_features
+        )
+    {
+        return PhysicalDeviceFeatures{
+            .robust_buffer_access =
+            (bool)vk_physical_device_features.robustBufferAccess,
+
+            .full_draw_index_uint32 =
+            (bool)vk_physical_device_features.fullDrawIndexUint32,
+
+            .image_cube_array =
+            (bool)vk_physical_device_features.imageCubeArray,
+
+            .independent_blend =
+            (bool)vk_physical_device_features.independentBlend,
+
+            .geometry_shader =
+            (bool)vk_physical_device_features.geometryShader,
+
+            .tessellation_shader =
+            (bool)vk_physical_device_features.tessellationShader,
+
+            .sample_rate_shading =
+            (bool)vk_physical_device_features.sampleRateShading,
+
+            .dual_src_blend =
+            (bool)vk_physical_device_features.dualSrcBlend,
+
+            .logic_op =
+            (bool)vk_physical_device_features.logicOp,
+
+            .multi_draw_indirect =
+            (bool)vk_physical_device_features.multiDrawIndirect,
+
+            .draw_indirect_first_instance =
+            (bool)vk_physical_device_features.drawIndirectFirstInstance,
+
+            .depth_clamp =
+            (bool)vk_physical_device_features.depthClamp,
+
+            .depth_bias_clamp =
+            (bool)vk_physical_device_features.depthBiasClamp,
+
+            .fill_mode_non_solid =
+            (bool)vk_physical_device_features.fillModeNonSolid,
+
+            .depth_bounds =
+            (bool)vk_physical_device_features.depthBounds,
+
+            .wide_lines =
+            (bool)vk_physical_device_features.wideLines,
+
+            .large_points =
+            (bool)vk_physical_device_features.largePoints,
+
+            .alpha_to_one =
+            (bool)vk_physical_device_features.alphaToOne,
+
+            .multi_viewport =
+            (bool)vk_physical_device_features.multiViewport,
+
+            .sampler_anisotropy =
+            (bool)vk_physical_device_features.samplerAnisotropy,
+
+            .texture_compression_etc2 =
+            (bool)vk_physical_device_features.textureCompressionETC2,
+
+            .texture_compression_astc_ldr =
+            (bool)vk_physical_device_features.textureCompressionASTC_LDR,
+
+            .texture_compression_bc =
+            (bool)vk_physical_device_features.textureCompressionBC,
+
+            .occlusion_query_precise =
+            (bool)vk_physical_device_features.occlusionQueryPrecise,
+
+            .pipeline_statistics_query =
+            (bool)vk_physical_device_features.pipelineStatisticsQuery,
+
+            .vertex_pipeline_stores_and_atomics =
+            (bool)vk_physical_device_features.vertexPipelineStoresAndAtomics,
+
+            .fragment_stores_and_atomics =
+            (bool)vk_physical_device_features.fragmentStoresAndAtomics,
+
+            .shader_tessellation_and_geometry_point_size =
+            (bool)vk_physical_device_features
+            .shaderTessellationAndGeometryPointSize,
+
+            .shader_image_gather_extended =
+            (bool)vk_physical_device_features.shaderImageGatherExtended,
+
+            .shader_storage_image_extended_formats =
+            (bool)vk_physical_device_features
+            .shaderStorageImageExtendedFormats,
+
+            .shader_storage_image_multisample =
+            (bool)vk_physical_device_features.shaderStorageImageMultisample,
+
+            .shader_storage_image_read_without_format =
+            (bool)vk_physical_device_features
+            .shaderStorageImageReadWithoutFormat,
+
+            .shader_storage_image_write_without_format =
+            (bool)vk_physical_device_features
+            .shaderStorageImageWriteWithoutFormat,
+
+            .shader_uniform_buffer_array_dynamic_indexing =
+            (bool)vk_physical_device_features
+            .shaderUniformBufferArrayDynamicIndexing,
+
+            .shader_sampled_image_array_dynamic_indexing =
+            (bool)vk_physical_device_features
+            .shaderSampledImageArrayDynamicIndexing,
+
+            .shader_storage_buffer_array_dynamic_indexing =
+            (bool)vk_physical_device_features
+            .shaderStorageBufferArrayDynamicIndexing,
+
+            .shader_storage_image_array_dynamic_indexing =
+            (bool)vk_physical_device_features
+            .shaderStorageImageArrayDynamicIndexing,
+
+            .shader_clip_distance =
+            (bool)vk_physical_device_features.shaderClipDistance,
+
+            .shader_cull_distance =
+            (bool)vk_physical_device_features.shaderCullDistance,
+
+            .shader_float64 =
+            (bool)vk_physical_device_features.shaderFloat64,
+
+            .shader_int64 =
+            (bool)vk_physical_device_features.shaderInt64,
+
+            .shader_int16 =
+            (bool)vk_physical_device_features.shaderInt16,
+
+            .shader_resource_residency =
+            (bool)vk_physical_device_features.shaderResourceResidency,
+
+            .shader_resource_min_lod =
+            (bool)vk_physical_device_features.shaderResourceMinLod,
+
+            .sparse_binding =
+            (bool)vk_physical_device_features.sparseBinding,
+
+            .sparse_residency_buffer =
+            (bool)vk_physical_device_features.sparseResidencyBuffer,
+
+            .sparse_residency_image2d =
+            (bool)vk_physical_device_features.sparseResidencyImage2D,
+
+            .sparse_residency_image3d =
+            (bool)vk_physical_device_features.sparseResidencyImage3D,
+
+            .sparse_residency2_samples =
+            (bool)vk_physical_device_features.sparseResidency2Samples,
+
+            .sparse_residency4_samples =
+            (bool)vk_physical_device_features.sparseResidency4Samples,
+
+            .sparse_residency8_samples =
+            (bool)vk_physical_device_features.sparseResidency8Samples,
+
+            .sparse_residency16_samples =
+            (bool)vk_physical_device_features.sparseResidency16Samples,
+
+            .sparse_residency_aliased =
+            (bool)vk_physical_device_features.sparseResidencyAliased,
+
+            .variable_multisample_rate =
+            (bool)vk_physical_device_features.variableMultisampleRate,
+
+            .inherited_queries =
+            (bool)vk_physical_device_features.inheritedQueries
+        };
+    }
+
+    VkPhysicalDeviceFeatures
+        PhysicalDeviceFeatures_to_VkPhysicalDeviceFeatures(
+            PhysicalDeviceFeatures physical_device_features
+        )
+    {
+        return VkPhysicalDeviceFeatures{
+            .robustBufferAccess =
+            physical_device_features.robust_buffer_access,
+
+            .fullDrawIndexUint32 =
+            physical_device_features.full_draw_index_uint32,
+
+            .imageCubeArray =
+            physical_device_features.image_cube_array,
+
+            .independentBlend =
+            physical_device_features.independent_blend,
+
+            .geometryShader =
+            physical_device_features.geometry_shader,
+
+            .tessellationShader =
+            physical_device_features.tessellation_shader,
+
+            .sampleRateShading =
+            physical_device_features.sample_rate_shading,
+
+            .dualSrcBlend =
+            physical_device_features.dual_src_blend,
+
+            .logicOp =
+            physical_device_features.logic_op,
+
+            .multiDrawIndirect =
+            physical_device_features.multi_draw_indirect,
+
+            .drawIndirectFirstInstance =
+            physical_device_features.draw_indirect_first_instance,
+
+            .depthClamp =
+            physical_device_features.depth_clamp,
+
+            .depthBiasClamp =
+            physical_device_features.depth_bias_clamp,
+
+            .fillModeNonSolid =
+            physical_device_features.fill_mode_non_solid,
+
+            .depthBounds =
+            physical_device_features.depth_bounds,
+
+            .wideLines =
+            physical_device_features.wide_lines,
+
+            .largePoints =
+            physical_device_features.large_points,
+
+            .alphaToOne =
+            physical_device_features.alpha_to_one,
+
+            .multiViewport =
+            physical_device_features.multi_viewport,
+
+            .samplerAnisotropy =
+            physical_device_features.sampler_anisotropy,
+
+            .textureCompressionETC2 =
+            physical_device_features.texture_compression_etc2,
+
+            .textureCompressionASTC_LDR =
+            physical_device_features.texture_compression_astc_ldr,
+
+            .textureCompressionBC =
+            physical_device_features.texture_compression_bc,
+
+            .occlusionQueryPrecise =
+            physical_device_features.occlusion_query_precise,
+
+            .pipelineStatisticsQuery =
+            physical_device_features.pipeline_statistics_query,
+
+            .vertexPipelineStoresAndAtomics =
+            physical_device_features.vertex_pipeline_stores_and_atomics,
+
+            .fragmentStoresAndAtomics =
+            physical_device_features.fragment_stores_and_atomics,
+
+            .shaderTessellationAndGeometryPointSize =
+            physical_device_features
+            .shader_tessellation_and_geometry_point_size,
+
+            .shaderImageGatherExtended =
+            physical_device_features.shader_image_gather_extended,
+
+            .shaderStorageImageExtendedFormats =
+            physical_device_features.shader_storage_image_extended_formats,
+
+            .shaderStorageImageMultisample =
+            physical_device_features.shader_storage_image_multisample,
+
+            .shaderStorageImageReadWithoutFormat =
+            physical_device_features.shader_storage_image_read_without_format,
+
+            .shaderStorageImageWriteWithoutFormat =
+            physical_device_features.shader_storage_image_write_without_format,
+
+            .shaderUniformBufferArrayDynamicIndexing =
+            physical_device_features
+            .shader_uniform_buffer_array_dynamic_indexing,
+
+            .shaderSampledImageArrayDynamicIndexing =
+            physical_device_features
+            .shader_sampled_image_array_dynamic_indexing,
+
+            .shaderStorageBufferArrayDynamicIndexing =
+            physical_device_features
+            .shader_storage_buffer_array_dynamic_indexing,
+
+            .shaderStorageImageArrayDynamicIndexing =
+            physical_device_features
+            .shader_storage_image_array_dynamic_indexing,
+
+            .shaderClipDistance =
+            physical_device_features.shader_clip_distance,
+
+            .shaderCullDistance =
+            physical_device_features.shader_cull_distance,
+
+            .shaderFloat64 =
+            physical_device_features.shader_float64,
+
+            .shaderInt64 =
+            physical_device_features.shader_int64,
+
+            .shaderInt16 =
+            physical_device_features.shader_int16,
+
+            .shaderResourceResidency =
+            physical_device_features.shader_resource_residency,
+
+            .shaderResourceMinLod =
+            physical_device_features.shader_resource_min_lod,
+
+            .sparseBinding =
+            physical_device_features.sparse_binding,
+
+            .sparseResidencyBuffer =
+            physical_device_features.sparse_residency_buffer,
+
+            .sparseResidencyImage2D =
+            physical_device_features.sparse_residency_image2d,
+
+            .sparseResidencyImage3D =
+            physical_device_features.sparse_residency_image3d,
+
+            .sparseResidency2Samples =
+            physical_device_features.sparse_residency2_samples,
+
+            .sparseResidency4Samples =
+            physical_device_features.sparse_residency4_samples,
+
+            .sparseResidency8Samples =
+            physical_device_features.sparse_residency8_samples,
+
+            .sparseResidency16Samples =
+            physical_device_features.sparse_residency16_samples,
+
+            .sparseResidencyAliased =
+            physical_device_features.sparse_residency_aliased,
+
+            .variableMultisampleRate =
+            physical_device_features.variable_multisample_rate,
+
+            .inheritedQueries =
+            physical_device_features.inherited_queries,
+        };
     }
 
     PhysicalDevice::PhysicalDevice(
@@ -133,13 +519,6 @@ namespace bv
         other.vk_instance = nullptr;
     }
 
-    struct Context_public_ctor : public Context
-    {
-        template<typename... Args> Context_public_ctor(Args &&... args)
-            : Context(std::forward<Args>(args)...)
-        {}
-    };
-
     Result<std::shared_ptr<Context>> Context::create(
         const ContextConfig& config,
         const std::shared_ptr<Allocator>& allocator
@@ -152,7 +531,7 @@ namespace bv
 
         // allocation callbacks
         {
-            c->vk_allocator.pUserData = c->_allocator.get();
+            c->vk_allocator.pUserData = c->allocator().get();
             c->vk_allocator.pfnAllocation = vk_allocation_callback;
             c->vk_allocator.pfnReallocation = vk_reallocation_callback;
             c->vk_allocator.pfnFree = vk_free_callback;
@@ -164,7 +543,7 @@ namespace bv
         VkInstanceCreateInfo create_info{};
         create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 
-        if (c->_config.will_enumerate_portability)
+        if (c->config().will_enumerate_portability)
             create_info.flags |=
             VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
 
@@ -172,23 +551,23 @@ namespace bv
         {
             app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 
-            app_info.pApplicationName = c->_config.app_name.c_str();
+            app_info.pApplicationName = c->config().app_name.c_str();
             app_info.applicationVersion = VK_MAKE_API_VERSION(
-                c->_config.app_version.variant,
-                c->_config.app_version.major,
-                c->_config.app_version.minor,
-                c->_config.app_version.patch
+                c->config().app_version.variant,
+                c->config().app_version.major,
+                c->config().app_version.minor,
+                c->config().app_version.patch
             );
 
-            app_info.pEngineName = c->_config.engine_name.c_str();
+            app_info.pEngineName = c->config().engine_name.c_str();
             app_info.engineVersion = VK_MAKE_API_VERSION(
-                c->_config.engine_version.variant,
-                c->_config.engine_version.major,
-                c->_config.engine_version.minor,
-                c->_config.engine_version.patch
+                c->config().engine_version.variant,
+                c->config().engine_version.major,
+                c->config().engine_version.minor,
+                c->config().engine_version.patch
             );
 
-            switch (c->_config.vulkan_api_version)
+            switch (c->config().vulkan_api_version)
             {
             case VulkanApiVersion::Vulkan1_0:
                 app_info.apiVersion = VK_API_VERSION_1_0;
@@ -212,9 +591,9 @@ namespace bv
         std::vector<const char*> layers_cstr;
         {
             layers_cstr.reserve(
-                c->_config.layers.size()
+                c->config().layers.size()
             );
-            for (const auto& layer : c->_config.layers)
+            for (const auto& layer : c->config().layers)
             {
                 layers_cstr.push_back(layer.c_str());
             }
@@ -229,9 +608,9 @@ namespace bv
         std::vector<const char*> extensions_cstr;
         {
             extensions_cstr.reserve(
-                c->_config.extensions.size()
+                c->config().extensions.size()
             );
-            for (const auto& ext : c->_config.extensions)
+            for (const auto& ext : c->config().extensions)
             {
                 extensions_cstr.push_back(ext.c_str());
             }
@@ -253,10 +632,13 @@ namespace bv
             return Error(vk_result);
         }
 
-        Result add_physical_devices_result = c->add_physical_devices();
-        if (!add_physical_devices_result.ok())
+        Result fetch_physical_devices_result = c->fetch_physical_devices();
+        if (!fetch_physical_devices_result.ok())
         {
-            return add_physical_devices_result.error();
+            return Error(
+                "failed to fetch physical devices: "
+                + fetch_physical_devices_result.error().to_string()
+            );
         }
 
         return c;
@@ -361,7 +743,7 @@ namespace bv
         return &vk_allocator;
     }
 
-    Result<> Context::add_physical_devices()
+    Result<> Context::fetch_physical_devices()
     {
         uint32_t count = 0;
         vkEnumeratePhysicalDevices(vk_instance, &count, nullptr);
@@ -497,16 +879,20 @@ namespace bv
                 vk_properties.limits.maxTessellationPatchSize,
 
                 .max_tessellation_control_per_vertex_input_components =
-                vk_properties.limits.maxTessellationControlPerVertexInputComponents,
+                vk_properties.limits
+                .maxTessellationControlPerVertexInputComponents,
 
                 .max_tessellation_control_per_vertex_output_components =
-                vk_properties.limits.maxTessellationControlPerVertexOutputComponents,
+                vk_properties.limits
+                .maxTessellationControlPerVertexOutputComponents,
 
                 .max_tessellation_control_per_patch_output_components =
-                vk_properties.limits.maxTessellationControlPerPatchOutputComponents,
+                vk_properties.limits
+                .maxTessellationControlPerPatchOutputComponents,
 
                 .max_tessellation_control_total_output_components =
-                vk_properties.limits.maxTessellationControlTotalOutputComponents,
+                vk_properties.limits
+                .maxTessellationControlTotalOutputComponents,
 
                 .max_tessellation_evaluation_input_components =
                 vk_properties.limits.maxTessellationEvaluationInputComponents,
@@ -728,7 +1114,8 @@ namespace bv
                 vk_properties.sparseProperties.residencyStandard2DBlockShape,
 
                 .residency_standard2d_multisample_block_shape = (bool)
-                vk_properties.sparseProperties.residencyStandard2DMultisampleBlockShape,
+                vk_properties.sparseProperties
+                .residencyStandard2DMultisampleBlockShape,
 
                 .residency_standard3d_block_shape = (bool)
                 vk_properties.sparseProperties.residencyStandard3DBlockShape,
@@ -760,172 +1147,10 @@ namespace bv
             VkPhysicalDeviceFeatures vk_features;
             vkGetPhysicalDeviceFeatures(vk_physical_device, &vk_features);
 
-            PhysicalDeviceFeatures features{
-                .robust_buffer_access =
-                (bool)vk_features.robustBufferAccess,
-
-                .full_draw_index_uint32 =
-                (bool)vk_features.fullDrawIndexUint32,
-
-                .image_cube_array =
-                (bool)vk_features.imageCubeArray,
-
-                .independent_blend =
-                (bool)vk_features.independentBlend,
-
-                .geometry_shader =
-                (bool)vk_features.geometryShader,
-
-                .tessellation_shader =
-                (bool)vk_features.tessellationShader,
-
-                .sample_rate_shading =
-                (bool)vk_features.sampleRateShading,
-
-                .dual_src_blend =
-                (bool)vk_features.dualSrcBlend,
-
-                .logic_op =
-                (bool)vk_features.logicOp,
-
-                .multi_draw_indirect =
-                (bool)vk_features.multiDrawIndirect,
-
-                .draw_indirect_first_instance =
-                (bool)vk_features.drawIndirectFirstInstance,
-
-                .depth_clamp =
-                (bool)vk_features.depthClamp,
-
-                .depth_bias_clamp =
-                (bool)vk_features.depthBiasClamp,
-
-                .fill_mode_non_solid =
-                (bool)vk_features.fillModeNonSolid,
-
-                .depth_bounds =
-                (bool)vk_features.depthBounds,
-
-                .wide_lines =
-                (bool)vk_features.wideLines,
-
-                .large_points =
-                (bool)vk_features.largePoints,
-
-                .alpha_to_one =
-                (bool)vk_features.alphaToOne,
-
-                .multi_viewport =
-                (bool)vk_features.multiViewport,
-
-                .sampler_anisotropy =
-                (bool)vk_features.samplerAnisotropy,
-
-                .texture_compression_etc2 =
-                (bool)vk_features.textureCompressionETC2,
-
-                .texture_compression_astc_ldr =
-                (bool)vk_features.textureCompressionASTC_LDR,
-
-                .texture_compression_bc =
-                (bool)vk_features.textureCompressionBC,
-
-                .occlusion_query_precise =
-                (bool)vk_features.occlusionQueryPrecise,
-
-                .pipeline_statistics_query =
-                (bool)vk_features.pipelineStatisticsQuery,
-
-                .vertex_pipeline_stores_and_atomics =
-                (bool)vk_features.vertexPipelineStoresAndAtomics,
-
-                .fragment_stores_and_atomics =
-                (bool)vk_features.fragmentStoresAndAtomics,
-
-                .shader_tessellation_and_geometry_point_size =
-                (bool)vk_features.shaderTessellationAndGeometryPointSize,
-
-                .shader_image_gather_extended =
-                (bool)vk_features.shaderImageGatherExtended,
-
-                .shader_storage_image_extended_formats =
-                (bool)vk_features.shaderStorageImageExtendedFormats,
-
-                .shader_storage_image_multisample =
-                (bool)vk_features.shaderStorageImageMultisample,
-
-                .shader_storage_image_read_without_format =
-                (bool)vk_features.shaderStorageImageReadWithoutFormat,
-
-                .shader_storage_image_write_without_format =
-                (bool)vk_features.shaderStorageImageWriteWithoutFormat,
-
-                .shader_uniform_buffer_array_dynamic_indexing =
-                (bool)vk_features.shaderUniformBufferArrayDynamicIndexing,
-
-                .shader_sampled_image_array_dynamic_indexing =
-                (bool)vk_features.shaderSampledImageArrayDynamicIndexing,
-
-                .shader_storage_buffer_array_dynamic_indexing =
-                (bool)vk_features.shaderStorageBufferArrayDynamicIndexing,
-
-                .shader_storage_image_array_dynamic_indexing =
-                (bool)vk_features.shaderStorageImageArrayDynamicIndexing,
-
-                .shader_clip_distance =
-                (bool)vk_features.shaderClipDistance,
-
-                .shader_cull_distance =
-                (bool)vk_features.shaderCullDistance,
-
-                .shader_float64 =
-                (bool)vk_features.shaderFloat64,
-
-                .shader_int64 =
-                (bool)vk_features.shaderInt64,
-
-                .shader_int16 =
-                (bool)vk_features.shaderInt16,
-
-                .shader_resource_residency =
-                (bool)vk_features.shaderResourceResidency,
-
-                .shader_resource_min_lod =
-                (bool)vk_features.shaderResourceMinLod,
-
-                .sparse_binding =
-                (bool)vk_features.sparseBinding,
-
-                .sparse_residency_buffer =
-                (bool)vk_features.sparseResidencyBuffer,
-
-                .sparse_residency_image2d =
-                (bool)vk_features.sparseResidencyImage2D,
-
-                .sparse_residency_image3d =
-                (bool)vk_features.sparseResidencyImage3D,
-
-                .sparse_residency2_samples =
-                (bool)vk_features.sparseResidency2Samples,
-
-                .sparse_residency4_samples =
-                (bool)vk_features.sparseResidency4Samples,
-
-                .sparse_residency8_samples =
-                (bool)vk_features.sparseResidency8Samples,
-
-                .sparse_residency16_samples =
-                (bool)vk_features.sparseResidency16Samples,
-
-                .sparse_residency_aliased =
-                (bool)vk_features.sparseResidencyAliased,
-
-                .variable_multisample_rate =
-                (bool)vk_features.variableMultisampleRate,
-
-                .inherited_queries =
-                (bool)vk_features.inheritedQueries
-            };
+            PhysicalDeviceFeatures features =
+                PhysicalDeviceFeatures_from_VkPhysicalDeviceFeatures(
+                    vk_features
+                );
 
             uint32_t queue_family_count = 0;
             vkGetPhysicalDeviceQueueFamilyProperties(
@@ -1024,13 +1249,15 @@ namespace bv
                 queue_families.push_back(queue_family);
             }
 
-            _physical_devices.push_back(PhysicalDevice{
-                vk_physical_device,
-                properties,
-                features,
-                queue_families,
-                queue_family_indices
-                });
+            _physical_devices.push_back(
+                std::make_shared<PhysicalDevice_public_ctor>(
+                    vk_physical_device,
+                    properties,
+                    features,
+                    queue_families,
+                    queue_family_indices
+                )
+            );
         }
 
         return Result();
@@ -1064,13 +1291,6 @@ namespace bv
         other._callback = nullptr;
     }
 
-    struct DebugMessenger_public_ctor : public DebugMessenger
-    {
-        template<typename... Args> DebugMessenger_public_ctor(Args &&... args)
-            : DebugMessenger(std::forward<Args>(args)...)
-        {}
-    };
-
     Result<std::shared_ptr<DebugMessenger>> DebugMessenger::create(
         const std::shared_ptr<Context>& context,
         DebugMessageSeverityFilter message_severity_filter,
@@ -1091,44 +1311,44 @@ namespace bv
             VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
 
         create_info.messageSeverity = 0;
-        if (messenger->_message_severity_filter.verbose)
+        if (messenger->message_severity_filter().verbose)
         {
             create_info.messageSeverity |=
                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT;
         }
-        if (messenger->_message_severity_filter.info)
+        if (messenger->message_severity_filter().info)
         {
             create_info.messageSeverity |=
                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT;
         }
-        if (messenger->_message_severity_filter.warning)
+        if (messenger->message_severity_filter().warning)
         {
             create_info.messageSeverity |=
                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
         }
-        if (messenger->_message_severity_filter.error)
+        if (messenger->message_severity_filter().error)
         {
             create_info.messageSeverity |=
                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
         }
 
         create_info.messageType = 0;
-        if (messenger->_message_type_filter.general)
+        if (messenger->message_type_filter().general)
         {
             create_info.messageType |=
                 VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT;
         }
-        if (messenger->_message_type_filter.validation)
+        if (messenger->message_type_filter().validation)
         {
             create_info.messageType |=
                 VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
         }
-        if (messenger->_message_type_filter.performance)
+        if (messenger->message_type_filter().performance)
         {
             create_info.messageType |=
                 VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
         }
-        if (messenger->_message_type_filter.device_address_binding)
+        if (messenger->message_type_filter().device_address_binding)
         {
             create_info.messageType |=
                 VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT;
@@ -1138,9 +1358,9 @@ namespace bv
         create_info.pUserData = messenger.get();
 
         VkResult vk_result = CreateDebugUtilsMessengerEXT(
-            messenger->_context->vk_instance,
+            messenger->context()->vk_instance,
             &create_info,
-            messenger->_context->vk_allocator_ptr(),
+            messenger->context()->vk_allocator_ptr(),
             &messenger->vk_debug_messenger
         );
         if (vk_result != VK_SUCCESS)
@@ -1153,22 +1373,168 @@ namespace bv
     DebugMessenger::~DebugMessenger()
     {
         DestroyDebugUtilsMessengerEXT(
-            _context->vk_instance,
+            context()->vk_instance,
             vk_debug_messenger,
-            _context->vk_allocator_ptr()
+            context()->vk_allocator_ptr()
         );
     }
 
     DebugMessenger::DebugMessenger(
         const std::shared_ptr<Context>& context,
-        DebugMessageSeverityFilter message_severity_filter,
-        DebugMessageTypeFilter message_type_filter,
+        const DebugMessageSeverityFilter& message_severity_filter,
+        const DebugMessageTypeFilter& message_type_filter,
         const DebugCallback& callback
     )
         : _context(context),
         _message_severity_filter(message_severity_filter),
         _message_type_filter(message_type_filter),
         _callback(callback)
+    {}
+
+    Queue::Queue(Queue&& other)
+    {
+        vk_queue = other.vk_queue;
+        other.vk_queue = nullptr;
+    }
+
+    Queue::Queue(VkQueue vk_queue)
+        : vk_queue(vk_queue)
+    {}
+
+    Device::Device(Device&& other)
+    {
+        _context = other._context;
+        other._context = nullptr;
+
+        _physical_device = other._physical_device;
+        other._physical_device = nullptr;
+
+        _config = other._config;
+        other._config = DeviceConfig{};
+
+        vk_device = other.vk_device;
+        other.vk_device = nullptr;
+    }
+
+    Result<std::shared_ptr<Device>>Device::create(
+        const std::shared_ptr<Context>& context,
+        const std::shared_ptr<PhysicalDevice>& physical_device,
+        const DeviceConfig& config
+    )
+    {
+        std::shared_ptr<Device> device = std::make_shared<Device_public_ctor>(
+            context,
+            physical_device,
+            config
+        );
+
+        std::vector<VkDeviceQueueCreateInfo> vk_queue_requests;
+        for (const auto& queue_request : device->config().queue_requests)
+        {
+            if (queue_request.priorities.size()
+                != queue_request.num_queues_to_create)
+            {
+                return Error(
+                    "there should be the same number of queue priorities as "
+                    "the number of queues to create"
+                );
+            }
+
+            VkDeviceQueueCreateFlags vk_flags = 0;
+            if (queue_request.flags.protected_)
+                vk_flags |= VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT;
+
+            vk_queue_requests.push_back(VkDeviceQueueCreateInfo{
+                .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = vk_flags,
+                .queueFamilyIndex = queue_request.queue_family_index,
+                .queueCount = queue_request.num_queues_to_create,
+                .pQueuePriorities = queue_request.priorities.data()
+                });
+        }
+
+        std::vector<const char*> layers_cstr;
+        {
+            layers_cstr.reserve(
+                device->context()->config().layers.size()
+            );
+            for (const auto& layer : device->context()->config().layers)
+            {
+                layers_cstr.push_back(layer.c_str());
+            }
+        }
+
+        std::vector<const char*> extensions_cstr;
+        {
+            extensions_cstr.reserve(
+                device->config().extensions.size()
+            );
+            for (const auto& ext : device->config().extensions)
+            {
+                extensions_cstr.push_back(ext.c_str());
+            }
+        }
+
+        VkPhysicalDeviceFeatures vk_enabled_features =
+            PhysicalDeviceFeatures_to_VkPhysicalDeviceFeatures(
+                device->config().enabled_features
+            );
+
+        VkDeviceCreateInfo create_info{
+            .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .queueCreateInfoCount = (uint32_t)vk_queue_requests.size(),
+            .pQueueCreateInfos = vk_queue_requests.data(),
+            .enabledLayerCount = (uint32_t)layers_cstr.size(),
+            .ppEnabledLayerNames = layers_cstr.data(),
+            .enabledExtensionCount = (uint32_t)extensions_cstr.size(),
+            .ppEnabledExtensionNames = extensions_cstr.data(),
+            .pEnabledFeatures = &vk_enabled_features
+        };
+
+        VkResult vk_result = vkCreateDevice(
+            device->physical_device()->vk_physical_device,
+            &create_info,
+            device->context()->vk_allocator_ptr(),
+            &device->vk_device
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return device;
+    }
+
+    std::shared_ptr<Queue> Device::retrieve_queue(
+        uint32_t queue_family_index,
+        uint32_t queue_index
+    )
+    {
+        VkQueue vk_queue;
+        vkGetDeviceQueue(
+            vk_device,
+            queue_family_index,
+            queue_index,
+            &vk_queue
+        );
+        return std::make_shared<Queue_public_ctor>(vk_queue);
+    }
+
+    Device::~Device()
+    {
+        vkDestroyDevice(vk_device, context()->vk_allocator_ptr());
+    }
+
+    Device::Device(
+        const std::shared_ptr<Context>& context,
+        const std::shared_ptr<PhysicalDevice>& physical_device,
+        const DeviceConfig& config
+    )
+        : _context(context),
+        _physical_device(physical_device),
+        _config(config)
     {}
 
     static void* vk_allocation_callback(

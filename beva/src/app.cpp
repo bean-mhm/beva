@@ -23,12 +23,8 @@ namespace beva_demo
         init_window();
         init_context();
         setup_debug_messenger();
-
-        for (const auto& physical_device : context->physical_devices())
-        {
-            std::cout << physical_device.properties().device_name << '\n';
-        }
-
+        pick_physical_device();
+        create_logical_device();
         main_loop();
         cleanup();
     }
@@ -149,6 +145,90 @@ namespace beva_demo
             throw std::runtime_error(s.c_str());
         }
         debug_messenger = debug_messenger_result.value();
+    }
+
+    void App::pick_physical_device()
+    {
+        if (context->physical_devices().empty())
+        {
+            throw std::runtime_error(
+                "there's no physical device that supports Vulkan on this "
+                "machine"
+            );
+        }
+
+        std::cout << "pick a physical device by entering its index:\n";
+        for (size_t i = 0; i < context->physical_devices().size(); i++)
+        {
+            const auto& physical_device = context->physical_devices()[i];
+            std::cout << std::format(
+                "{}: {} ({})\n",
+                i,
+                physical_device->properties().device_name,
+                bv::PhysicalDeviceType_to_string(
+                    physical_device->properties().device_type
+                )
+            );
+        }
+
+        int32_t idx;
+        while (true)
+        {
+            std::cin >> idx;
+            if (idx < 0 || idx >= context->physical_devices().size())
+            {
+                std::cout << "enter a valid physical device index\n";
+            }
+            {
+                break;
+            }
+        }
+
+        physical_device = context->physical_devices()[idx];
+    }
+
+    void App::create_logical_device()
+    {
+        if (!physical_device->queue_family_indices().graphics.has_value())
+        {
+            throw std::runtime_error(
+                "the selected physical device doesn't have a queue family that "
+                "supports graphics operations"
+            );
+        }
+
+        uint32_t graphics_family_idx =
+            physical_device->queue_family_indices().graphics.value();
+
+        std::vector<bv::QueueRequest> queue_requests;
+        queue_requests.push_back(bv::QueueRequest{
+            .flags = bv::QueueRequestFlags{},
+                .queue_family_index = graphics_family_idx,
+                .num_queues_to_create = 1,
+                .priorities = { 1.f }
+        });
+
+        bv::DeviceConfig config{
+            .queue_requests = queue_requests,
+                .extensions = {},
+                .enabled_features = bv::PhysicalDeviceFeatures{}
+        };
+
+        auto device_result = bv::Device::create(
+            context,
+            physical_device,
+            config
+        );
+        if (!device_result.ok())
+        {
+            std::string s =
+                "failed to create device: "
+                + device_result.error().to_string();
+            throw std::runtime_error(s.c_str());
+        }
+        device = device_result.value();
+
+        graphics_queue = device->retrieve_queue(graphics_family_idx, 0);
     }
 
     void App::main_loop()

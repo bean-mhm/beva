@@ -806,7 +806,7 @@ namespace bv
         bool error : 1;
     };
 
-    // // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessageTypeFlagBitsEXT.html
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessageTypeFlagBitsEXT.html
     struct DebugMessageTypeFilter
     {
         bool general : 1;
@@ -855,6 +855,12 @@ namespace bv
 
     BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(DebugMessageType);
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceQueueCreateFlagBits.html
+    struct QueueRequestFlags
+    {
+        bool protected_ : 1 = false;
+    };
+
 #pragma endregion
 
 #pragma region error handling
@@ -863,22 +869,30 @@ namespace bv
     {
     public:
         constexpr Error()
-            : _api_result(VK_SUCCESS)
+            : message("no error information provided"),
+            api_result(std::nullopt)
+        {}
+
+        constexpr Error(std::string message)
+            : message(std::move(message)),
+            api_result(std::nullopt)
         {}
 
         constexpr Error(ApiResult api_result)
-            : _api_result(api_result)
+            : message(),
+            api_result(api_result)
         {}
 
-        constexpr ApiResult api_result() const
-        {
-            return _api_result;
-        }
+        constexpr Error(std::string message, ApiResult api_result)
+            : message(std::move(message)),
+            api_result(api_result)
+        {}
 
         std::string to_string() const;
 
     private:
-        ApiResult _api_result;
+        std::string message;
+        std::optional<ApiResult> api_result;
 
     };
 
@@ -1255,6 +1269,16 @@ namespace bv
         bool inherited_queries : 1 = false;
     };
 
+    PhysicalDeviceFeatures
+        PhysicalDeviceFeatures_from_VkPhysicalDeviceFeatures(
+            VkPhysicalDeviceFeatures vk_physical_device_features
+        );
+
+    VkPhysicalDeviceFeatures
+        PhysicalDeviceFeatures_to_VkPhysicalDeviceFeatures(
+            PhysicalDeviceFeatures physical_device_features
+        );
+
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent3D.html
     struct Extent3D
     {
@@ -1322,7 +1346,7 @@ namespace bv
             return _queue_family_indices;
         }
 
-    private:
+    protected:
         VkPhysicalDevice vk_physical_device;
 
         PhysicalDeviceProperties _properties;
@@ -1339,6 +1363,7 @@ namespace bv
         );
 
         friend class Context;
+        friend class Device;
 
     };
 
@@ -1406,7 +1431,8 @@ namespace bv
             const std::shared_ptr<Allocator>& allocator
         );
 
-        constexpr const std::vector<PhysicalDevice>& physical_devices() const
+        constexpr const std::vector<std::shared_ptr<PhysicalDevice>>&
+            physical_devices() const
         {
             return _physical_devices;
         }
@@ -1421,7 +1447,7 @@ namespace bv
 
         VkInstance vk_instance = nullptr;
 
-        std::vector<PhysicalDevice> _physical_devices;
+        std::vector<std::shared_ptr<PhysicalDevice>> _physical_devices;
 
         Context(
             const ContextConfig& config,
@@ -1430,9 +1456,10 @@ namespace bv
 
         const VkAllocationCallbacks* vk_allocator_ptr() const;
 
-        Result<> add_physical_devices();
+        Result<> fetch_physical_devices();
 
         friend class DebugMessenger;
+        friend class Device;
 
     };
 
@@ -1489,12 +1516,13 @@ namespace bv
             return _context;
         }
 
-        constexpr DebugMessageSeverityFilter message_severity_filter() const
+        constexpr const DebugMessageSeverityFilter&
+            message_severity_filter() const
         {
             return _message_severity_filter;
         }
 
-        constexpr DebugMessageTypeFilter message_type_filter() const
+        constexpr const DebugMessageTypeFilter& message_type_filter() const
         {
             return _message_type_filter;
         }
@@ -1516,9 +1544,92 @@ namespace bv
 
         DebugMessenger(
             const std::shared_ptr<Context>& context,
-            DebugMessageSeverityFilter message_severity_filter,
-            DebugMessageTypeFilter message_type_filter,
+            const DebugMessageSeverityFilter& message_severity_filter,
+            const DebugMessageTypeFilter& message_type_filter,
             const DebugCallback& callback
+        );
+
+    };
+
+    class Queue
+    {
+    public:
+        Queue() = delete;
+        Queue(const Queue& other) = delete;
+        Queue(Queue&& other);
+
+    protected:
+        VkQueue vk_queue;
+
+        Queue(VkQueue vk_queue);
+
+        friend class Device;
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceQueueCreateInfo.html
+    struct QueueRequest
+    {
+        QueueRequestFlags flags;
+        uint32_t queue_family_index;
+        uint32_t num_queues_to_create;
+        std::vector<float> priorities; // * same size as num_queues_to_create
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceCreateInfo.html
+    struct DeviceConfig
+    {
+        std::vector<QueueRequest> queue_requests;
+        std::vector<std::string> extensions;
+        PhysicalDeviceFeatures enabled_features;
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDevice.html
+    class Device
+    {
+    public:
+        Device() = delete;
+        Device(const Device& other) = delete;
+        Device(Device&& other);
+
+        static Result<std::shared_ptr<Device>> create(
+            const std::shared_ptr<Context>& context,
+            const std::shared_ptr<PhysicalDevice>& physical_device,
+            const DeviceConfig& config
+        );
+
+        constexpr const std::shared_ptr<Context>& context() const
+        {
+            return _context;
+        }
+
+        constexpr const std::shared_ptr<PhysicalDevice>& physical_device() const
+        {
+            return _physical_device;
+        }
+
+        constexpr const DeviceConfig& config() const
+        {
+            return _config;
+        }
+
+        std::shared_ptr<Queue> retrieve_queue(
+            uint32_t queue_family_index,
+            uint32_t queue_index
+        );
+
+        ~Device();
+
+    protected:
+        std::shared_ptr<Context> _context;
+        std::shared_ptr<PhysicalDevice> _physical_device;
+        DeviceConfig _config;
+        VkDevice vk_device;
+
+        Device(
+            const std::shared_ptr<Context>& context,
+            const std::shared_ptr<PhysicalDevice>& physical_device,
+            const DeviceConfig& config
         );
 
     };
