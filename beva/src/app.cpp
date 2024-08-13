@@ -174,13 +174,20 @@ namespace beva_demo
         int32_t idx;
         while (true)
         {
-            std::cin >> idx;
-            if (idx < 0 || idx >= context->physical_devices().size())
+            std::string s_idx;
+            std::getline(std::cin, s_idx);
+            try
+            {
+                idx = std::stoi(s_idx);
+                if (idx < 0 || idx >= context->physical_devices().size())
+                {
+                    throw std::exception();
+                }
+                break;
+            }
+            catch (const std::exception&)
             {
                 std::cout << "enter a valid physical device index\n";
-            }
-            {
-                break;
             }
         }
 

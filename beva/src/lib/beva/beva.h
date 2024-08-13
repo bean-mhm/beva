@@ -999,6 +999,8 @@ namespace bv
     class Allocator
     {
     public:
+        using ptr = std::shared_ptr<Allocator>;
+
         virtual void* allocate(
             size_t size,
             size_t alignment,
@@ -1324,6 +1326,8 @@ namespace bv
     class PhysicalDevice
     {
     public:
+        using ptr = std::shared_ptr<PhysicalDevice>;
+
         PhysicalDevice() = delete;
 
         constexpr const PhysicalDeviceProperties& properties() const
@@ -1396,6 +1400,8 @@ namespace bv
     class Context
     {
     public:
+        using ptr = std::shared_ptr<Context>;
+
         Context() = delete;
         Context(const Context& other) = delete;
         Context(Context&& other);
@@ -1403,9 +1409,9 @@ namespace bv
         // * it's best to keep at least one external reference to the allocator
         //   so that it doesn't die with the Context because the driver might
         //   still use the allocator even after the instance is destroyed.
-        static Result<std::shared_ptr<Context>> create(
+        static Result<Context::ptr> create(
             const ContextConfig& config,
-            const std::shared_ptr<Allocator>& allocator = nullptr
+            const Allocator::ptr& allocator = nullptr
         );
 
         static Result<std::vector<LayerProperties>> available_layers();
@@ -1419,7 +1425,7 @@ namespace bv
             return _config;
         }
 
-        constexpr const std::shared_ptr<Allocator>& allocator() const
+        constexpr const Allocator::ptr& allocator() const
         {
             return _allocator;
         }
@@ -1428,10 +1434,10 @@ namespace bv
         //   so that it doesn't die with the Context because the driver might
         //   still use the allocator even after the instance is destroyed.
         void set_allocator(
-            const std::shared_ptr<Allocator>& allocator
+            const Allocator::ptr& allocator
         );
 
-        constexpr const std::vector<std::shared_ptr<PhysicalDevice>>&
+        constexpr const std::vector<PhysicalDevice::ptr>&
             physical_devices() const
         {
             return _physical_devices;
@@ -1442,16 +1448,16 @@ namespace bv
     protected:
         ContextConfig _config;
 
-        std::shared_ptr<Allocator> _allocator = nullptr;
+        Allocator::ptr _allocator = nullptr;
         VkAllocationCallbacks vk_allocator{ 0 };
 
         VkInstance vk_instance = nullptr;
 
-        std::vector<std::shared_ptr<PhysicalDevice>> _physical_devices;
+        std::vector<PhysicalDevice::ptr> _physical_devices;
 
         Context(
             const ContextConfig& config,
-            const std::shared_ptr<Allocator>& allocator
+            const Allocator::ptr& allocator
         );
 
         const VkAllocationCallbacks* vk_allocator_ptr() const;
@@ -1501,17 +1507,19 @@ namespace bv
     class DebugMessenger
     {
     public:
+        using ptr = std::shared_ptr<DebugMessenger>;
+
         DebugMessenger(const DebugMessenger& other) = delete;
         DebugMessenger(DebugMessenger&& other);
 
-        static Result<std::shared_ptr<DebugMessenger>> create(
-            const std::shared_ptr<Context>& context,
+        static Result<DebugMessenger::ptr> create(
+            const Context::ptr& context,
             DebugMessageSeverityFilter message_severity_filter,
             DebugMessageTypeFilter message_type_filter,
             const DebugCallback& callback
         );
 
-        constexpr const std::shared_ptr<Context>& context() const
+        constexpr const Context::ptr& context() const
         {
             return _context;
         }
@@ -1535,7 +1543,7 @@ namespace bv
         ~DebugMessenger();
 
     protected:
-        std::shared_ptr<Context> _context;
+        Context::ptr _context;
         VkDebugUtilsMessengerEXT vk_debug_messenger;
 
         DebugMessageSeverityFilter _message_severity_filter;
@@ -1543,7 +1551,7 @@ namespace bv
         DebugCallback _callback;
 
         DebugMessenger(
-            const std::shared_ptr<Context>& context,
+            const Context::ptr& context,
             const DebugMessageSeverityFilter& message_severity_filter,
             const DebugMessageTypeFilter& message_type_filter,
             const DebugCallback& callback
@@ -1554,6 +1562,8 @@ namespace bv
     class Queue
     {
     public:
+        using ptr = std::shared_ptr<Queue>;
+
         Queue() = delete;
         Queue(const Queue& other) = delete;
         Queue(Queue&& other);
@@ -1588,22 +1598,24 @@ namespace bv
     class Device
     {
     public:
+        using ptr = std::shared_ptr<Device>;
+
         Device() = delete;
         Device(const Device& other) = delete;
         Device(Device&& other);
 
-        static Result<std::shared_ptr<Device>> create(
-            const std::shared_ptr<Context>& context,
-            const std::shared_ptr<PhysicalDevice>& physical_device,
+        static Result<Device::ptr> create(
+            const Context::ptr& context,
+            const PhysicalDevice::ptr& physical_device,
             const DeviceConfig& config
         );
 
-        constexpr const std::shared_ptr<Context>& context() const
+        constexpr const Context::ptr& context() const
         {
             return _context;
         }
 
-        constexpr const std::shared_ptr<PhysicalDevice>& physical_device() const
+        constexpr const PhysicalDevice::ptr& physical_device() const
         {
             return _physical_device;
         }
@@ -1613,7 +1625,7 @@ namespace bv
             return _config;
         }
 
-        std::shared_ptr<Queue> retrieve_queue(
+        Queue::ptr retrieve_queue(
             uint32_t queue_family_index,
             uint32_t queue_index
         );
@@ -1621,14 +1633,14 @@ namespace bv
         ~Device();
 
     protected:
-        std::shared_ptr<Context> _context;
-        std::shared_ptr<PhysicalDevice> _physical_device;
+        Context::ptr _context;
+        PhysicalDevice::ptr _physical_device;
         DeviceConfig _config;
         VkDevice vk_device;
 
         Device(
-            const std::shared_ptr<Context>& context,
-            const std::shared_ptr<PhysicalDevice>& physical_device,
+            const Context::ptr& context,
+            const PhysicalDevice::ptr& physical_device,
             const DeviceConfig& config
         );
 

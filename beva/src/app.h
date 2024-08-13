@@ -1,10 +1,5 @@
 #pragma once
 
-#include <string>
-#include <vector>
-#include <memory>
-#include <optional>>
-
 #include "vulkan/vulkan.h"
 #include "GLFW/glfw3.h"
 
@@ -27,11 +22,11 @@ namespace beva_demo
         static constexpr bool debug_mode = true;
 
         GLFWwindow* window;
-        std::shared_ptr<bv::Context> context = nullptr;
-        std::shared_ptr<bv::DebugMessenger> debug_messenger = nullptr;
-        std::shared_ptr<bv::PhysicalDevice> physical_device = nullptr;
-        std::shared_ptr<bv::Device> device = nullptr;
-        std::shared_ptr<bv::Queue> graphics_queue = nullptr;
+        bv::Context::ptr context = nullptr;
+        bv::DebugMessenger::ptr debug_messenger = nullptr;
+        bv::PhysicalDevice::ptr physical_device = nullptr;
+        bv::Device::ptr device = nullptr;
+        bv::Queue::ptr graphics_queue = nullptr;
 
         void init_window();
         void init_context();

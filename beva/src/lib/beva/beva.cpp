@@ -525,12 +525,12 @@ namespace bv
         other.vk_instance = nullptr;
     }
 
-    Result<std::shared_ptr<Context>> Context::create(
+    Result<Context::ptr> Context::create(
         const ContextConfig& config,
-        const std::shared_ptr<Allocator>& allocator
+        const Allocator::ptr& allocator
     )
     {
-        std::shared_ptr<Context> c = std::make_shared<Context_public_ctor>(
+        Context::ptr c = std::make_shared<Context_public_ctor>(
             config,
             allocator
         );
@@ -722,7 +722,7 @@ namespace bv
         return extensions;
     }
 
-    void Context::set_allocator(const std::shared_ptr<Allocator>& allocator)
+    void Context::set_allocator(const Allocator::ptr& allocator)
     {
         _allocator = allocator;
         vk_allocator.pUserData = _allocator.get();
@@ -735,7 +735,7 @@ namespace bv
 
     Context::Context(
         const ContextConfig& config,
-        const std::shared_ptr<Allocator>& allocator
+        const Allocator::ptr& allocator
     )
         : _config(config), _allocator(allocator)
     {}
@@ -1297,14 +1297,14 @@ namespace bv
         other._callback = nullptr;
     }
 
-    Result<std::shared_ptr<DebugMessenger>> DebugMessenger::create(
-        const std::shared_ptr<Context>& context,
+    Result<DebugMessenger::ptr> DebugMessenger::create(
+        const Context::ptr& context,
         DebugMessageSeverityFilter message_severity_filter,
         DebugMessageTypeFilter message_type_filter,
         const DebugCallback& callback
     )
     {
-        std::shared_ptr<DebugMessenger> messenger =
+        DebugMessenger::ptr messenger =
             std::make_shared<DebugMessenger_public_ctor>(
                 context,
                 message_severity_filter,
@@ -1386,7 +1386,7 @@ namespace bv
     }
 
     DebugMessenger::DebugMessenger(
-        const std::shared_ptr<Context>& context,
+        const Context::ptr& context,
         const DebugMessageSeverityFilter& message_severity_filter,
         const DebugMessageTypeFilter& message_type_filter,
         const DebugCallback& callback
@@ -1422,13 +1422,13 @@ namespace bv
         other.vk_device = nullptr;
     }
 
-    Result<std::shared_ptr<Device>>Device::create(
-        const std::shared_ptr<Context>& context,
-        const std::shared_ptr<PhysicalDevice>& physical_device,
+    Result<Device::ptr>Device::create(
+        const Context::ptr& context,
+        const PhysicalDevice::ptr& physical_device,
         const DeviceConfig& config
     )
     {
-        std::shared_ptr<Device> device = std::make_shared<Device_public_ctor>(
+        Device::ptr device = std::make_shared<Device_public_ctor>(
             context,
             physical_device,
             config
@@ -1513,7 +1513,7 @@ namespace bv
         return device;
     }
 
-    std::shared_ptr<Queue> Device::retrieve_queue(
+    Queue::ptr Device::retrieve_queue(
         uint32_t queue_family_index,
         uint32_t queue_index
     )
@@ -1534,8 +1534,8 @@ namespace bv
     }
 
     Device::Device(
-        const std::shared_ptr<Context>& context,
-        const std::shared_ptr<PhysicalDevice>& physical_device,
+        const Context::ptr& context,
+        const PhysicalDevice::ptr& physical_device,
         const DeviceConfig& config
     )
         : _context(context),
