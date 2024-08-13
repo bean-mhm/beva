@@ -85,18 +85,18 @@ namespace beva_demo
             }
         }
 
-        beva::ContextConfig config{
+        bv::ContextConfig config{
             .will_enumerate_portability = false,
                 .app_name = "beva demo",
-                .app_version = beva::Version(1, 1, 0, 0),
+                .app_version = bv::Version(1, 1, 0, 0),
                 .engine_name = "no engine",
-                .engine_version = beva::Version(1, 1, 0, 0),
-                .vulkan_api_version = beva::VulkanApiVersion::Vulkan1_0,
+                .engine_version = bv::Version(1, 1, 0, 0),
+                .vulkan_api_version = bv::VulkanApiVersion::Vulkan1_0,
                 .layers = layers,
                 .extensions = extensions
         };
 
-        auto context_result = beva::Context::create(config);
+        auto context_result = bv::Context::create(config);
         if (!context_result.ok())
         {
             std::string s =
@@ -114,28 +114,28 @@ namespace beva_demo
             return;
         }
 
-        beva::DebugMessageSeverityFilter severity_filter{
+        bv::DebugMessageSeverityFilter severity_filter{
             .verbose = false,
                 .info = false,
                 .warning = true,
                 .error = true
         };
 
-        beva::DebugMessageTypeFilter type_filter{
+        bv::DebugMessageTypeFilter type_filter{
             .general = true,
                 .validation = true,
                 .performance = true,
                 .device_address_binding = true
         };
 
-        auto debug_messenger_result = beva::DebugMessenger::create(
+        auto debug_messenger_result = bv::DebugMessenger::create(
             context,
             severity_filter,
             type_filter,
             [](
-                beva::DebugMessageSeverity message_severity,
-                beva::DebugMessageType message_type,
-                const beva::DebugMessageData& message_data
+                bv::DebugMessageSeverity message_severity,
+                bv::DebugMessageType message_type,
+                const bv::DebugMessageData& message_data
                 )
             {
                 std::cout << message_data.message << '\n';

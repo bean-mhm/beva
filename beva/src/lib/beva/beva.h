@@ -16,7 +16,7 @@
 #include "vulkan/vulkan.h"
 #include "vulkan/vk_enum_string_helper.h"
 
-namespace beva
+namespace bv
 {
 
     template<size_t size, typename T>
@@ -1466,7 +1466,7 @@ namespace beva
     using DebugCallback = std::function<void(
         DebugMessageSeverity,
         DebugMessageType,
-        const beva::DebugMessageData&
+        const DebugMessageData&
         )>;
 
     // * requires extension VK_EXT_DEBUG_UTILS_EXTENSION_NAME

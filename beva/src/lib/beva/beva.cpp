@@ -1,6 +1,6 @@
 #include "beva.h"
 
-namespace beva
+namespace bv
 {
 
     // forward declarations

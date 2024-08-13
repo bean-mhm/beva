@@ -24,8 +24,8 @@ namespace beva_demo
         static constexpr bool debug_mode = true;
 
         GLFWwindow* window;
-        std::shared_ptr<beva::Context> context = nullptr;
-        std::shared_ptr<beva::DebugMessenger> debug_messenger = nullptr;
+        std::shared_ptr<bv::Context> context = nullptr;
+        std::shared_ptr<bv::DebugMessenger> debug_messenger = nullptr;
 
         void init_window();
         void init_context();
