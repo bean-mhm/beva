@@ -4,8 +4,9 @@ namespace bv
 {
 
     // define a derived class named ClassName_public_ctor that lets us use the
-    // previously private constructors as public ones so that they can be used
-    // in std::make_shared() or whatever else.
+    // previously private constructors (actually protected, just go with it) as
+    // public ones so that they can be used in std::make_shared() or whatever
+    // else.
 #define DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(ClassName) \
     class ClassName##_public_ctor : public ClassName \
     { \
@@ -18,6 +19,7 @@ namespace bv
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(PhysicalDevice);
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Context);
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DebugMessenger);
+    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Surface);
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Queue);
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Device);
 
@@ -116,6 +118,21 @@ namespace bv
         return ApiResultType_string[(uint8_t)_type];
     }
 
+    SampleCountFlags SampleCountFlags_from_VkSampleCountFlags(
+        VkSampleCountFlags vk_sample_count_flags
+    )
+    {
+        return SampleCountFlags{
+            ._1 = (bool)(vk_sample_count_flags & VK_SAMPLE_COUNT_1_BIT),
+            ._2 = (bool)(vk_sample_count_flags & VK_SAMPLE_COUNT_2_BIT),
+            ._4 = (bool)(vk_sample_count_flags & VK_SAMPLE_COUNT_4_BIT),
+            ._8 = (bool)(vk_sample_count_flags & VK_SAMPLE_COUNT_8_BIT),
+            ._16 = (bool)(vk_sample_count_flags & VK_SAMPLE_COUNT_16_BIT),
+            ._32 = (bool)(vk_sample_count_flags & VK_SAMPLE_COUNT_32_BIT),
+            ._64 = (bool)(vk_sample_count_flags & VK_SAMPLE_COUNT_64_BIT)
+        };
+    }
+
     std::string Error::to_string() const
     {
         std::string s = message;
@@ -133,6 +150,351 @@ namespace bv
     std::string Version::to_string() const
     {
         return std::format("{}.{}.{}.{}", variant, major, minor, patch);
+    }
+
+    PhysicalDeviceLimits PhysicalDeviceLimits_from_VkPhysicalDeviceLimits(
+        VkPhysicalDeviceLimits vk_physical_device_limits
+    )
+    {
+        return PhysicalDeviceLimits{
+            .max_image_dimension1d =
+            vk_physical_device_limits.maxImageDimension1D,
+
+            .max_image_dimension2d =
+            vk_physical_device_limits.maxImageDimension2D,
+
+            .max_image_dimension3d =
+            vk_physical_device_limits.maxImageDimension3D,
+
+            .max_image_dimension_cube =
+            vk_physical_device_limits.maxImageDimensionCube,
+
+            .max_image_array_layers =
+            vk_physical_device_limits.maxImageArrayLayers,
+
+            .max_texel_buffer_elements =
+            vk_physical_device_limits.maxTexelBufferElements,
+
+            .max_uniform_buffer_range =
+            vk_physical_device_limits.maxUniformBufferRange,
+
+            .max_storage_buffer_range =
+            vk_physical_device_limits.maxStorageBufferRange,
+
+            .max_push_constants_size =
+            vk_physical_device_limits.maxPushConstantsSize,
+
+            .max_memory_allocation_count =
+            vk_physical_device_limits.maxMemoryAllocationCount,
+
+            .max_sampler_allocation_count =
+            vk_physical_device_limits.maxSamplerAllocationCount,
+
+            .buffer_image_granularity =
+            vk_physical_device_limits.bufferImageGranularity,
+
+            .sparse_address_space_size =
+            vk_physical_device_limits.sparseAddressSpaceSize,
+
+            .max_bound_descriptor_sets =
+            vk_physical_device_limits.maxBoundDescriptorSets,
+
+            .max_per_stage_descriptor_samplers =
+            vk_physical_device_limits.maxPerStageDescriptorSamplers,
+
+            .max_per_stage_descriptor_uniform_buffers =
+            vk_physical_device_limits.maxPerStageDescriptorUniformBuffers,
+
+            .max_per_stage_descriptor_storage_buffers =
+            vk_physical_device_limits.maxPerStageDescriptorStorageBuffers,
+
+            .max_per_stage_descriptor_sampled_images =
+            vk_physical_device_limits.maxPerStageDescriptorSampledImages,
+
+            .max_per_stage_descriptor_storage_images =
+            vk_physical_device_limits.maxPerStageDescriptorStorageImages,
+
+            .max_per_stage_descriptor_input_attachments =
+            vk_physical_device_limits.maxPerStageDescriptorInputAttachments,
+
+            .max_per_stage_resources =
+            vk_physical_device_limits.maxPerStageResources,
+
+            .max_descriptor_set_samplers =
+            vk_physical_device_limits.maxDescriptorSetSamplers,
+
+            .max_descriptor_set_uniform_buffers =
+            vk_physical_device_limits.maxDescriptorSetUniformBuffers,
+
+            .max_descriptor_set_uniform_buffers_dynamic =
+            vk_physical_device_limits.maxDescriptorSetUniformBuffersDynamic,
+
+            .max_descriptor_set_storage_buffers =
+            vk_physical_device_limits.maxDescriptorSetStorageBuffers,
+
+            .max_descriptor_set_storage_buffers_dynamic =
+            vk_physical_device_limits.maxDescriptorSetStorageBuffersDynamic,
+
+            .max_descriptor_set_sampled_images =
+            vk_physical_device_limits.maxDescriptorSetSampledImages,
+
+            .max_descriptor_set_storage_images =
+            vk_physical_device_limits.maxDescriptorSetStorageImages,
+
+            .max_descriptor_set_input_attachments =
+            vk_physical_device_limits.maxDescriptorSetInputAttachments,
+
+            .max_vertex_input_attributes =
+            vk_physical_device_limits.maxVertexInputAttributes,
+
+            .max_vertex_input_bindings =
+            vk_physical_device_limits.maxVertexInputBindings,
+
+            .max_vertex_input_attribute_offset =
+            vk_physical_device_limits.maxVertexInputAttributeOffset,
+
+            .max_vertex_input_binding_stride =
+            vk_physical_device_limits.maxVertexInputBindingStride,
+
+            .max_vertex_output_components =
+            vk_physical_device_limits.maxVertexOutputComponents,
+
+            .max_tessellation_generation_level =
+            vk_physical_device_limits.maxTessellationGenerationLevel,
+
+            .max_tessellation_patch_size =
+            vk_physical_device_limits.maxTessellationPatchSize,
+
+            .max_tessellation_control_per_vertex_input_components =
+            vk_physical_device_limits
+            .maxTessellationControlPerVertexInputComponents,
+
+            .max_tessellation_control_per_vertex_output_components =
+            vk_physical_device_limits
+            .maxTessellationControlPerVertexOutputComponents,
+
+            .max_tessellation_control_per_patch_output_components =
+            vk_physical_device_limits
+            .maxTessellationControlPerPatchOutputComponents,
+
+            .max_tessellation_control_total_output_components =
+            vk_physical_device_limits
+            .maxTessellationControlTotalOutputComponents,
+
+            .max_tessellation_evaluation_input_components =
+            vk_physical_device_limits.maxTessellationEvaluationInputComponents,
+
+            .max_tessellation_evaluation_output_components =
+            vk_physical_device_limits.maxTessellationEvaluationOutputComponents,
+
+            .max_geometry_shader_invocations =
+            vk_physical_device_limits.maxGeometryShaderInvocations,
+
+            .max_geometry_input_components =
+            vk_physical_device_limits.maxGeometryInputComponents,
+
+            .max_geometry_output_components =
+            vk_physical_device_limits.maxGeometryOutputComponents,
+
+            .max_geometry_output_vertices =
+            vk_physical_device_limits.maxGeometryOutputVertices,
+
+            .max_geometry_total_output_components =
+            vk_physical_device_limits.maxGeometryTotalOutputComponents,
+
+            .max_fragment_input_components =
+            vk_physical_device_limits.maxFragmentInputComponents,
+
+            .max_fragment_output_attachments =
+            vk_physical_device_limits.maxFragmentOutputAttachments,
+
+            .max_fragment_dual_src_attachments =
+            vk_physical_device_limits.maxFragmentDualSrcAttachments,
+
+            .max_fragment_combined_output_resources =
+            vk_physical_device_limits.maxFragmentCombinedOutputResources,
+
+            .max_compute_shared_memory_size =
+            vk_physical_device_limits.maxComputeSharedMemorySize,
+
+            .max_compute_work_group_count = raw_arr_to_std<3>(
+                vk_physical_device_limits.maxComputeWorkGroupCount
+            ),
+
+            .max_compute_work_group_invocations =
+            vk_physical_device_limits.maxComputeWorkGroupInvocations,
+
+            .max_compute_work_group_size = raw_arr_to_std<3>(
+                vk_physical_device_limits.maxComputeWorkGroupSize
+            ),
+
+            .sub_pixel_precision_bits =
+            vk_physical_device_limits.subPixelPrecisionBits,
+
+            .sub_texel_precision_bits =
+            vk_physical_device_limits.subTexelPrecisionBits,
+
+            .mipmap_precision_bits =
+            vk_physical_device_limits.mipmapPrecisionBits,
+
+            .max_draw_indexed_index_value =
+            vk_physical_device_limits.maxDrawIndexedIndexValue,
+
+            .max_draw_indirect_count =
+            vk_physical_device_limits.maxDrawIndirectCount,
+
+            .max_sampler_lod_bias = vk_physical_device_limits.maxSamplerLodBias,
+
+            .max_sampler_anisotropy =
+            vk_physical_device_limits.maxSamplerAnisotropy,
+
+            .max_viewports = vk_physical_device_limits.maxViewports,
+
+            .max_viewport_dimensions = raw_arr_to_std<2>(
+                vk_physical_device_limits.maxViewportDimensions
+            ),
+
+            .viewport_bounds_range = raw_arr_to_std<2>(
+                vk_physical_device_limits.viewportBoundsRange
+            ),
+
+            .viewport_sub_pixel_bits =
+            vk_physical_device_limits.viewportSubPixelBits,
+
+            .min_memory_map_alignment =
+            vk_physical_device_limits.minMemoryMapAlignment,
+
+            .min_texel_buffer_offset_alignment =
+            vk_physical_device_limits.minTexelBufferOffsetAlignment,
+
+            .min_uniform_buffer_offset_alignment =
+            vk_physical_device_limits.minUniformBufferOffsetAlignment,
+
+            .min_storage_buffer_offset_alignment =
+            vk_physical_device_limits.minStorageBufferOffsetAlignment,
+
+            .min_texel_offset = vk_physical_device_limits.minTexelOffset,
+
+            .max_texel_offset = vk_physical_device_limits.maxTexelOffset,
+
+            .min_texel_gather_offset =
+            vk_physical_device_limits.minTexelGatherOffset,
+
+            .max_texel_gather_offset =
+            vk_physical_device_limits.maxTexelGatherOffset,
+
+            .min_interpolation_offset =
+            vk_physical_device_limits.minInterpolationOffset,
+
+            .max_interpolation_offset =
+            vk_physical_device_limits.maxInterpolationOffset,
+
+            .sub_pixel_interpolation_offset_bits =
+            vk_physical_device_limits.subPixelInterpolationOffsetBits,
+
+            .max_framebuffer_width =
+            vk_physical_device_limits.maxFramebufferWidth,
+
+            .max_framebuffer_height =
+            vk_physical_device_limits.maxFramebufferHeight,
+
+            .max_framebuffer_layers =
+            vk_physical_device_limits.maxFramebufferLayers,
+
+            .framebuffer_color_sample_counts =
+            SampleCountFlags_from_VkSampleCountFlags(
+                vk_physical_device_limits.framebufferColorSampleCounts
+            ),
+
+            .framebuffer_depth_sample_counts =
+            SampleCountFlags_from_VkSampleCountFlags(
+                vk_physical_device_limits.framebufferDepthSampleCounts
+            ),
+
+            .framebuffer_stencil_sample_counts =
+            SampleCountFlags_from_VkSampleCountFlags(
+                vk_physical_device_limits.framebufferStencilSampleCounts
+            ),
+
+            .framebuffer_no_attachments_sample_counts =
+            SampleCountFlags_from_VkSampleCountFlags(
+                vk_physical_device_limits.framebufferNoAttachmentsSampleCounts
+            ),
+
+            .max_color_attachments =
+            vk_physical_device_limits.maxColorAttachments,
+
+            .sampled_image_color_sample_counts =
+            SampleCountFlags_from_VkSampleCountFlags(
+                vk_physical_device_limits.sampledImageColorSampleCounts
+            ),
+
+            .sampled_image_integer_sample_counts =
+            SampleCountFlags_from_VkSampleCountFlags(
+                vk_physical_device_limits.sampledImageIntegerSampleCounts
+            ),
+
+            .sampled_image_depth_sample_counts =
+            SampleCountFlags_from_VkSampleCountFlags(
+                vk_physical_device_limits.sampledImageDepthSampleCounts
+            ),
+
+            .sampled_image_stencil_sample_counts =
+            SampleCountFlags_from_VkSampleCountFlags(
+                vk_physical_device_limits.sampledImageStencilSampleCounts
+            ),
+
+            .storage_image_sample_counts =
+            SampleCountFlags_from_VkSampleCountFlags(
+                vk_physical_device_limits.storageImageSampleCounts
+            ),
+
+            .max_sample_mask_words =
+            vk_physical_device_limits.maxSampleMaskWords,
+
+            .timestamp_compute_and_graphics =
+            (bool)vk_physical_device_limits.timestampComputeAndGraphics,
+
+            .timestamp_period = vk_physical_device_limits.timestampPeriod,
+
+            .max_clip_distances = vk_physical_device_limits.maxClipDistances,
+
+            .max_cull_distances = vk_physical_device_limits.maxCullDistances,
+
+            .max_combined_clip_and_cull_distances =
+            vk_physical_device_limits.maxCombinedClipAndCullDistances,
+
+            .discrete_queue_priorities =
+            vk_physical_device_limits.discreteQueuePriorities,
+
+            .point_size_range = raw_arr_to_std<2>(
+                vk_physical_device_limits.pointSizeRange
+            ),
+
+            .line_width_range = raw_arr_to_std<2>(
+                vk_physical_device_limits.lineWidthRange
+            ),
+
+            .point_size_granularity =
+            vk_physical_device_limits.pointSizeGranularity,
+
+            .line_width_granularity =
+            vk_physical_device_limits.lineWidthGranularity,
+
+            .strict_lines = (bool)vk_physical_device_limits.strictLines,
+
+            .standard_sample_locations =
+            (bool)vk_physical_device_limits.standardSampleLocations,
+
+            .optimal_buffer_copy_offset_alignment =
+            vk_physical_device_limits.optimalBufferCopyOffsetAlignment,
+
+            .optimal_buffer_copy_row_pitch_alignment =
+            vk_physical_device_limits.optimalBufferCopyRowPitchAlignment,
+
+            .non_coherent_atom_size =
+            vk_physical_device_limits.nonCoherentAtomSize
+        };
     }
 
     PhysicalDeviceFeatures
@@ -517,12 +879,12 @@ namespace bv
         _allocator = other._allocator;
         other._allocator = nullptr;
 
-        vk_allocator = other.vk_allocator;
-        vk_allocator.pUserData = _allocator.get();
-        other.vk_allocator = VkAllocationCallbacks{ 0 };
+        _vk_allocator = other._vk_allocator;
+        _vk_allocator.pUserData = _allocator.get();
+        other._vk_allocator = VkAllocationCallbacks{};
 
-        vk_instance = other.vk_instance;
-        other.vk_instance = nullptr;
+        _vk_instance = other._vk_instance;
+        other._vk_instance = nullptr;
     }
 
     Result<Context::ptr> Context::create(
@@ -537,13 +899,13 @@ namespace bv
 
         // allocation callbacks
         {
-            c->vk_allocator.pUserData = c->allocator().get();
-            c->vk_allocator.pfnAllocation = vk_allocation_callback;
-            c->vk_allocator.pfnReallocation = vk_reallocation_callback;
-            c->vk_allocator.pfnFree = vk_free_callback;
-            c->vk_allocator.pfnInternalAllocation =
+            c->_vk_allocator.pUserData = c->allocator().get();
+            c->_vk_allocator.pfnAllocation = vk_allocation_callback;
+            c->_vk_allocator.pfnReallocation = vk_reallocation_callback;
+            c->_vk_allocator.pfnFree = vk_free_callback;
+            c->_vk_allocator.pfnInternalAllocation =
                 vk_internal_allocation_notification;
-            c->vk_allocator.pfnInternalFree = vk_internal_free_notification;
+            c->_vk_allocator.pfnInternalFree = vk_internal_free_notification;
         }
 
         VkInstanceCreateInfo create_info{};
@@ -631,7 +993,7 @@ namespace bv
         VkResult vk_result = vkCreateInstance(
             &create_info,
             c->vk_allocator_ptr(),
-            &c->vk_instance
+            &c->_vk_instance
         );
         if (vk_result != VK_SUCCESS)
         {
@@ -725,20 +1087,8 @@ namespace bv
     void Context::set_allocator(const Allocator::ptr& allocator)
     {
         _allocator = allocator;
-        vk_allocator.pUserData = _allocator.get();
+        _vk_allocator.pUserData = _allocator.get();
     }
-
-    Context::~Context()
-    {
-        vkDestroyInstance(vk_instance, vk_allocator_ptr());
-    }
-
-    Context::Context(
-        const ContextConfig& config,
-        const Allocator::ptr& allocator
-    )
-        : _config(config), _allocator(allocator)
-    {}
 
     const VkAllocationCallbacks* Context::vk_allocator_ptr() const
     {
@@ -746,17 +1096,19 @@ namespace bv
         {
             return nullptr;
         }
-        return &vk_allocator;
+        return &_vk_allocator;
     }
 
-    Result<> Context::fetch_physical_devices()
+    Result<std::vector<PhysicalDevice::ptr>> Context::fetch_physical_devices(
+        std::shared_ptr<Surface> surface
+    )
     {
         uint32_t count = 0;
-        vkEnumeratePhysicalDevices(vk_instance, &count, nullptr);
+        vkEnumeratePhysicalDevices(_vk_instance, &count, nullptr);
 
         std::vector<VkPhysicalDevice> vk_physical_devices(count);
         VkResult vk_result = vkEnumeratePhysicalDevices(
-            vk_instance,
+            _vk_instance,
             &count,
             vk_physical_devices.data()
         );
@@ -765,8 +1117,8 @@ namespace bv
             return Error(vk_result);
         }
 
-        _physical_devices.reserve(vk_physical_devices.size());
-
+        std::vector<PhysicalDevice::ptr> physical_devices;
+        physical_devices.reserve(vk_physical_devices.size());
         for (const auto& vk_physical_device : vk_physical_devices)
         {
             VkPhysicalDeviceProperties vk_properties;
@@ -775,345 +1127,10 @@ namespace bv
                 &vk_properties
             );
 
-            PhysicalDeviceLimits limits{
-                .max_image_dimension1d =
-                vk_properties.limits.maxImageDimension1D,
-
-                .max_image_dimension2d =
-                vk_properties.limits.maxImageDimension2D,
-
-                .max_image_dimension3d =
-                vk_properties.limits.maxImageDimension3D,
-
-                .max_image_dimension_cube =
-                vk_properties.limits.maxImageDimensionCube,
-
-                .max_image_array_layers =
-                vk_properties.limits.maxImageArrayLayers,
-
-                .max_texel_buffer_elements =
-                vk_properties.limits.maxTexelBufferElements,
-
-                .max_uniform_buffer_range =
-                vk_properties.limits.maxUniformBufferRange,
-
-                .max_storage_buffer_range =
-                vk_properties.limits.maxStorageBufferRange,
-
-                .max_push_constants_size =
-                vk_properties.limits.maxPushConstantsSize,
-
-                .max_memory_allocation_count =
-                vk_properties.limits.maxMemoryAllocationCount,
-
-                .max_sampler_allocation_count =
-                vk_properties.limits.maxSamplerAllocationCount,
-
-                .buffer_image_granularity =
-                vk_properties.limits.bufferImageGranularity,
-
-                .sparse_address_space_size =
-                vk_properties.limits.sparseAddressSpaceSize,
-
-                .max_bound_descriptor_sets =
-                vk_properties.limits.maxBoundDescriptorSets,
-
-                .max_per_stage_descriptor_samplers =
-                vk_properties.limits.maxPerStageDescriptorSamplers,
-
-                .max_per_stage_descriptor_uniform_buffers =
-                vk_properties.limits.maxPerStageDescriptorUniformBuffers,
-
-                .max_per_stage_descriptor_storage_buffers =
-                vk_properties.limits.maxPerStageDescriptorStorageBuffers,
-
-                .max_per_stage_descriptor_sampled_images =
-                vk_properties.limits.maxPerStageDescriptorSampledImages,
-
-                .max_per_stage_descriptor_storage_images =
-                vk_properties.limits.maxPerStageDescriptorStorageImages,
-
-                .max_per_stage_descriptor_input_attachments =
-                vk_properties.limits.maxPerStageDescriptorInputAttachments,
-
-                .max_per_stage_resources =
-                vk_properties.limits.maxPerStageResources,
-
-                .max_descriptor_set_samplers =
-                vk_properties.limits.maxDescriptorSetSamplers,
-
-                .max_descriptor_set_uniform_buffers =
-                vk_properties.limits.maxDescriptorSetUniformBuffers,
-
-                .max_descriptor_set_uniform_buffers_dynamic =
-                vk_properties.limits.maxDescriptorSetUniformBuffersDynamic,
-
-                .max_descriptor_set_storage_buffers =
-                vk_properties.limits.maxDescriptorSetStorageBuffers,
-
-                .max_descriptor_set_storage_buffers_dynamic =
-                vk_properties.limits.maxDescriptorSetStorageBuffersDynamic,
-
-                .max_descriptor_set_sampled_images =
-                vk_properties.limits.maxDescriptorSetSampledImages,
-
-                .max_descriptor_set_storage_images =
-                vk_properties.limits.maxDescriptorSetStorageImages,
-
-                .max_descriptor_set_input_attachments =
-                vk_properties.limits.maxDescriptorSetInputAttachments,
-
-                .max_vertex_input_attributes =
-                vk_properties.limits.maxVertexInputAttributes,
-
-                .max_vertex_input_bindings =
-                vk_properties.limits.maxVertexInputBindings,
-
-                .max_vertex_input_attribute_offset =
-                vk_properties.limits.maxVertexInputAttributeOffset,
-
-                .max_vertex_input_binding_stride =
-                vk_properties.limits.maxVertexInputBindingStride,
-
-                .max_vertex_output_components =
-                vk_properties.limits.maxVertexOutputComponents,
-
-                .max_tessellation_generation_level =
-                vk_properties.limits.maxTessellationGenerationLevel,
-
-                .max_tessellation_patch_size =
-                vk_properties.limits.maxTessellationPatchSize,
-
-                .max_tessellation_control_per_vertex_input_components =
-                vk_properties.limits
-                .maxTessellationControlPerVertexInputComponents,
-
-                .max_tessellation_control_per_vertex_output_components =
-                vk_properties.limits
-                .maxTessellationControlPerVertexOutputComponents,
-
-                .max_tessellation_control_per_patch_output_components =
-                vk_properties.limits
-                .maxTessellationControlPerPatchOutputComponents,
-
-                .max_tessellation_control_total_output_components =
-                vk_properties.limits
-                .maxTessellationControlTotalOutputComponents,
-
-                .max_tessellation_evaluation_input_components =
-                vk_properties.limits.maxTessellationEvaluationInputComponents,
-
-                .max_tessellation_evaluation_output_components =
-                vk_properties.limits.maxTessellationEvaluationOutputComponents,
-
-                .max_geometry_shader_invocations =
-                vk_properties.limits.maxGeometryShaderInvocations,
-
-                .max_geometry_input_components =
-                vk_properties.limits.maxGeometryInputComponents,
-
-                .max_geometry_output_components =
-                vk_properties.limits.maxGeometryOutputComponents,
-
-                .max_geometry_output_vertices =
-                vk_properties.limits.maxGeometryOutputVertices,
-
-                .max_geometry_total_output_components =
-                vk_properties.limits.maxGeometryTotalOutputComponents,
-
-                .max_fragment_input_components =
-                vk_properties.limits.maxFragmentInputComponents,
-
-                .max_fragment_output_attachments =
-                vk_properties.limits.maxFragmentOutputAttachments,
-
-                .max_fragment_dual_src_attachments =
-                vk_properties.limits.maxFragmentDualSrcAttachments,
-
-                .max_fragment_combined_output_resources =
-                vk_properties.limits.maxFragmentCombinedOutputResources,
-
-                .max_compute_shared_memory_size =
-                vk_properties.limits.maxComputeSharedMemorySize,
-
-                .max_compute_work_group_count = raw_arr_to_std<3>(
-                    vk_properties.limits.maxComputeWorkGroupCount
-                ),
-
-                .max_compute_work_group_invocations =
-                vk_properties.limits.maxComputeWorkGroupInvocations,
-
-                .max_compute_work_group_size = raw_arr_to_std<3>(
-                    vk_properties.limits.maxComputeWorkGroupSize
-                ),
-
-                .sub_pixel_precision_bits =
-                vk_properties.limits.subPixelPrecisionBits,
-
-                .sub_texel_precision_bits =
-                vk_properties.limits.subTexelPrecisionBits,
-
-                .mipmap_precision_bits =
-                vk_properties.limits.mipmapPrecisionBits,
-
-                .max_draw_indexed_index_value =
-                vk_properties.limits.maxDrawIndexedIndexValue,
-
-                .max_draw_indirect_count =
-                vk_properties.limits.maxDrawIndirectCount,
-
-                .max_sampler_lod_bias = vk_properties.limits.maxSamplerLodBias,
-
-                .max_sampler_anisotropy =
-                vk_properties.limits.maxSamplerAnisotropy,
-
-                .max_viewports = vk_properties.limits.maxViewports,
-
-                .max_viewport_dimensions = raw_arr_to_std<2>(
-                    vk_properties.limits.maxViewportDimensions
-                ),
-
-                .viewport_bounds_range = raw_arr_to_std<2>(
-                    vk_properties.limits.viewportBoundsRange
-                ),
-
-                .viewport_sub_pixel_bits =
-                vk_properties.limits.viewportSubPixelBits,
-
-                .min_memory_map_alignment =
-                vk_properties.limits.minMemoryMapAlignment,
-
-                .min_texel_buffer_offset_alignment =
-                vk_properties.limits.minTexelBufferOffsetAlignment,
-
-                .min_uniform_buffer_offset_alignment =
-                vk_properties.limits.minUniformBufferOffsetAlignment,
-
-                .min_storage_buffer_offset_alignment =
-                vk_properties.limits.minStorageBufferOffsetAlignment,
-
-                .min_texel_offset = vk_properties.limits.minTexelOffset,
-
-                .max_texel_offset = vk_properties.limits.maxTexelOffset,
-
-                .min_texel_gather_offset =
-                vk_properties.limits.minTexelGatherOffset,
-
-                .max_texel_gather_offset =
-                vk_properties.limits.maxTexelGatherOffset,
-
-                .min_interpolation_offset =
-                vk_properties.limits.minInterpolationOffset,
-
-                .max_interpolation_offset =
-                vk_properties.limits.maxInterpolationOffset,
-
-                .sub_pixel_interpolation_offset_bits =
-                vk_properties.limits.subPixelInterpolationOffsetBits,
-
-                .max_framebuffer_width =
-                vk_properties.limits.maxFramebufferWidth,
-
-                .max_framebuffer_height =
-                vk_properties.limits.maxFramebufferHeight,
-
-                .max_framebuffer_layers =
-                vk_properties.limits.maxFramebufferLayers,
-
-                .framebuffer_color_sample_counts =
-                SampleCountFlags(
-                    vk_properties.limits.framebufferColorSampleCounts
-                ),
-
-                .framebuffer_depth_sample_counts =
-                SampleCountFlags(
-                    vk_properties.limits.framebufferDepthSampleCounts
-                ),
-
-                .framebuffer_stencil_sample_counts =
-                SampleCountFlags(
-                    vk_properties.limits.framebufferStencilSampleCounts
-                ),
-
-                .framebuffer_no_attachments_sample_counts =
-                SampleCountFlags(
-                    vk_properties.limits.framebufferNoAttachmentsSampleCounts
-                ),
-
-                .max_color_attachments =
-                vk_properties.limits.maxColorAttachments,
-
-                .sampled_image_color_sample_counts =
-                SampleCountFlags(
-                    vk_properties.limits.sampledImageColorSampleCounts
-                ),
-
-                .sampled_image_integer_sample_counts =
-                SampleCountFlags(
-                    vk_properties.limits.sampledImageIntegerSampleCounts
-                ),
-
-                .sampled_image_depth_sample_counts =
-                SampleCountFlags(
-                    vk_properties.limits.sampledImageDepthSampleCounts
-                ),
-
-                .sampled_image_stencil_sample_counts =
-                SampleCountFlags(
-                    vk_properties.limits.sampledImageStencilSampleCounts
-                ),
-
-                .storage_image_sample_counts =
-                SampleCountFlags(
-                    vk_properties.limits.storageImageSampleCounts
-                ),
-
-                .max_sample_mask_words =
-                vk_properties.limits.maxSampleMaskWords,
-
-                .timestamp_compute_and_graphics =
-                (bool)vk_properties.limits.timestampComputeAndGraphics,
-
-                .timestamp_period = vk_properties.limits.timestampPeriod,
-
-                .max_clip_distances = vk_properties.limits.maxClipDistances,
-
-                .max_cull_distances = vk_properties.limits.maxCullDistances,
-
-                .max_combined_clip_and_cull_distances =
-                vk_properties.limits.maxCombinedClipAndCullDistances,
-
-                .discrete_queue_priorities =
-                vk_properties.limits.discreteQueuePriorities,
-
-                .point_size_range = raw_arr_to_std<2>(
-                    vk_properties.limits.pointSizeRange
-                ),
-
-                .line_width_range = raw_arr_to_std<2>(
-                    vk_properties.limits.lineWidthRange
-                ),
-
-                .point_size_granularity =
-                vk_properties.limits.pointSizeGranularity,
-
-                .line_width_granularity =
-                vk_properties.limits.lineWidthGranularity,
-
-                .strict_lines = (bool)vk_properties.limits.strictLines,
-
-                .standard_sample_locations =
-                (bool)vk_properties.limits.standardSampleLocations,
-
-                .optimal_buffer_copy_offset_alignment =
-                vk_properties.limits.optimalBufferCopyOffsetAlignment,
-
-                .optimal_buffer_copy_row_pitch_alignment =
-                vk_properties.limits.optimalBufferCopyRowPitchAlignment,
-
-                .non_coherent_atom_size =
-                vk_properties.limits.nonCoherentAtomSize
-            };
+            PhysicalDeviceLimits limits =
+                PhysicalDeviceLimits_from_VkPhysicalDeviceLimits(
+                    vk_properties.limits
+                );
 
             PhysicalDeviceSparseProperties sparse_properties{
                 .residency_standard2d_block_shape = (bool)
@@ -1177,14 +1194,35 @@ namespace bv
             QueueFamilyIndices queue_family_indices;
 
             std::vector<QueueFamily> queue_families;
+            queue_families.reserve(vk_queue_families.size());
             for (size_t i = 0; i < vk_queue_families.size(); i++)
             {
                 const VkQueueFamilyProperties& vk_queue_family =
                     vk_queue_families[i];
 
+                VkBool32 vk_present_support = VK_FALSE;
+                if (surface != nullptr)
+                {
+                    vk_result = vkGetPhysicalDeviceSurfaceSupportKHR(
+                        vk_physical_device,
+                        i,
+                        surface->vk_surface,
+                        &vk_present_support
+                    );
+                    if (vk_result != VK_SUCCESS)
+                    {
+                        return Error(
+                            "failed to check surface support",
+                            vk_result
+                        );
+                    }
+                }
+
                 QueueFlags queue_flags{
                     .graphics = (bool)
                     (vk_queue_family.queueFlags & VK_QUEUE_GRAPHICS_BIT),
+
+                    .present = (bool)vk_present_support,
 
                     .compute = (bool)
                     (vk_queue_family.queueFlags & VK_QUEUE_COMPUTE_BIT),
@@ -1212,6 +1250,11 @@ namespace bv
                     !queue_family_indices.graphics.has_value())
                 {
                     queue_family_indices.graphics = i;
+                }
+                if (queue_flags.present &&
+                    !queue_family_indices.present.has_value())
+                {
+                    queue_family_indices.present = i;
                 }
                 if (queue_flags.compute &&
                     !queue_family_indices.compute.has_value())
@@ -1244,6 +1287,26 @@ namespace bv
                     queue_family_indices.optical_flow_nv = i;
                 }
 
+                bool supports_both_graphics_and_present =
+                    queue_flags.graphics && queue_flags.present;
+
+                bool already_have_shared_graphics_and_present_indices =
+                    (
+                        queue_family_indices.graphics.has_value()
+                        && queue_family_indices.present.has_value()
+                        )
+                    && (
+                        queue_family_indices.graphics.value()
+                        == queue_family_indices.present.value()
+                        );
+
+                if (supports_both_graphics_and_present &&
+                    !already_have_shared_graphics_and_present_indices)
+                {
+                    queue_family_indices.graphics = i;
+                    queue_family_indices.present = i;
+                }
+
                 QueueFamily queue_family{
                     .queue_flags = queue_flags,
                     .queue_count = vk_queue_family.queueCount,
@@ -1255,7 +1318,7 @@ namespace bv
                 queue_families.push_back(queue_family);
             }
 
-            _physical_devices.push_back(
+            physical_devices.push_back(
                 std::make_shared<PhysicalDevice_public_ctor>(
                     vk_physical_device,
                     properties,
@@ -1266,8 +1329,20 @@ namespace bv
             );
         }
 
-        return Result();
+        return physical_devices;
     }
+
+    Context::~Context()
+    {
+        vkDestroyInstance(_vk_instance, vk_allocator_ptr());
+    }
+
+    Context::Context(
+        const ContextConfig& config,
+        const Allocator::ptr& allocator
+    )
+        : _config(config), _allocator(allocator)
+    {}
 
     DebugMessenger::DebugMessenger(DebugMessenger&& other)
     {
@@ -1364,7 +1439,7 @@ namespace bv
         create_info.pUserData = messenger.get();
 
         VkResult vk_result = CreateDebugUtilsMessengerEXT(
-            messenger->context()->vk_instance,
+            messenger->context()->vk_instance(),
             &create_info,
             messenger->context()->vk_allocator_ptr(),
             &messenger->vk_debug_messenger
@@ -1379,7 +1454,7 @@ namespace bv
     DebugMessenger::~DebugMessenger()
     {
         DestroyDebugUtilsMessengerEXT(
-            context()->vk_instance,
+            context()->vk_instance(),
             vk_debug_messenger,
             context()->vk_allocator_ptr()
         );
@@ -1395,6 +1470,36 @@ namespace bv
         _message_severity_filter(message_severity_filter),
         _message_type_filter(message_type_filter),
         _callback(callback)
+    {}
+
+    Surface::Surface(Surface&& other)
+    {
+        vk_surface = other.vk_surface;
+        other.vk_surface = nullptr;
+    }
+
+    Surface::ptr Surface::create(
+        const Context::ptr& context,
+        VkSurfaceKHR vk_surface
+    )
+    {
+        return std::make_shared<Surface_public_ctor>(context, vk_surface);
+    }
+
+    Surface::~Surface()
+    {
+        vkDestroySurfaceKHR(
+            _context->vk_instance(),
+            vk_surface,
+            _context->vk_allocator_ptr()
+        );
+    }
+
+    Surface::Surface(
+        const Context::ptr& context,
+        VkSurfaceKHR vk_surface
+    )
+        : _context(context), vk_surface(vk_surface)
     {}
 
     Queue::Queue(Queue&& other)

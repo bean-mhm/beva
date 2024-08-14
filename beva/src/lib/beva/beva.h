@@ -515,30 +515,18 @@ namespace bv
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSampleCountFlagBits.html
     struct SampleCountFlags
     {
-        bool _1 : 1;
-        bool _2 : 1;
-        bool _4 : 1;
-        bool _8 : 1;
-        bool _16 : 1;
-        bool _32 : 1;
-        bool _64 : 1;
-
-        SampleCountFlags() = default;
-
-    private:
-        constexpr SampleCountFlags(VkSampleCountFlags vk_flags)
-            : _1(vk_flags& VK_SAMPLE_COUNT_1_BIT),
-            _2(vk_flags& VK_SAMPLE_COUNT_2_BIT),
-            _4(vk_flags& VK_SAMPLE_COUNT_4_BIT),
-            _8(vk_flags& VK_SAMPLE_COUNT_8_BIT),
-            _16(vk_flags& VK_SAMPLE_COUNT_16_BIT),
-            _32(vk_flags& VK_SAMPLE_COUNT_32_BIT),
-            _64(vk_flags& VK_SAMPLE_COUNT_64_BIT)
-        {}
-
-        friend class Context;
-
+        bool _1 : 1 = false;
+        bool _2 : 1 = false;
+        bool _4 : 1 = false;
+        bool _8 : 1 = false;
+        bool _16 : 1 = false;
+        bool _32 : 1 = false;
+        bool _64 : 1 = false;
     };
+
+    SampleCountFlags SampleCountFlags_from_VkSampleCountFlags(
+        VkSampleCountFlags vk_sample_count_flags
+    );
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSampleCountFlagBits.html
     enum class SampleCount : uint8_t
@@ -567,15 +555,17 @@ namespace bv
     BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(SampleCount);
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueueFlagBits.html
+    // present: https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceSupportKHR.html
     struct QueueFlags
     {
-        bool graphics : 1;
-        bool compute : 1;
-        bool transfer : 1;
-        bool sparse_binding : 1;
-        bool protected_ : 1;
-        bool video_decode : 1;
-        bool optical_flow_nv : 1;
+        bool graphics : 1 = false;
+        bool present : 1 = false;
+        bool compute : 1 = false;
+        bool transfer : 1 = false;
+        bool sparse_binding : 1 = false;
+        bool protected_ : 1 = false;
+        bool video_decode : 1 = false;
+        bool optical_flow_nv : 1 = false;
     };
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkObjectType.html
@@ -1187,6 +1177,10 @@ namespace bv
         uint64_t non_coherent_atom_size;
     };
 
+    PhysicalDeviceLimits PhysicalDeviceLimits_from_VkPhysicalDeviceLimits(
+        VkPhysicalDeviceLimits vk_physical_device_limits
+    );
+
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceSparseProperties.html
     struct PhysicalDeviceSparseProperties
     {
@@ -1314,6 +1308,7 @@ namespace bv
     struct QueueFamilyIndices
     {
         std::optional<uint32_t> graphics;
+        std::optional<uint32_t> present;
         std::optional<uint32_t> compute;
         std::optional<uint32_t> transfer;
         std::optional<uint32_t> sparse_binding;
@@ -1394,6 +1389,8 @@ namespace bv
         std::vector<std::string> extensions;
     };
 
+    class Surface;
+
     // manages a VkInstance and custom allocators, provides utility functions,
     // and is used by other classes
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkInstance.html
@@ -1437,11 +1434,31 @@ namespace bv
             const Allocator::ptr& allocator
         );
 
-        constexpr const std::vector<PhysicalDevice::ptr>&
-            physical_devices() const
+        // get the VkInstance handle
+        // * avoid using this as much as possible. it's generally supposed to be
+        //   used internally. the only reason it's public is for surface
+        //   creation which is handed off to the user to write their own little
+        //   implementation based on the platform or the windowing library
+        //   they're using.
+        constexpr VkInstance vk_instance() const
         {
-            return _physical_devices;
+            return _vk_instance;
         }
+
+        // get allocation callbacks pointer
+        // * avoid using this as much as possible. it's generally supposed to be
+        //   used internally. the only reason it's public is for surface
+        //   creation which is handed off to the user to write their own little
+        //   implementation based on the platform or the windowing library
+        //   they're using.
+        const VkAllocationCallbacks* vk_allocator_ptr() const;
+
+        // fetch a list of supported physical devices
+        // * if surface == nullptr then the present flag in queue families will
+        //   always be disabled.
+        Result<std::vector<PhysicalDevice::ptr>> fetch_physical_devices(
+            std::shared_ptr<Surface> surface = nullptr
+        );
 
         ~Context();
 
@@ -1449,23 +1466,14 @@ namespace bv
         ContextConfig _config;
 
         Allocator::ptr _allocator = nullptr;
-        VkAllocationCallbacks vk_allocator{ 0 };
+        VkAllocationCallbacks _vk_allocator{};
 
-        VkInstance vk_instance = nullptr;
-
-        std::vector<PhysicalDevice::ptr> _physical_devices;
+        VkInstance _vk_instance = nullptr;
 
         Context(
             const ContextConfig& config,
             const Allocator::ptr& allocator
         );
-
-        const VkAllocationCallbacks* vk_allocator_ptr() const;
-
-        Result<> fetch_physical_devices();
-
-        friend class DebugMessenger;
-        friend class Device;
 
     };
 
@@ -1559,6 +1567,47 @@ namespace bv
 
     };
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceKHR.html
+    class Surface
+    {
+    public:
+        using ptr = std::shared_ptr<Surface>;
+
+        Surface() = delete;
+        Surface(const Surface& other) = delete;
+        Surface(Surface&& other);
+
+        // create a surface based on a user-provided handle. this lets the user
+        // write their own little surface creation implementation based on the
+        // platform or the windowing library they're using.
+        // * make sure to enable the required extensions for surfaces. some
+        //   windowing libraries (like GLFW) provide the list for you.
+        static Surface::ptr create(
+            const Context::ptr& context,
+            VkSurfaceKHR vk_surface
+        );
+
+        constexpr const Context::ptr& context() const
+        {
+            return _context;
+        }
+
+        ~Surface();
+
+    protected:
+        Context::ptr _context;
+        VkSurfaceKHR vk_surface;
+
+        Surface(
+            const Context::ptr& context,
+            VkSurfaceKHR vk_surface
+        );
+
+        friend class Context;
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueue.html
     class Queue
     {
     public:

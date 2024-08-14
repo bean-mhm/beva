@@ -24,13 +24,16 @@ namespace beva_demo
         GLFWwindow* window;
         bv::Context::ptr context = nullptr;
         bv::DebugMessenger::ptr debug_messenger = nullptr;
+        bv::Surface::ptr surface = nullptr;
         bv::PhysicalDevice::ptr physical_device = nullptr;
         bv::Device::ptr device = nullptr;
         bv::Queue::ptr graphics_queue = nullptr;
+        bv::Queue::ptr present_queue = nullptr;
 
         void init_window();
         void init_context();
         void setup_debug_messenger();
+        void create_surface();
         void pick_physical_device();
         void create_logical_device();
         void main_loop();

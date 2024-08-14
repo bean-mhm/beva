@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <format>
+#include <set>
 #include <stdexcept>
 #include <cstdlib>
 #include <cstdint>
@@ -23,6 +24,7 @@ namespace beva_demo
         init_window();
         init_context();
         setup_debug_messenger();
+        create_surface();
         pick_physical_device();
         create_logical_device();
         main_loop();
@@ -147,20 +149,48 @@ namespace beva_demo
         debug_messenger = debug_messenger_result.value();
     }
 
+    void App::create_surface()
+    {
+        VkSurfaceKHR vk_surface;
+
+        VkResult vk_result = glfwCreateWindowSurface(
+            context->vk_instance(),
+            window,
+            context->vk_allocator_ptr(),
+            &vk_surface
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            throw std::runtime_error(bv::Error(
+                "failed to create window surface",
+                vk_result
+            ).to_string().c_str());
+        }
+
+        surface = bv::Surface::create(context, vk_surface);
+    }
+
     void App::pick_physical_device()
     {
-        if (context->physical_devices().empty())
+        auto physical_devices_result = context->fetch_physical_devices(surface);
+        if (!physical_devices_result.ok())
         {
-            throw std::runtime_error(
-                "there's no physical device that supports Vulkan on this "
-                "machine"
-            );
+            std::string s =
+                "failed to fetch physical devices: "
+                + physical_devices_result.error().to_string();
+            throw std::runtime_error(s.c_str());
+        }
+
+        auto physical_devices = physical_devices_result.value();
+        if (physical_devices.empty())
+        {
+            throw std::runtime_error("no supported physical devices");
         }
 
         std::cout << "pick a physical device by entering its index:\n";
-        for (size_t i = 0; i < context->physical_devices().size(); i++)
+        for (size_t i = 0; i < physical_devices.size(); i++)
         {
-            const auto& physical_device = context->physical_devices()[i];
+            const auto& physical_device = physical_devices[i];
             std::cout << std::format(
                 "{}: {} ({})\n",
                 i,
@@ -179,7 +209,7 @@ namespace beva_demo
             try
             {
                 idx = std::stoi(s_idx);
-                if (idx < 0 || idx >= context->physical_devices().size())
+                if (idx < 0 || idx >= physical_devices.size())
                 {
                     throw std::exception();
                 }
@@ -191,7 +221,7 @@ namespace beva_demo
             }
         }
 
-        physical_device = context->physical_devices()[idx];
+        physical_device = physical_devices[idx];
     }
 
     void App::create_logical_device()
@@ -203,17 +233,35 @@ namespace beva_demo
                 "supports graphics operations"
             );
         }
+        if (!physical_device->queue_family_indices().present.has_value())
+        {
+            throw std::runtime_error(
+                "the selected physical device doesn't have a queue family that "
+                "supports presentation"
+            );
+        }
 
         uint32_t graphics_family_idx =
             physical_device->queue_family_indices().graphics.value();
 
+        uint32_t present_family_idx =
+            physical_device->queue_family_indices().present.value();
+
+        std::set<uint32_t> unique_queue_family_indices = {
+            graphics_family_idx,
+            present_family_idx
+        };
+
         std::vector<bv::QueueRequest> queue_requests;
-        queue_requests.push_back(bv::QueueRequest{
-            .flags = bv::QueueRequestFlags{},
-                .queue_family_index = graphics_family_idx,
-                .num_queues_to_create = 1,
-                .priorities = { 1.f }
-        });
+        for (auto family_idx : unique_queue_family_indices)
+        {
+            queue_requests.push_back(bv::QueueRequest{
+                .flags = bv::QueueRequestFlags{},
+                    .queue_family_index = family_idx,
+                    .num_queues_to_create = 1,
+                    .priorities = { 1.f }
+            });
+        }
 
         bv::DeviceConfig config{
             .queue_requests = queue_requests,
@@ -236,6 +284,7 @@ namespace beva_demo
         device = device_result.value();
 
         graphics_queue = device->retrieve_queue(graphics_family_idx, 0);
+        present_queue = device->retrieve_queue(present_family_idx, 0);
     }
 
     void App::main_loop()
@@ -253,7 +302,13 @@ namespace beva_demo
 
     void App::cleanup()
     {
+        graphics_queue = nullptr;
+        device = nullptr;
+        physical_device = nullptr;
+        surface = nullptr;
+        debug_messenger = nullptr;
         context = nullptr;
+
         glfwDestroyWindow(window);
         glfwTerminate();
     }
