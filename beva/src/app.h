@@ -16,8 +16,8 @@ namespace beva_demo
 
     private:
         static constexpr const char* initial_title = "beva demo";
-        static constexpr int initial_width = 960;
-        static constexpr int initial_height = 720;
+        static constexpr int initial_width = 800;
+        static constexpr int initial_height = 450;
 
         static constexpr bool debug_mode = true;
 
@@ -28,7 +28,11 @@ namespace beva_demo
         bv::PhysicalDevice::ptr physical_device = nullptr;
         bv::Device::ptr device = nullptr;
         bv::Queue::ptr graphics_queue = nullptr;
-        bv::Queue::ptr present_queue = nullptr;
+        bv::Queue::ptr presentation_queue = nullptr;
+        bv::Swapchain::ptr swapchain = nullptr;
+
+        uint32_t graphics_family_idx = 0;
+        uint32_t presentation_family_idx = 0;
 
         void init_window();
         void init_context();
@@ -36,6 +40,7 @@ namespace beva_demo
         void create_surface();
         void pick_physical_device();
         void create_logical_device();
+        void create_swapchain();
         void main_loop();
         void cleanup();
 

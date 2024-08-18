@@ -5,6 +5,8 @@
 #include <string>
 #include <format>
 #include <set>
+#include <limits>
+#include <algorithm>
 #include <stdexcept>
 #include <cstdlib>
 #include <cstdint>
@@ -27,6 +29,7 @@ namespace beva_demo
         create_surface();
         pick_physical_device();
         create_logical_device();
+        create_swapchain();
         main_loop();
         cleanup();
     }
@@ -112,14 +115,14 @@ namespace beva_demo
             return;
         }
 
-        bv::DebugMessageSeverityFilter severity_filter{
+        bv::DebugMessageSeverityFlags severity_filter{
             .verbose = false,
                 .info = false,
                 .warning = true,
                 .error = true
         };
 
-        bv::DebugMessageTypeFilter type_filter{
+        bv::DebugMessageTypeFlags type_filter{
             .general = true,
                 .validation = true,
                 .performance = true,
@@ -132,7 +135,7 @@ namespace beva_demo
             type_filter,
             [](
                 bv::DebugMessageSeverity message_severity,
-                bv::DebugMessageType message_type,
+                bv::DebugMessageTypeFlags message_type_flags,
                 const bv::DebugMessageData& message_data
                 )
             {
@@ -180,24 +183,48 @@ namespace beva_demo
                 + physical_devices_result.error().to_string();
             throw std::runtime_error(s.c_str());
         }
+        auto all_physical_devices = physical_devices_result.value();
 
-        auto physical_devices = physical_devices_result.value();
-        if (physical_devices.empty())
+        std::vector<bv::PhysicalDevice::ptr> supported_physical_devices;
+        for (const auto& pdev : all_physical_devices)
+        {
+            if (!pdev->queue_family_indices().graphics.has_value())
+            {
+                continue;
+            }
+            if (!pdev->queue_family_indices().presentation.has_value())
+            {
+                continue;
+            }
+
+            if (!pdev->swapchain_support().has_value())
+            {
+                continue;
+            }
+
+            const auto& swapchain_support = pdev->swapchain_support().value();
+            if (swapchain_support.present_modes.empty()
+                || swapchain_support.surface_formats.empty())
+            {
+                continue;
+            }
+
+            supported_physical_devices.push_back(pdev);
+        }
+        if (supported_physical_devices.empty())
         {
             throw std::runtime_error("no supported physical devices");
         }
 
         std::cout << "pick a physical device by entering its index:\n";
-        for (size_t i = 0; i < physical_devices.size(); i++)
+        for (size_t i = 0; i < supported_physical_devices.size(); i++)
         {
-            const auto& physical_device = physical_devices[i];
+            const auto& pdev = supported_physical_devices[i];
             std::cout << std::format(
                 "{}: {} ({})\n",
                 i,
-                physical_device->properties().device_name,
-                bv::PhysicalDeviceType_to_string(
-                    physical_device->properties().device_type
-                )
+                pdev->properties().device_name,
+                bv::PhysicalDeviceType_to_string(pdev->properties().device_type)
             );
         }
 
@@ -209,7 +236,7 @@ namespace beva_demo
             try
             {
                 idx = std::stoi(s_idx);
-                if (idx < 0 || idx >= physical_devices.size())
+                if (idx < 0 || idx >= supported_physical_devices.size())
                 {
                     throw std::exception();
                 }
@@ -221,35 +248,20 @@ namespace beva_demo
             }
         }
 
-        physical_device = physical_devices[idx];
+        physical_device = supported_physical_devices[idx];
     }
 
     void App::create_logical_device()
     {
-        if (!physical_device->queue_family_indices().graphics.has_value())
-        {
-            throw std::runtime_error(
-                "the selected physical device doesn't have a queue family that "
-                "supports graphics operations"
-            );
-        }
-        if (!physical_device->queue_family_indices().present.has_value())
-        {
-            throw std::runtime_error(
-                "the selected physical device doesn't have a queue family that "
-                "supports presentation"
-            );
-        }
-
-        uint32_t graphics_family_idx =
+        graphics_family_idx =
             physical_device->queue_family_indices().graphics.value();
 
-        uint32_t present_family_idx =
-            physical_device->queue_family_indices().present.value();
+        presentation_family_idx =
+            physical_device->queue_family_indices().presentation.value();
 
         std::set<uint32_t> unique_queue_family_indices = {
             graphics_family_idx,
-            present_family_idx
+            presentation_family_idx
         };
 
         std::vector<bv::QueueRequest> queue_requests;
@@ -265,7 +277,7 @@ namespace beva_demo
 
         bv::DeviceConfig config{
             .queue_requests = queue_requests,
-                .extensions = {},
+                .extensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME },
                 .enabled_features = bv::PhysicalDeviceFeatures{}
         };
 
@@ -284,7 +296,106 @@ namespace beva_demo
         device = device_result.value();
 
         graphics_queue = device->retrieve_queue(graphics_family_idx, 0);
-        present_queue = device->retrieve_queue(present_family_idx, 0);
+        presentation_queue = device->retrieve_queue(presentation_family_idx, 0);
+    }
+
+    void App::create_swapchain()
+    {
+        const auto& swapchain_support =
+            physical_device->swapchain_support().value();
+
+        bv::SurfaceFormat surface_format;
+        bool found_surface_format = false;
+        for (const auto& sfmt : swapchain_support.surface_formats)
+        {
+            if (sfmt.color_space == bv::ColorSpace::SrgbNonlinear)
+            {
+                surface_format = sfmt;
+                found_surface_format = true;
+                break;
+            }
+        }
+        if (!found_surface_format)
+        {
+            throw std::runtime_error("no supported surface format");
+        }
+
+        bv::Extent2d extent = swapchain_support.capabilities.current_extent;
+        if (extent.width == 0
+            || extent.width == std::numeric_limits<uint32_t>::max()
+            || extent.height == 0
+            || extent.height == std::numeric_limits<uint32_t>::max())
+        {
+            int width, height;
+            glfwGetFramebufferSize(window, &width, &height);
+
+            extent = {
+                .width = (uint32_t)width,
+                .height = (uint32_t)height
+            };
+
+            extent.width = std::clamp(
+                extent.width,
+                swapchain_support.capabilities.min_image_extent.width,
+                swapchain_support.capabilities.max_image_extent.width
+            );
+            extent.height = std::clamp(
+                extent.height,
+                swapchain_support.capabilities.min_image_extent.height,
+                swapchain_support.capabilities.max_image_extent.height
+            );
+        }
+
+        uint32_t image_count =
+            swapchain_support.capabilities.min_image_count + 1;
+        if (swapchain_support.capabilities.max_image_count > 0
+            && image_count > swapchain_support.capabilities.max_image_count)
+        {
+            image_count = swapchain_support.capabilities.max_image_count;
+        }
+
+        bv::SharingMode image_sharing_mode;
+        std::vector<uint32_t> queue_family_indices;
+        if (graphics_family_idx != presentation_family_idx)
+        {
+            image_sharing_mode = bv::SharingMode::Concurrent;
+            queue_family_indices = {
+                graphics_family_idx,
+                presentation_family_idx
+            };
+        }
+        else
+        {
+            image_sharing_mode = bv::SharingMode::Exclusive;
+        }
+
+        auto pre_transform = swapchain_support.capabilities.current_transform;
+
+        bv::SwapchainConfig config{
+            .flags = {},
+                .min_image_count = image_count,
+                .image_format = surface_format.format,
+                .image_color_space = surface_format.color_space,
+                .image_extent = extent,
+                .image_array_layers = 1,
+                .image_usage = { .color_attachment = true },
+                .image_sharing_mode = image_sharing_mode,
+                .queue_family_indices = queue_family_indices,
+                .pre_transform = pre_transform,
+                .composite_alpha = bv::CompositeAlpha::Opaque,
+                .present_mode = bv::PresentMode::Fifo,
+                .clipped = true
+        };
+
+        auto swapchain_result = bv::Swapchain::create(device, surface, config);
+        if (!swapchain_result.ok())
+        {
+            std::string s =
+                "failed to create swapchain: "
+                + swapchain_result.error().to_string();
+            throw std::runtime_error(s.c_str());
+        }
+        swapchain = swapchain_result.value();
     }
 
     void App::main_loop()
@@ -302,6 +413,8 @@ namespace beva_demo
 
     void App::cleanup()
     {
+        swapchain = nullptr;
+        presentation_queue = nullptr;
         graphics_queue = nullptr;
         device = nullptr;
         physical_device = nullptr;

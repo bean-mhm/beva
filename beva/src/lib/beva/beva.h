@@ -19,15 +19,7 @@
 namespace bv
 {
 
-    template<size_t size, typename T>
-    std::array<T, size> raw_arr_to_std(T* raw_arr)
-    {
-        std::array<T, size> arr;
-        std::copy(raw_arr, raw_arr + size, arr.data());
-        return arr;
-    }
-
-#pragma region enums and flags
+#pragma region data-only structs, enums, and type aliases
 
     // defines a string conversion function for an enum that meets the following
     // requirements:
@@ -35,6 +27,7 @@ namespace bv
     // - enum must be based on uint8_t
     // - there must be a static constexpr const char* array named
     //   EnumName_string representing the enum values as strings.
+    // - the enum values must start from 0 and increase by one (ordered)
 #define BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(EnumName) \
     constexpr const char* EnumName##_to_string( \
         EnumName v \
@@ -48,6 +41,41 @@ namespace bv
         } \
         return EnumName##_string[(uint8_t)v]; \
     }
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_MAKE_API_VERSION.html
+    struct Version
+    {
+        uint8_t variant : 8 = 0;
+        uint8_t major : 8 = 0;
+        uint8_t minor : 8 = 0;
+        uint8_t patch : 8 = 0;
+
+        Version() = default;
+
+        constexpr Version(
+            uint8_t variant,
+            uint8_t major,
+            uint8_t minor,
+            uint8_t patch
+        )
+            : variant(variant), major(major), minor(minor), patch(patch)
+        {}
+
+        constexpr Version(uint32_t encoded)
+            : variant(VK_API_VERSION_VARIANT(encoded)),
+            major(VK_API_VERSION_MAJOR(encoded)),
+            minor(VK_API_VERSION_MINOR(encoded)),
+            patch(VK_API_VERSION_PATCH(encoded))
+        {}
+
+        std::string to_string() const;
+
+        constexpr uint32_t encode() const
+        {
+            return VK_MAKE_API_VERSION(variant, major, minor, patch);
+        }
+
+    };
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkResult.html
     enum class ApiResultType : uint8_t
@@ -243,154 +271,11 @@ namespace bv
         "not compatible with this device.",
     };
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkResult.html
     class ApiResult
     {
     public:
-        constexpr ApiResult(VkResult vk_result)
-        {
-            _undocumented_vk_result = vk_result;
-            switch (vk_result)
-            {
-            case VK_NOT_READY:
-                _type = ApiResultType::NotReady;
-                break;
-            case VK_TIMEOUT:
-                _type = ApiResultType::Timeout;
-                break;
-            case VK_EVENT_SET:
-                _type = ApiResultType::EventSet;
-                break;
-            case VK_EVENT_RESET:
-                _type = ApiResultType::EventReset;
-                break;
-            case VK_INCOMPLETE:
-                _type = ApiResultType::Incomplete;
-                break;
-            case VK_ERROR_OUT_OF_HOST_MEMORY:
-                _type = ApiResultType::ErrorOutOfHostMemory;
-                break;
-            case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-                _type = ApiResultType::ErrorOutOfDeviceMemory;
-                break;
-            case VK_ERROR_INITIALIZATION_FAILED:
-                _type = ApiResultType::ErrorInitializationFailed;
-                break;
-            case VK_ERROR_DEVICE_LOST:
-                _type = ApiResultType::ErrorDeviceLost;
-                break;
-            case VK_ERROR_MEMORY_MAP_FAILED:
-                _type = ApiResultType::ErrorMemoryMapFailed;
-                break;
-            case VK_ERROR_LAYER_NOT_PRESENT:
-                _type = ApiResultType::ErrorLayerNotPresent;
-                break;
-            case VK_ERROR_EXTENSION_NOT_PRESENT:
-                _type = ApiResultType::ErrorExtensionNotPresent;
-                break;
-            case VK_ERROR_FEATURE_NOT_PRESENT:
-                _type = ApiResultType::ErrorFeatureNotPresent;
-                break;
-            case VK_ERROR_INCOMPATIBLE_DRIVER:
-                _type = ApiResultType::ErrorIncompatibleDriver;
-                break;
-            case VK_ERROR_TOO_MANY_OBJECTS:
-                _type = ApiResultType::ErrorTooManyObjects;
-                break;
-            case VK_ERROR_FORMAT_NOT_SUPPORTED:
-                _type = ApiResultType::ErrorFormatNotSupported;
-                break;
-            case VK_ERROR_FRAGMENTED_POOL:
-                _type = ApiResultType::ErrorFragmentedPool;
-                break;
-            case VK_ERROR_UNKNOWN:
-                _type = ApiResultType::ErrorUnknown;
-                break;
-            case VK_ERROR_OUT_OF_POOL_MEMORY:
-                _type = ApiResultType::ErrorOutOfPoolMemory;
-                break;
-            case VK_ERROR_INVALID_EXTERNAL_HANDLE:
-                _type = ApiResultType::ErrorInvalidExternalHandle;
-                break;
-            case VK_ERROR_FRAGMENTATION:
-                _type = ApiResultType::ErrorFragmentation;
-                break;
-            case VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS:
-                _type = ApiResultType::ErrorInvalidOpaqueCaptureAddress;
-                break;
-            case VK_PIPELINE_COMPILE_REQUIRED:
-                _type = ApiResultType::PipelineCompileRequired;
-                break;
-            case VK_ERROR_SURFACE_LOST_KHR:
-                _type = ApiResultType::ErrorSurfaceLostKhr;
-                break;
-            case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR:
-                _type = ApiResultType::ErrorNativeWindowInUseKhr;
-                break;
-            case VK_SUBOPTIMAL_KHR:
-                _type = ApiResultType::SuboptimalKhr;
-                break;
-            case VK_ERROR_OUT_OF_DATE_KHR:
-                _type = ApiResultType::ErrorOutOfDateKhr;
-                break;
-            case VK_ERROR_INCOMPATIBLE_DISPLAY_KHR:
-                _type = ApiResultType::ErrorIncompatibleDisplayKhr;
-                break;
-            case VK_ERROR_VALIDATION_FAILED_EXT:
-                _type = ApiResultType::ErrorValidationFailedExt;
-                break;
-            case VK_ERROR_INVALID_SHADER_NV:
-                _type = ApiResultType::ErrorInvalidShaderNv;
-                break;
-            case VK_ERROR_IMAGE_USAGE_NOT_SUPPORTED_KHR:
-                _type = ApiResultType::ErrorImageUsageNotSupportedKhr;
-                break;
-            case VK_ERROR_VIDEO_PICTURE_LAYOUT_NOT_SUPPORTED_KHR:
-                _type =
-                    ApiResultType::ErrorVideoPictureLayoutNotSupportedKhr;
-                break;
-            case VK_ERROR_VIDEO_PROFILE_OPERATION_NOT_SUPPORTED_KHR:
-                _type =
-                    ApiResultType::ErrorVideoProfileOperationNotSupportedKhr;
-                break;
-            case VK_ERROR_VIDEO_PROFILE_FORMAT_NOT_SUPPORTED_KHR:
-                _type =
-                    ApiResultType::ErrorVideoProfileFormatNotSupportedKhr;
-                break;
-            case VK_ERROR_VIDEO_PROFILE_CODEC_NOT_SUPPORTED_KHR:
-                _type = ApiResultType::ErrorVideoProfileCodecNotSupportedKhr;
-                break;
-            case VK_ERROR_VIDEO_STD_VERSION_NOT_SUPPORTED_KHR:
-                _type = ApiResultType::ErrorVideoStdVersionNotSupportedKhr;
-                break;
-            case VK_ERROR_NOT_PERMITTED_KHR:
-                _type = ApiResultType::ErrorNotPermittedKhr;
-                break;
-            case VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT:
-                _type = ApiResultType::ErrorFullScreenExclusiveModeLostExt;
-                break;
-            case VK_THREAD_IDLE_KHR:
-                _type = ApiResultType::ThreadIdleKhr;
-                break;
-            case VK_THREAD_DONE_KHR:
-                _type = ApiResultType::ThreadDoneKhr;
-                break;
-            case VK_OPERATION_DEFERRED_KHR:
-                _type = ApiResultType::OperationDeferredKhr;
-                break;
-            case VK_OPERATION_NOT_DEFERRED_KHR:
-                _type = ApiResultType::OperationNotDeferredKhr;
-                break;
-            case VK_ERROR_COMPRESSION_EXHAUSTED_EXT:
-                _type = ApiResultType::ErrorCompressionExhaustedExt;
-                break;
-            case VK_ERROR_INCOMPATIBLE_SHADER_BINARY_EXT:
-                _type = ApiResultType::ErrorIncompatibleShaderBinaryExt;
-                break;
-            default:
-                _type = ApiResultType::UndocumentedVkResult;
-                break;
-            }
-        }
+        ApiResult(VkResult vk_result);
 
         constexpr ApiResultType type() const
         {
@@ -434,6 +319,10 @@ namespace bv
 
     BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(AllocationScope);
 
+    AllocationScope AllocationScope_from_vk(
+        VkSystemAllocationScope vk_scope
+    );
+
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkInternalAllocationType.html
     enum class InternalAllocationType : uint8_t
     {
@@ -450,7 +339,11 @@ namespace bv
 
     BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(InternalAllocationType);
 
-    enum class VulkanApiVersion
+    InternalAllocationType InternalAllocationType_from_vk(
+        VkInternalAllocationType vk_type
+    );
+
+    enum class VulkanApiVersion : uint8_t
     {
         Vulkan1_0,
         Vulkan1_1,
@@ -468,6 +361,8 @@ namespace bv
     };
 
     BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(VulkanApiVersion);
+
+    uint32_t VulkanApiVersion_to_vk(VulkanApiVersion version);
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceType.html
     enum class PhysicalDeviceType : uint8_t
@@ -491,26 +386,9 @@ namespace bv
 
     BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(PhysicalDeviceType);
 
-    constexpr PhysicalDeviceType PhysicalDeviceType_from_VkPhysicalDeviceType(
-        VkPhysicalDeviceType vk_physical_device_type
-    )
-    {
-        switch (vk_physical_device_type)
-        {
-        case VK_PHYSICAL_DEVICE_TYPE_OTHER:
-            return PhysicalDeviceType::Other;
-        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
-            return PhysicalDeviceType::IntegratedGpu;
-        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
-            return PhysicalDeviceType::DiscreteGpu;
-        case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
-            return PhysicalDeviceType::VirtualGpu;
-        case VK_PHYSICAL_DEVICE_TYPE_CPU:
-            return PhysicalDeviceType::Cpu;
-        default:
-            return PhysicalDeviceType::Other;
-        }
-    }
+    PhysicalDeviceType PhysicalDeviceType_from_vk(
+        VkPhysicalDeviceType vk_type
+    );
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSampleCountFlagBits.html
     struct SampleCountFlags
@@ -524,8 +402,8 @@ namespace bv
         bool _64 : 1 = false;
     };
 
-    SampleCountFlags SampleCountFlags_from_VkSampleCountFlags(
-        VkSampleCountFlags vk_sample_count_flags
+    SampleCountFlags SampleCountFlags_from_vk(
+        VkSampleCountFlags vk_flags
     );
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSampleCountFlagBits.html
@@ -554,12 +432,15 @@ namespace bv
 
     BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(SampleCount);
 
+    SampleCount SampleCount_from_vk(VkSampleCountFlagBits vk_sample_count);
+    VkSampleCountFlagBits SampleCount_to_vk(SampleCount sample_count);
+
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueueFlagBits.html
     // present: https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceSupportKHR.html
     struct QueueFlags
     {
         bool graphics : 1 = false;
-        bool present : 1 = false;
+        bool presentation : 1 = false;
         bool compute : 1 = false;
         bool transfer : 1 = false;
         bool sparse_binding : 1 = false;
@@ -567,6 +448,11 @@ namespace bv
         bool video_decode : 1 = false;
         bool optical_flow_nv : 1 = false;
     };
+
+    QueueFlags QueueFlags_from_vk(
+        const VkQueueFlags& vk_queue_flags,
+        VkBool32 vk_presentation_support
+    );
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkObjectType.html
     enum class ObjectType : uint8_t
@@ -678,132 +564,37 @@ namespace bv
 
     BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(ObjectType);
 
-    constexpr ObjectType ObjectType_from_VkObjectType(
-        VkObjectType vk_object_type
-    )
-    {
-        switch (vk_object_type)
-        {
-        case VK_OBJECT_TYPE_UNKNOWN:
-            return ObjectType::Unknown;
-        case VK_OBJECT_TYPE_INSTANCE:
-            return ObjectType::Instance;
-        case VK_OBJECT_TYPE_PHYSICAL_DEVICE:
-            return ObjectType::PhysicalDevice;
-        case VK_OBJECT_TYPE_DEVICE:
-            return ObjectType::Device;
-        case VK_OBJECT_TYPE_QUEUE:
-            return ObjectType::Queue;
-        case VK_OBJECT_TYPE_SEMAPHORE:
-            return ObjectType::Semaphore;
-        case VK_OBJECT_TYPE_COMMAND_BUFFER:
-            return ObjectType::CommandBuffer;
-        case VK_OBJECT_TYPE_FENCE:
-            return ObjectType::Fence;
-        case VK_OBJECT_TYPE_DEVICE_MEMORY:
-            return ObjectType::DeviceMemory;
-        case VK_OBJECT_TYPE_BUFFER:
-            return ObjectType::Buffer;
-        case VK_OBJECT_TYPE_IMAGE:
-            return ObjectType::Image;
-        case VK_OBJECT_TYPE_EVENT:
-            return ObjectType::Event;
-        case VK_OBJECT_TYPE_QUERY_POOL:
-            return ObjectType::QueryPool;
-        case VK_OBJECT_TYPE_BUFFER_VIEW:
-            return ObjectType::BufferView;
-        case VK_OBJECT_TYPE_IMAGE_VIEW:
-            return ObjectType::ImageView;
-        case VK_OBJECT_TYPE_SHADER_MODULE:
-            return ObjectType::ShaderModule;
-        case VK_OBJECT_TYPE_PIPELINE_CACHE:
-            return ObjectType::PipelineCache;
-        case VK_OBJECT_TYPE_PIPELINE_LAYOUT:
-            return ObjectType::PipelineLayout;
-        case VK_OBJECT_TYPE_RENDER_PASS:
-            return ObjectType::RenderPass;
-        case VK_OBJECT_TYPE_PIPELINE:
-            return ObjectType::Pipeline;
-        case VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT:
-            return ObjectType::DescriptorSetLayout;
-        case VK_OBJECT_TYPE_SAMPLER:
-            return ObjectType::Sampler;
-        case VK_OBJECT_TYPE_DESCRIPTOR_POOL:
-            return ObjectType::DescriptorPool;
-        case VK_OBJECT_TYPE_DESCRIPTOR_SET:
-            return ObjectType::DescriptorSet;
-        case VK_OBJECT_TYPE_FRAMEBUFFER:
-            return ObjectType::Framebuffer;
-        case VK_OBJECT_TYPE_COMMAND_POOL:
-            return ObjectType::CommandPool;
-        case VK_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION:
-            return ObjectType::SamplerYcbcrConversion;
-        case VK_OBJECT_TYPE_DESCRIPTOR_UPDATE_TEMPLATE:
-            return ObjectType::DescriptorUpdateTemplate;
-        case VK_OBJECT_TYPE_PRIVATE_DATA_SLOT:
-            return ObjectType::PrivateDataSlot;
-        case VK_OBJECT_TYPE_SURFACE_KHR:
-            return ObjectType::Surface;
-        case VK_OBJECT_TYPE_SWAPCHAIN_KHR:
-            return ObjectType::Swapchain;
-        case VK_OBJECT_TYPE_DISPLAY_KHR:
-            return ObjectType::Display;
-        case VK_OBJECT_TYPE_DISPLAY_MODE_KHR:
-            return ObjectType::DisplayMode;
-        case VK_OBJECT_TYPE_DEBUG_REPORT_CALLBACK_EXT:
-            return ObjectType::DebugReportCallback;
-        case VK_OBJECT_TYPE_VIDEO_SESSION_KHR:
-            return ObjectType::VideoSession;
-        case VK_OBJECT_TYPE_VIDEO_SESSION_PARAMETERS_KHR:
-            return ObjectType::VideoSessionParameters;
-        case VK_OBJECT_TYPE_CU_MODULE_NVX:
-            return ObjectType::CuModuleNvx;
-        case VK_OBJECT_TYPE_CU_FUNCTION_NVX:
-            return ObjectType::CuFunctionNvx;
-        case VK_OBJECT_TYPE_DEBUG_UTILS_MESSENGER_EXT:
-            return ObjectType::DebugMessenger;
-        case VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR:
-            return ObjectType::AccelerationStructure;
-        case VK_OBJECT_TYPE_VALIDATION_CACHE_EXT:
-            return ObjectType::ValidationCache;
-        case VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_NV:
-            return ObjectType::AccelerationStructureNv;
-        case VK_OBJECT_TYPE_PERFORMANCE_CONFIGURATION_INTEL:
-            return ObjectType::PerformanceConfigurationIntel;
-        case VK_OBJECT_TYPE_DEFERRED_OPERATION_KHR:
-            return ObjectType::DeferredOperation;
-        case VK_OBJECT_TYPE_INDIRECT_COMMANDS_LAYOUT_NV:
-            return ObjectType::IndirectCommandsLayoutNv;
-        case VK_OBJECT_TYPE_BUFFER_COLLECTION_FUCHSIA:
-            return ObjectType::BufferCollectionFuchsia;
-        case VK_OBJECT_TYPE_MICROMAP_EXT:
-            return ObjectType::Micromap;
-        case VK_OBJECT_TYPE_OPTICAL_FLOW_SESSION_NV:
-            return ObjectType::OpticalFlowSessionNv;
-        case VK_OBJECT_TYPE_SHADER_EXT:
-            return ObjectType::Shader;
-        default:
-            return ObjectType::Unknown;
-        }
-    }
+    ObjectType ObjectType_from_vk(VkObjectType vk_type);
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessageSeverityFlagBitsEXT.html
-    struct DebugMessageSeverityFilter
+    struct DebugMessageSeverityFlags
     {
-        bool verbose : 1;
-        bool info : 1;
-        bool warning : 1;
-        bool error : 1;
+        bool verbose : 1 = false;
+        bool info : 1 = false;
+        bool warning : 1 = false;
+        bool error : 1 = false;
     };
 
+    VkDebugUtilsMessageSeverityFlagsEXT DebugMessageSeverityFlags_to_vk(
+        const DebugMessageSeverityFlags& flags
+    );
+
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessageTypeFlagBitsEXT.html
-    struct DebugMessageTypeFilter
+    struct DebugMessageTypeFlags
     {
-        bool general : 1;
-        bool validation : 1;
-        bool performance : 1;
-        bool device_address_binding : 1;
+        bool general : 1 = false;
+        bool validation : 1 = false;
+        bool performance : 1 = false;
+        bool device_address_binding : 1 = false;
     };
+
+    DebugMessageTypeFlags DebugMessageTypeFlags_from_vk(
+        VkDebugUtilsMessageTypeFlagsEXT vk_flags
+    );
+
+    VkDebugUtilsMessageTypeFlagsEXT DebugMessageTypeFlags_to_vk(
+        const DebugMessageTypeFlags& flags
+    );
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessageSeverityFlagBitsEXT.html
     enum class DebugMessageSeverity : uint8_t
@@ -825,30 +616,1181 @@ namespace bv
 
     BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(DebugMessageSeverity);
 
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessageTypeFlagBitsEXT.html
-    enum class DebugMessageType : uint8_t
-    {
-        General,
-        Validation,
-        Performance,
-        DeviceAddressBinding,
-        _
-    };
-
-    static constexpr const char* DebugMessageType_string[]
-    {
-        "General",
-        "Validation",
-        "Performance",
-        "Device Address Binding"
-    };
-
-    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(DebugMessageType);
+    DebugMessageSeverity DebugMessageSeverity_from_vk(
+        VkDebugUtilsMessageSeverityFlagBitsEXT vk_severity
+    );
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceQueueCreateFlagBits.html
     struct QueueRequestFlags
     {
         bool protected_ : 1 = false;
+    };
+
+    VkDeviceQueueCreateFlags QueueRequestFlags_to_vk(
+        const QueueRequestFlags& flags
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtensionProperties.html
+    struct ExtensionProperties
+    {
+        std::string name;
+        uint32_t spec_version;
+    };
+
+    ExtensionProperties ExtensionProperties_from_vk(
+        VkExtensionProperties vk_properties
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkLayerProperties.html
+    struct LayerProperties
+    {
+        std::string name;
+        Version spec_version;
+        uint32_t implementation_version;
+        std::string description;
+    };
+
+    LayerProperties LayerProperties_from_vk(
+        const VkLayerProperties& vk_properties
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
+    struct PhysicalDeviceLimits
+    {
+        uint32_t max_image_dimension1d;
+        uint32_t max_image_dimension2d;
+        uint32_t max_image_dimension3d;
+        uint32_t max_image_dimension_cube;
+        uint32_t max_image_array_layers;
+        uint32_t max_texel_buffer_elements;
+        uint32_t max_uniform_buffer_range;
+        uint32_t max_storage_buffer_range;
+        uint32_t max_push_constants_size;
+        uint32_t max_memory_allocation_count;
+        uint32_t max_sampler_allocation_count;
+        uint64_t buffer_image_granularity;
+        uint64_t sparse_address_space_size;
+        uint32_t max_bound_descriptor_sets;
+        uint32_t max_per_stage_descriptor_samplers;
+        uint32_t max_per_stage_descriptor_uniform_buffers;
+        uint32_t max_per_stage_descriptor_storage_buffers;
+        uint32_t max_per_stage_descriptor_sampled_images;
+        uint32_t max_per_stage_descriptor_storage_images;
+        uint32_t max_per_stage_descriptor_input_attachments;
+        uint32_t max_per_stage_resources;
+        uint32_t max_descriptor_set_samplers;
+        uint32_t max_descriptor_set_uniform_buffers;
+        uint32_t max_descriptor_set_uniform_buffers_dynamic;
+        uint32_t max_descriptor_set_storage_buffers;
+        uint32_t max_descriptor_set_storage_buffers_dynamic;
+        uint32_t max_descriptor_set_sampled_images;
+        uint32_t max_descriptor_set_storage_images;
+        uint32_t max_descriptor_set_input_attachments;
+        uint32_t max_vertex_input_attributes;
+        uint32_t max_vertex_input_bindings;
+        uint32_t max_vertex_input_attribute_offset;
+        uint32_t max_vertex_input_binding_stride;
+        uint32_t max_vertex_output_components;
+        uint32_t max_tessellation_generation_level;
+        uint32_t max_tessellation_patch_size;
+        uint32_t max_tessellation_control_per_vertex_input_components;
+        uint32_t max_tessellation_control_per_vertex_output_components;
+        uint32_t max_tessellation_control_per_patch_output_components;
+        uint32_t max_tessellation_control_total_output_components;
+        uint32_t max_tessellation_evaluation_input_components;
+        uint32_t max_tessellation_evaluation_output_components;
+        uint32_t max_geometry_shader_invocations;
+        uint32_t max_geometry_input_components;
+        uint32_t max_geometry_output_components;
+        uint32_t max_geometry_output_vertices;
+        uint32_t max_geometry_total_output_components;
+        uint32_t max_fragment_input_components;
+        uint32_t max_fragment_output_attachments;
+        uint32_t max_fragment_dual_src_attachments;
+        uint32_t max_fragment_combined_output_resources;
+        uint32_t max_compute_shared_memory_size;
+        std::array<uint32_t, 3> max_compute_work_group_count;
+        uint32_t max_compute_work_group_invocations;
+        std::array<uint32_t, 3> max_compute_work_group_size;
+        uint32_t sub_pixel_precision_bits;
+        uint32_t sub_texel_precision_bits;
+        uint32_t mipmap_precision_bits;
+        uint32_t max_draw_indexed_index_value;
+        uint32_t max_draw_indirect_count;
+        float max_sampler_lod_bias;
+        float max_sampler_anisotropy;
+        uint32_t max_viewports;
+        std::array<uint32_t, 2> max_viewport_dimensions;
+        std::array<float, 2> viewport_bounds_range;
+        uint32_t viewport_sub_pixel_bits;
+        size_t min_memory_map_alignment;
+        uint64_t min_texel_buffer_offset_alignment;
+        uint64_t min_uniform_buffer_offset_alignment;
+        uint64_t min_storage_buffer_offset_alignment;
+        int32_t min_texel_offset;
+        uint32_t max_texel_offset;
+        int32_t min_texel_gather_offset;
+        uint32_t max_texel_gather_offset;
+        float min_interpolation_offset;
+        float max_interpolation_offset;
+        uint32_t sub_pixel_interpolation_offset_bits;
+        uint32_t max_framebuffer_width;
+        uint32_t max_framebuffer_height;
+        uint32_t max_framebuffer_layers;
+        SampleCountFlags framebuffer_color_sample_counts;
+        SampleCountFlags framebuffer_depth_sample_counts;
+        SampleCountFlags framebuffer_stencil_sample_counts;
+        SampleCountFlags framebuffer_no_attachments_sample_counts;
+        uint32_t max_color_attachments;
+        SampleCountFlags sampled_image_color_sample_counts;
+        SampleCountFlags sampled_image_integer_sample_counts;
+        SampleCountFlags sampled_image_depth_sample_counts;
+        SampleCountFlags sampled_image_stencil_sample_counts;
+        SampleCountFlags storage_image_sample_counts;
+        uint32_t max_sample_mask_words;
+        bool timestamp_compute_and_graphics;
+        float timestamp_period;
+        uint32_t max_clip_distances;
+        uint32_t max_cull_distances;
+        uint32_t max_combined_clip_and_cull_distances;
+        uint32_t discrete_queue_priorities;
+        std::array<float, 2> point_size_range;
+        std::array<float, 2> line_width_range;
+        float point_size_granularity;
+        float line_width_granularity;
+        bool strict_lines;
+        bool standard_sample_locations;
+        uint64_t optimal_buffer_copy_offset_alignment;
+        uint64_t optimal_buffer_copy_row_pitch_alignment;
+        uint64_t non_coherent_atom_size;
+    };
+
+    PhysicalDeviceLimits PhysicalDeviceLimits_from_vk(
+        const VkPhysicalDeviceLimits& vk_limits
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceSparseProperties.html
+    struct PhysicalDeviceSparseProperties
+    {
+        bool residency_standard2d_block_shape : 1;
+        bool residency_standard2d_multisample_block_shape : 1;
+        bool residency_standard3d_block_shape : 1;
+        bool residency_aligned_mip_size : 1;
+        bool residency_non_resident_strict : 1;
+    };
+
+    PhysicalDeviceSparseProperties PhysicalDeviceSparseProperties_from_vk(
+        const VkPhysicalDeviceSparseProperties& vk_properties
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceProperties.html
+    struct PhysicalDeviceProperties
+    {
+        Version api_version;
+        uint32_t driver_version;
+        uint32_t vendor_id;
+        uint32_t device_id;
+        PhysicalDeviceType device_type;
+        std::string device_name;
+        std::array<uint8_t, VK_UUID_SIZE> pipeline_cache_uuid;
+        PhysicalDeviceLimits limits;
+        PhysicalDeviceSparseProperties sparse_properties;
+    };
+
+    PhysicalDeviceProperties PhysicalDeviceProperties_from_vk(
+        const VkPhysicalDeviceProperties& vk_properties
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceFeatures.html
+    struct PhysicalDeviceFeatures
+    {
+        bool robust_buffer_access : 1 = false;
+        bool full_draw_index_uint32 : 1 = false;
+        bool image_cube_array : 1 = false;
+        bool independent_blend : 1 = false;
+        bool geometry_shader : 1 = false;
+        bool tessellation_shader : 1 = false;
+        bool sample_rate_shading : 1 = false;
+        bool dual_src_blend : 1 = false;
+        bool logic_op : 1 = false;
+        bool multi_draw_indirect : 1 = false;
+        bool draw_indirect_first_instance : 1 = false;
+        bool depth_clamp : 1 = false;
+        bool depth_bias_clamp : 1 = false;
+        bool fill_mode_non_solid : 1 = false;
+        bool depth_bounds : 1 = false;
+        bool wide_lines : 1 = false;
+        bool large_points : 1 = false;
+        bool alpha_to_one : 1 = false;
+        bool multi_viewport : 1 = false;
+        bool sampler_anisotropy : 1 = false;
+        bool texture_compression_etc2 : 1 = false;
+        bool texture_compression_astc_ldr : 1 = false;
+        bool texture_compression_bc : 1 = false;
+        bool occlusion_query_precise : 1 = false;
+        bool pipeline_statistics_query : 1 = false;
+        bool vertex_pipeline_stores_and_atomics : 1 = false;
+        bool fragment_stores_and_atomics : 1 = false;
+        bool shader_tessellation_and_geometry_point_size : 1 = false;
+        bool shader_image_gather_extended : 1 = false;
+        bool shader_storage_image_extended_formats : 1 = false;
+        bool shader_storage_image_multisample : 1 = false;
+        bool shader_storage_image_read_without_format : 1 = false;
+        bool shader_storage_image_write_without_format : 1 = false;
+        bool shader_uniform_buffer_array_dynamic_indexing : 1 = false;
+        bool shader_sampled_image_array_dynamic_indexing : 1 = false;
+        bool shader_storage_buffer_array_dynamic_indexing : 1 = false;
+        bool shader_storage_image_array_dynamic_indexing : 1 = false;
+        bool shader_clip_distance : 1 = false;
+        bool shader_cull_distance : 1 = false;
+        bool shader_float64 : 1 = false;
+        bool shader_int64 : 1 = false;
+        bool shader_int16 : 1 = false;
+        bool shader_resource_residency : 1 = false;
+        bool shader_resource_min_lod : 1 = false;
+        bool sparse_binding : 1 = false;
+        bool sparse_residency_buffer : 1 = false;
+        bool sparse_residency_image2d : 1 = false;
+        bool sparse_residency_image3d : 1 = false;
+        bool sparse_residency2_samples : 1 = false;
+        bool sparse_residency4_samples : 1 = false;
+        bool sparse_residency8_samples : 1 = false;
+        bool sparse_residency16_samples : 1 = false;
+        bool sparse_residency_aliased : 1 = false;
+        bool variable_multisample_rate : 1 = false;
+        bool inherited_queries : 1 = false;
+    };
+
+    PhysicalDeviceFeatures PhysicalDeviceFeatures_from_vk(
+        const VkPhysicalDeviceFeatures& vk_features
+    );
+
+    VkPhysicalDeviceFeatures PhysicalDeviceFeatures_to_vk(
+        const PhysicalDeviceFeatures& features
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent3D.html
+    struct Extent3d
+    {
+        uint32_t width;
+        uint32_t height;
+        uint32_t depth;
+    };
+
+    Extent3d Extent3d_from_vk(const VkExtent3D& vk_extent_3d);
+    VkExtent3D Extent3d_to_vk(const Extent3d& extent_3d);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent2D.html
+    struct Extent2d
+    {
+        uint32_t width;
+        uint32_t height;
+    };
+
+    Extent2d Extent2d_from_vk(const VkExtent2D& vk_extent_2d);
+    VkExtent2D Extent2d_to_vk(const Extent2d& extent_2d);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueueFamilyProperties.html
+    struct QueueFamily
+    {
+        QueueFlags queue_flags;
+        uint32_t queue_count;
+        uint32_t timestamp_valid_bits;
+        Extent3d min_image_transfer_granularity;
+    };
+
+    QueueFamily QueueFamily_from_vk(
+        const VkQueueFamilyProperties& vk_family,
+        VkBool32 vk_presentation_support
+    );
+
+    // index of the first queue family that supports the corresponding set of
+    // operations
+    struct QueueFamilyIndices
+    {
+        std::optional<uint32_t> graphics;
+        std::optional<uint32_t> presentation;
+        std::optional<uint32_t> compute;
+        std::optional<uint32_t> transfer;
+        std::optional<uint32_t> sparse_binding;
+        std::optional<uint32_t> protected_;
+        std::optional<uint32_t> video_decode;
+        std::optional<uint32_t> optical_flow_nv;
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceTransformFlagBitsKHR.html
+    struct SurfaceTransformFlags
+    {
+        bool identity : 1 = false;
+        bool rotate90 : 1 = false;
+        bool rotate180 : 1 = false;
+        bool rotate270 : 1 = false;
+        bool horizontal_mirror : 1 = false;
+        bool horizontal_mirror_rotate90 : 1 = false;
+        bool horizontal_mirror_rotate180 : 1 = false;
+        bool horizontal_mirror_rotate270 : 1 = false;
+        bool inherit : 1 = false;
+    };
+
+    SurfaceTransformFlags SurfaceTransformFlags_from_vk(
+        const VkSurfaceTransformFlagsKHR& vk_flags
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceTransformFlagBitsKHR.html
+    enum class SurfaceTransform : uint8_t
+    {
+        Identity,
+        Rotate90,
+        Rotate180,
+        Rotate270,
+        HorizontalMirror,
+        HorizontalMirrorRotate90,
+        HorizontalMirrorRotate180,
+        HorizontalMirrorRotate270,
+        Inherit,
+        _
+    };
+
+    static constexpr const char* SurfaceTransform_string[]
+    {
+        "Identity",
+        "Rotate 90",
+        "Rotate 180",
+        "Rotate 270",
+        "Horizontal Mirror",
+        "Horizontal Mirror Rotate 90",
+        "Horizontal Mirror Rotate 180",
+        "Horizontal Mirror Rotate 270",
+        "Inherit"
+    };
+
+    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(SurfaceTransform);
+
+    SurfaceTransform SurfaceTransform_from_vk(
+        VkSurfaceTransformFlagBitsKHR vk_transform
+    );
+
+    VkSurfaceTransformFlagBitsKHR SurfaceTransform_to_vk(
+        SurfaceTransform transform
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCompositeAlphaFlagBitsKHR.html
+    struct CompositeAlphaFlags
+    {
+        bool opaque : 1 = false;
+        bool pre_multiplied : 1 = false;
+        bool post_multiplied : 1 = false;
+        bool inherit : 1 = false;
+    };
+
+    CompositeAlphaFlags CompositeAlphaFlags_from_vk(
+        VkCompositeAlphaFlagsKHR vk_flags
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCompositeAlphaFlagBitsKHR.html
+    enum class CompositeAlpha : uint8_t
+    {
+        Opaque,
+        PreMultiplied,
+        PostMultiplied,
+        Inherit,
+        _
+    };
+
+    static constexpr const char* CompositeAlpha_string[]
+    {
+        "Opaque",
+        "Pre-Multiplied",
+        "Post-Multiplied",
+        "Inherit"
+    };
+
+    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(CompositeAlpha);
+
+    VkCompositeAlphaFlagBitsKHR CompositeAlpha_to_vk(CompositeAlpha alpha);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageUsageFlagBits.html
+    struct ImageUsageFlags
+    {
+        bool transfer_src : 1 = false;
+        bool transfer_dst : 1 = false;
+        bool sampled : 1 = false;
+        bool storage : 1 = false;
+        bool color_attachment : 1 = false;
+        bool depth_stencil_attachment : 1 = false;
+        bool transient_attachment : 1 = false;
+        bool input_attachment : 1 = false;
+        bool video_decode_dst : 1 = false;
+        bool video_decode_src : 1 = false;
+        bool video_decode_dpb : 1 = false;
+        bool fragment_density_map : 1 = false;
+        bool fragment_shading_rate_attachment : 1 = false;
+        bool attachment_feedback_loop : 1 = false;
+        bool invocation_mask_huawei : 1 = false;
+        bool sample_weight_qcom : 1 = false;
+        bool sample_block_match_qcom : 1 = false;
+    };
+
+    ImageUsageFlags ImageUsageFlags_from_vk(VkImageUsageFlags vk_flags);
+    VkImageUsageFlags ImageUsageFlags_to_vk(const ImageUsageFlags& flags);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceCapabilitiesKHR.html
+    struct SurfaceCapabilities
+    {
+        uint32_t min_image_count;
+        uint32_t max_image_count;
+        Extent2d current_extent;
+        Extent2d min_image_extent;
+        Extent2d max_image_extent;
+        uint32_t max_image_array_layers;
+        SurfaceTransformFlags supported_transforms;
+        SurfaceTransform current_transform;
+        CompositeAlphaFlags supported_composite_alpha;
+        ImageUsageFlags supported_usage_flags;
+    };
+
+    SurfaceCapabilities SurfaceCapabilities_from_vk(
+        const VkSurfaceCapabilitiesKHR& vk_capabilities
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFormat.html
+    enum class Format : uint8_t
+    {
+        Undefined,
+        R4G4_UNORM_PACK8,
+        R4G4B4A4_UNORM_PACK16,
+        B4G4R4A4_UNORM_PACK16,
+        R5G6B5_UNORM_PACK16,
+        B5G6R5_UNORM_PACK16,
+        R5G5B5A1_UNORM_PACK16,
+        B5G5R5A1_UNORM_PACK16,
+        A1R5G5B5_UNORM_PACK16,
+        R8_UNORM,
+        R8_SNORM,
+        R8_USCALED,
+        R8_SSCALED,
+        R8_UINT,
+        R8_SINT,
+        R8_SRGB,
+        R8G8_UNORM,
+        R8G8_SNORM,
+        R8G8_USCALED,
+        R8G8_SSCALED,
+        R8G8_UINT,
+        R8G8_SINT,
+        R8G8_SRGB,
+        R8G8B8_UNORM,
+        R8G8B8_SNORM,
+        R8G8B8_USCALED,
+        R8G8B8_SSCALED,
+        R8G8B8_UINT,
+        R8G8B8_SINT,
+        R8G8B8_SRGB,
+        B8G8R8_UNORM,
+        B8G8R8_SNORM,
+        B8G8R8_USCALED,
+        B8G8R8_SSCALED,
+        B8G8R8_UINT,
+        B8G8R8_SINT,
+        B8G8R8_SRGB,
+        R8G8B8A8_UNORM,
+        R8G8B8A8_SNORM,
+        R8G8B8A8_USCALED,
+        R8G8B8A8_SSCALED,
+        R8G8B8A8_UINT,
+        R8G8B8A8_SINT,
+        R8G8B8A8_SRGB,
+        B8G8R8A8_UNORM,
+        B8G8R8A8_SNORM,
+        B8G8R8A8_USCALED,
+        B8G8R8A8_SSCALED,
+        B8G8R8A8_UINT,
+        B8G8R8A8_SINT,
+        B8G8R8A8_SRGB,
+        A8B8G8R8_UNORM_PACK32,
+        A8B8G8R8_SNORM_PACK32,
+        A8B8G8R8_USCALED_PACK32,
+        A8B8G8R8_SSCALED_PACK32,
+        A8B8G8R8_UINT_PACK32,
+        A8B8G8R8_SINT_PACK32,
+        A8B8G8R8_SRGB_PACK32,
+        A2R10G10B10_UNORM_PACK32,
+        A2R10G10B10_SNORM_PACK32,
+        A2R10G10B10_USCALED_PACK32,
+        A2R10G10B10_SSCALED_PACK32,
+        A2R10G10B10_UINT_PACK32,
+        A2R10G10B10_SINT_PACK32,
+        A2B10G10R10_UNORM_PACK32,
+        A2B10G10R10_SNORM_PACK32,
+        A2B10G10R10_USCALED_PACK32,
+        A2B10G10R10_SSCALED_PACK32,
+        A2B10G10R10_UINT_PACK32,
+        A2B10G10R10_SINT_PACK32,
+        R16_UNORM,
+        R16_SNORM,
+        R16_USCALED,
+        R16_SSCALED,
+        R16_UINT,
+        R16_SINT,
+        R16_SFLOAT,
+        R16G16_UNORM,
+        R16G16_SNORM,
+        R16G16_USCALED,
+        R16G16_SSCALED,
+        R16G16_UINT,
+        R16G16_SINT,
+        R16G16_SFLOAT,
+        R16G16B16_UNORM,
+        R16G16B16_SNORM,
+        R16G16B16_USCALED,
+        R16G16B16_SSCALED,
+        R16G16B16_UINT,
+        R16G16B16_SINT,
+        R16G16B16_SFLOAT,
+        R16G16B16A16_UNORM,
+        R16G16B16A16_SNORM,
+        R16G16B16A16_USCALED,
+        R16G16B16A16_SSCALED,
+        R16G16B16A16_UINT,
+        R16G16B16A16_SINT,
+        R16G16B16A16_SFLOAT,
+        R32_UINT,
+        R32_SINT,
+        R32_SFLOAT,
+        R32G32_UINT,
+        R32G32_SINT,
+        R32G32_SFLOAT,
+        R32G32B32_UINT,
+        R32G32B32_SINT,
+        R32G32B32_SFLOAT,
+        R32G32B32A32_UINT,
+        R32G32B32A32_SINT,
+        R32G32B32A32_SFLOAT,
+        R64_UINT,
+        R64_SINT,
+        R64_SFLOAT,
+        R64G64_UINT,
+        R64G64_SINT,
+        R64G64_SFLOAT,
+        R64G64B64_UINT,
+        R64G64B64_SINT,
+        R64G64B64_SFLOAT,
+        R64G64B64A64_UINT,
+        R64G64B64A64_SINT,
+        R64G64B64A64_SFLOAT,
+        B10G11R11_UFLOAT_PACK32,
+        E5B9G9R9_UFLOAT_PACK32,
+        D16_UNORM,
+        X8_D24_UNORM_PACK32,
+        D32_SFLOAT,
+        S8_UINT,
+        D16_UNORM_S8_UINT,
+        D24_UNORM_S8_UINT,
+        D32_SFLOAT_S8_UINT,
+        BC1_RGB_UNORM_BLOCK,
+        BC1_RGB_SRGB_BLOCK,
+        BC1_RGBA_UNORM_BLOCK,
+        BC1_RGBA_SRGB_BLOCK,
+        BC2_UNORM_BLOCK,
+        BC2_SRGB_BLOCK,
+        BC3_UNORM_BLOCK,
+        BC3_SRGB_BLOCK,
+        BC4_UNORM_BLOCK,
+        BC4_SNORM_BLOCK,
+        BC5_UNORM_BLOCK,
+        BC5_SNORM_BLOCK,
+        BC6H_UFLOAT_BLOCK,
+        BC6H_SFLOAT_BLOCK,
+        BC7_UNORM_BLOCK,
+        BC7_SRGB_BLOCK,
+        ETC2_R8G8B8_UNORM_BLOCK,
+        ETC2_R8G8B8_SRGB_BLOCK,
+        ETC2_R8G8B8A1_UNORM_BLOCK,
+        ETC2_R8G8B8A1_SRGB_BLOCK,
+        ETC2_R8G8B8A8_UNORM_BLOCK,
+        ETC2_R8G8B8A8_SRGB_BLOCK,
+        EAC_R11_UNORM_BLOCK,
+        EAC_R11_SNORM_BLOCK,
+        EAC_R11G11_UNORM_BLOCK,
+        EAC_R11G11_SNORM_BLOCK,
+        ASTC_4x4_UNORM_BLOCK,
+        ASTC_4x4_SRGB_BLOCK,
+        ASTC_5x4_UNORM_BLOCK,
+        ASTC_5x4_SRGB_BLOCK,
+        ASTC_5x5_UNORM_BLOCK,
+        ASTC_5x5_SRGB_BLOCK,
+        ASTC_6x5_UNORM_BLOCK,
+        ASTC_6x5_SRGB_BLOCK,
+        ASTC_6x6_UNORM_BLOCK,
+        ASTC_6x6_SRGB_BLOCK,
+        ASTC_8x5_UNORM_BLOCK,
+        ASTC_8x5_SRGB_BLOCK,
+        ASTC_8x6_UNORM_BLOCK,
+        ASTC_8x6_SRGB_BLOCK,
+        ASTC_8x8_UNORM_BLOCK,
+        ASTC_8x8_SRGB_BLOCK,
+        ASTC_10x5_UNORM_BLOCK,
+        ASTC_10x5_SRGB_BLOCK,
+        ASTC_10x6_UNORM_BLOCK,
+        ASTC_10x6_SRGB_BLOCK,
+        ASTC_10x8_UNORM_BLOCK,
+        ASTC_10x8_SRGB_BLOCK,
+        ASTC_10x10_UNORM_BLOCK,
+        ASTC_10x10_SRGB_BLOCK,
+        ASTC_12x10_UNORM_BLOCK,
+        ASTC_12x10_SRGB_BLOCK,
+        ASTC_12x12_UNORM_BLOCK,
+        ASTC_12x12_SRGB_BLOCK,
+        G8B8G8R8_422_UNORM,
+        B8G8R8G8_422_UNORM,
+        G8_B8_R8_3PLANE_420_UNORM,
+        G8_B8R8_2PLANE_420_UNORM,
+        G8_B8_R8_3PLANE_422_UNORM,
+        G8_B8R8_2PLANE_422_UNORM,
+        G8_B8_R8_3PLANE_444_UNORM,
+        R10X6_UNORM_PACK16,
+        R10X6G10X6_UNORM_2PACK16,
+        R10X6G10X6B10X6A10X6_UNORM_4PACK16,
+        G10X6B10X6G10X6R10X6_422_UNORM_4PACK16,
+        B10X6G10X6R10X6G10X6_422_UNORM_4PACK16,
+        G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16,
+        G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16,
+        G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16,
+        G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16,
+        G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16,
+        R12X4_UNORM_PACK16,
+        R12X4G12X4_UNORM_2PACK16,
+        R12X4G12X4B12X4A12X4_UNORM_4PACK16,
+        G12X4B12X4G12X4R12X4_422_UNORM_4PACK16,
+        B12X4G12X4R12X4G12X4_422_UNORM_4PACK16,
+        G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16,
+        G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16,
+        G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16,
+        G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16,
+        G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16,
+        G16B16G16R16_422_UNORM,
+        B16G16R16G16_422_UNORM,
+        G16_B16_R16_3PLANE_420_UNORM,
+        G16_B16R16_2PLANE_420_UNORM,
+        G16_B16_R16_3PLANE_422_UNORM,
+        G16_B16R16_2PLANE_422_UNORM,
+        G16_B16_R16_3PLANE_444_UNORM,
+        G8_B8R8_2PLANE_444_UNORM,
+        G10X6_B10X6R10X6_2PLANE_444_UNORM_3PACK16,
+        G12X4_B12X4R12X4_2PLANE_444_UNORM_3PACK16,
+        G16_B16R16_2PLANE_444_UNORM,
+        A4R4G4B4_UNORM_PACK16,
+        A4B4G4R4_UNORM_PACK16,
+        ASTC_4x4_SFLOAT_BLOCK,
+        ASTC_5x4_SFLOAT_BLOCK,
+        ASTC_5x5_SFLOAT_BLOCK,
+        ASTC_6x5_SFLOAT_BLOCK,
+        ASTC_6x6_SFLOAT_BLOCK,
+        ASTC_8x5_SFLOAT_BLOCK,
+        ASTC_8x6_SFLOAT_BLOCK,
+        ASTC_8x8_SFLOAT_BLOCK,
+        ASTC_10x5_SFLOAT_BLOCK,
+        ASTC_10x6_SFLOAT_BLOCK,
+        ASTC_10x8_SFLOAT_BLOCK,
+        ASTC_10x10_SFLOAT_BLOCK,
+        ASTC_12x10_SFLOAT_BLOCK,
+        ASTC_12x12_SFLOAT_BLOCK,
+        PVRTC1_2BPP_UNORM_BLOCK_IMG,
+        PVRTC1_4BPP_UNORM_BLOCK_IMG,
+        PVRTC2_2BPP_UNORM_BLOCK_IMG,
+        PVRTC2_4BPP_UNORM_BLOCK_IMG,
+        PVRTC1_2BPP_SRGB_BLOCK_IMG,
+        PVRTC1_4BPP_SRGB_BLOCK_IMG,
+        PVRTC2_2BPP_SRGB_BLOCK_IMG,
+        PVRTC2_4BPP_SRGB_BLOCK_IMG,
+        R16G16_S10_5_NV,
+        _
+    };
+
+    static constexpr const char* Format_string[]
+    {
+        "Undefined",
+        "R4G4_UNORM_PACK8",
+        "R4G4B4A4_UNORM_PACK16",
+        "B4G4R4A4_UNORM_PACK16",
+        "R5G6B5_UNORM_PACK16",
+        "B5G6R5_UNORM_PACK16",
+        "R5G5B5A1_UNORM_PACK16",
+        "B5G5R5A1_UNORM_PACK16",
+        "A1R5G5B5_UNORM_PACK16",
+        "R8_UNORM",
+        "R8_SNORM",
+        "R8_USCALED",
+        "R8_SSCALED",
+        "R8_UINT",
+        "R8_SINT",
+        "R8_SRGB",
+        "R8G8_UNORM",
+        "R8G8_SNORM",
+        "R8G8_USCALED",
+        "R8G8_SSCALED",
+        "R8G8_UINT",
+        "R8G8_SINT",
+        "R8G8_SRGB",
+        "R8G8B8_UNORM",
+        "R8G8B8_SNORM",
+        "R8G8B8_USCALED",
+        "R8G8B8_SSCALED",
+        "R8G8B8_UINT",
+        "R8G8B8_SINT",
+        "R8G8B8_SRGB",
+        "B8G8R8_UNORM",
+        "B8G8R8_SNORM",
+        "B8G8R8_USCALED",
+        "B8G8R8_SSCALED",
+        "B8G8R8_UINT",
+        "B8G8R8_SINT",
+        "B8G8R8_SRGB",
+        "R8G8B8A8_UNORM",
+        "R8G8B8A8_SNORM",
+        "R8G8B8A8_USCALED",
+        "R8G8B8A8_SSCALED",
+        "R8G8B8A8_UINT",
+        "R8G8B8A8_SINT",
+        "R8G8B8A8_SRGB",
+        "B8G8R8A8_UNORM",
+        "B8G8R8A8_SNORM",
+        "B8G8R8A8_USCALED",
+        "B8G8R8A8_SSCALED",
+        "B8G8R8A8_UINT",
+        "B8G8R8A8_SINT",
+        "B8G8R8A8_SRGB",
+        "A8B8G8R8_UNORM_PACK32",
+        "A8B8G8R8_SNORM_PACK32",
+        "A8B8G8R8_USCALED_PACK32",
+        "A8B8G8R8_SSCALED_PACK32",
+        "A8B8G8R8_UINT_PACK32",
+        "A8B8G8R8_SINT_PACK32",
+        "A8B8G8R8_SRGB_PACK32",
+        "A2R10G10B10_UNORM_PACK32",
+        "A2R10G10B10_SNORM_PACK32",
+        "A2R10G10B10_USCALED_PACK32",
+        "A2R10G10B10_SSCALED_PACK32",
+        "A2R10G10B10_UINT_PACK32",
+        "A2R10G10B10_SINT_PACK32",
+        "A2B10G10R10_UNORM_PACK32",
+        "A2B10G10R10_SNORM_PACK32",
+        "A2B10G10R10_USCALED_PACK32",
+        "A2B10G10R10_SSCALED_PACK32",
+        "A2B10G10R10_UINT_PACK32",
+        "A2B10G10R10_SINT_PACK32",
+        "R16_UNORM",
+        "R16_SNORM",
+        "R16_USCALED",
+        "R16_SSCALED",
+        "R16_UINT",
+        "R16_SINT",
+        "R16_SFLOAT",
+        "R16G16_UNORM",
+        "R16G16_SNORM",
+        "R16G16_USCALED",
+        "R16G16_SSCALED",
+        "R16G16_UINT",
+        "R16G16_SINT",
+        "R16G16_SFLOAT",
+        "R16G16B16_UNORM",
+        "R16G16B16_SNORM",
+        "R16G16B16_USCALED",
+        "R16G16B16_SSCALED",
+        "R16G16B16_UINT",
+        "R16G16B16_SINT",
+        "R16G16B16_SFLOAT",
+        "R16G16B16A16_UNORM",
+        "R16G16B16A16_SNORM",
+        "R16G16B16A16_USCALED",
+        "R16G16B16A16_SSCALED",
+        "R16G16B16A16_UINT",
+        "R16G16B16A16_SINT",
+        "R16G16B16A16_SFLOAT",
+        "R32_UINT",
+        "R32_SINT",
+        "R32_SFLOAT",
+        "R32G32_UINT",
+        "R32G32_SINT",
+        "R32G32_SFLOAT",
+        "R32G32B32_UINT",
+        "R32G32B32_SINT",
+        "R32G32B32_SFLOAT",
+        "R32G32B32A32_UINT",
+        "R32G32B32A32_SINT",
+        "R32G32B32A32_SFLOAT",
+        "R64_UINT",
+        "R64_SINT",
+        "R64_SFLOAT",
+        "R64G64_UINT",
+        "R64G64_SINT",
+        "R64G64_SFLOAT",
+        "R64G64B64_UINT",
+        "R64G64B64_SINT",
+        "R64G64B64_SFLOAT",
+        "R64G64B64A64_UINT",
+        "R64G64B64A64_SINT",
+        "R64G64B64A64_SFLOAT",
+        "B10G11R11_UFLOAT_PACK32",
+        "E5B9G9R9_UFLOAT_PACK32",
+        "D16_UNORM",
+        "X8_D24_UNORM_PACK32",
+        "D32_SFLOAT",
+        "S8_UINT",
+        "D16_UNORM_S8_UINT",
+        "D24_UNORM_S8_UINT",
+        "D32_SFLOAT_S8_UINT",
+        "BC1_RGB_UNORM_BLOCK",
+        "BC1_RGB_SRGB_BLOCK",
+        "BC1_RGBA_UNORM_BLOCK",
+        "BC1_RGBA_SRGB_BLOCK",
+        "BC2_UNORM_BLOCK",
+        "BC2_SRGB_BLOCK",
+        "BC3_UNORM_BLOCK",
+        "BC3_SRGB_BLOCK",
+        "BC4_UNORM_BLOCK",
+        "BC4_SNORM_BLOCK",
+        "BC5_UNORM_BLOCK",
+        "BC5_SNORM_BLOCK",
+        "BC6H_UFLOAT_BLOCK",
+        "BC6H_SFLOAT_BLOCK",
+        "BC7_UNORM_BLOCK",
+        "BC7_SRGB_BLOCK",
+        "ETC2_R8G8B8_UNORM_BLOCK",
+        "ETC2_R8G8B8_SRGB_BLOCK",
+        "ETC2_R8G8B8A1_UNORM_BLOCK",
+        "ETC2_R8G8B8A1_SRGB_BLOCK",
+        "ETC2_R8G8B8A8_UNORM_BLOCK",
+        "ETC2_R8G8B8A8_SRGB_BLOCK",
+        "EAC_R11_UNORM_BLOCK",
+        "EAC_R11_SNORM_BLOCK",
+        "EAC_R11G11_UNORM_BLOCK",
+        "EAC_R11G11_SNORM_BLOCK",
+        "ASTC_4x4_UNORM_BLOCK",
+        "ASTC_4x4_SRGB_BLOCK",
+        "ASTC_5x4_UNORM_BLOCK",
+        "ASTC_5x4_SRGB_BLOCK",
+        "ASTC_5x5_UNORM_BLOCK",
+        "ASTC_5x5_SRGB_BLOCK",
+        "ASTC_6x5_UNORM_BLOCK",
+        "ASTC_6x5_SRGB_BLOCK",
+        "ASTC_6x6_UNORM_BLOCK",
+        "ASTC_6x6_SRGB_BLOCK",
+        "ASTC_8x5_UNORM_BLOCK",
+        "ASTC_8x5_SRGB_BLOCK",
+        "ASTC_8x6_UNORM_BLOCK",
+        "ASTC_8x6_SRGB_BLOCK",
+        "ASTC_8x8_UNORM_BLOCK",
+        "ASTC_8x8_SRGB_BLOCK",
+        "ASTC_10x5_UNORM_BLOCK",
+        "ASTC_10x5_SRGB_BLOCK",
+        "ASTC_10x6_UNORM_BLOCK",
+        "ASTC_10x6_SRGB_BLOCK",
+        "ASTC_10x8_UNORM_BLOCK",
+        "ASTC_10x8_SRGB_BLOCK",
+        "ASTC_10x10_UNORM_BLOCK",
+        "ASTC_10x10_SRGB_BLOCK",
+        "ASTC_12x10_UNORM_BLOCK",
+        "ASTC_12x10_SRGB_BLOCK",
+        "ASTC_12x12_UNORM_BLOCK",
+        "ASTC_12x12_SRGB_BLOCK",
+        "G8B8G8R8_422_UNORM",
+        "B8G8R8G8_422_UNORM",
+        "G8_B8_R8_3PLANE_420_UNORM",
+        "G8_B8R8_2PLANE_420_UNORM",
+        "G8_B8_R8_3PLANE_422_UNORM",
+        "G8_B8R8_2PLANE_422_UNORM",
+        "G8_B8_R8_3PLANE_444_UNORM",
+        "R10X6_UNORM_PACK16",
+        "R10X6G10X6_UNORM_2PACK16",
+        "R10X6G10X6B10X6A10X6_UNORM_4PACK16",
+        "G10X6B10X6G10X6R10X6_422_UNORM_4PACK16",
+        "B10X6G10X6R10X6G10X6_422_UNORM_4PACK16",
+        "G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16",
+        "G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16",
+        "G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16",
+        "G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16",
+        "G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16",
+        "R12X4_UNORM_PACK16",
+        "R12X4G12X4_UNORM_2PACK16",
+        "R12X4G12X4B12X4A12X4_UNORM_4PACK16",
+        "G12X4B12X4G12X4R12X4_422_UNORM_4PACK16",
+        "B12X4G12X4R12X4G12X4_422_UNORM_4PACK16",
+        "G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16",
+        "G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16",
+        "G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16",
+        "G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16",
+        "G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16",
+        "G16B16G16R16_422_UNORM",
+        "B16G16R16G16_422_UNORM",
+        "G16_B16_R16_3PLANE_420_UNORM",
+        "G16_B16R16_2PLANE_420_UNORM",
+        "G16_B16_R16_3PLANE_422_UNORM",
+        "G16_B16R16_2PLANE_422_UNORM",
+        "G16_B16_R16_3PLANE_444_UNORM",
+        "G8_B8R8_2PLANE_444_UNORM",
+        "G10X6_B10X6R10X6_2PLANE_444_UNORM_3PACK16",
+        "G12X4_B12X4R12X4_2PLANE_444_UNORM_3PACK16",
+        "G16_B16R16_2PLANE_444_UNORM",
+        "A4R4G4B4_UNORM_PACK16",
+        "A4B4G4R4_UNORM_PACK16",
+        "ASTC_4x4_SFLOAT_BLOCK",
+        "ASTC_5x4_SFLOAT_BLOCK",
+        "ASTC_5x5_SFLOAT_BLOCK",
+        "ASTC_6x5_SFLOAT_BLOCK",
+        "ASTC_6x6_SFLOAT_BLOCK",
+        "ASTC_8x5_SFLOAT_BLOCK",
+        "ASTC_8x6_SFLOAT_BLOCK",
+        "ASTC_8x8_SFLOAT_BLOCK",
+        "ASTC_10x5_SFLOAT_BLOCK",
+        "ASTC_10x6_SFLOAT_BLOCK",
+        "ASTC_10x8_SFLOAT_BLOCK",
+        "ASTC_10x10_SFLOAT_BLOCK",
+        "ASTC_12x10_SFLOAT_BLOCK",
+        "ASTC_12x12_SFLOAT_BLOCK",
+        "PVRTC1_2BPP_UNORM_BLOCK_IMG",
+        "PVRTC1_4BPP_UNORM_BLOCK_IMG",
+        "PVRTC2_2BPP_UNORM_BLOCK_IMG",
+        "PVRTC2_4BPP_UNORM_BLOCK_IMG",
+        "PVRTC1_2BPP_SRGB_BLOCK_IMG",
+        "PVRTC1_4BPP_SRGB_BLOCK_IMG",
+        "PVRTC2_2BPP_SRGB_BLOCK_IMG",
+        "PVRTC2_4BPP_SRGB_BLOCK_IMG",
+        "R16G16_S10_5_NV"
+    };
+
+    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(Format);
+
+    Format Format_from_vk(VkFormat vk_format);
+    VkFormat Format_to_vk(Format format);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkColorSpaceKHR.html
+    enum class ColorSpace : uint8_t
+    {
+        SrgbNonlinear,
+        DisplayP3Nonlinear,
+        ExtendedSrgbLinear,
+        DisplayP3Linear,
+        DciP3Nonlinear,
+        Bt709Linear,
+        Bt709Nonlinear,
+        Bt2020Linear,
+        Hdr10St2084,
+        DolbyVision,
+        Hdr10Hlg,
+        AdobeRgbLinear,
+        AdobeRgbNonlinear,
+        PassThrough,
+        ExtendedSrgbNonlinear,
+        DisplayNativeAmd,
+        _
+    };
+
+    static constexpr const char* ColorSpace_string[]
+    {
+        "sRGB Nonlinear",
+        "Display P3 Nonlinear",
+        "Extended sRGB Linear",
+        "Display P3 Linear",
+        "DCI-P3 Nonlinear",
+        "BT.709 Linear",
+        "BT.709 Nonlinear",
+        "BT.2020 Linear",
+        "HDR10 ST.2084",
+        "Dolby Vision",
+        "HDR10 HLG",
+        "Adobe RGB Linear",
+        "Adobe RGB Nonlinear",
+        "Pass Through",
+        "Extended sRGB Nonlinear",
+        "Display Native AMD"
+    };
+
+    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(ColorSpace);
+
+    ColorSpace ColorSpace_from_vk(VkColorSpaceKHR vk_space);
+    VkColorSpaceKHR ColorSpace_to_vk(ColorSpace space);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceFormatKHR.html
+    struct SurfaceFormat
+    {
+        Format format;
+        ColorSpace color_space;
+    };
+
+    SurfaceFormat SurfaceFormat_from_vk(
+        const VkSurfaceFormatKHR& vk_surface_format
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentModeKHR.html
+    enum class PresentMode : uint8_t
+    {
+        Immediate,
+        Mailbox,
+        Fifo,
+        FifoRelaxed,
+        SharedDemandRefresh,
+        SharedContinuousRefresh,
+        _
+    };
+
+    static constexpr const char* PresentMode_string[]
+    {
+        "Immediate",
+        "Mailbox",
+        "FIFO",
+        "FIFO Relaxed",
+        "Shared Demand Refresh",
+        "Shared Continuous Refresh"
+    };
+
+    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(PresentMode);
+
+    PresentMode PresentMode_from_vk(VkPresentModeKHR vk_mode);
+    VkPresentModeKHR PresentMode_to_vk(PresentMode mode);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceCapabilitiesKHR.html
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceFormatsKHR.html
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfacePresentModesKHR.html
+    struct SwapchainSupport
+    {
+        SurfaceCapabilities capabilities;
+        std::vector<SurfaceFormat> surface_formats;
+        std::vector<PresentMode> present_modes;
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkInstanceCreateInfo.html
+    struct ContextConfig
+    {
+        // enables the VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR flag
+        // which specifies that the instance will enumerate available Vulkan
+        // Portability-compliant physical devices and groups in addition to the
+        // Vulkan physical devices and groups that are enumerated by default.
+        // you might want to enable the
+        // VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME extension when using
+        // this.
+        bool will_enumerate_portability = false;
+
+        std::string app_name;
+        Version app_version;
+
+        std::string engine_name;
+        Version engine_version;
+
+        VulkanApiVersion vulkan_api_version;
+
+        std::vector<std::string> layers;
+        std::vector<std::string> extensions;
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsLabelEXT.html
+    struct DebugLabel
+    {
+        std::string name;
+        std::array<float, 4> color;
+    };
+
+    DebugLabel DebugLabel_from_vk(const VkDebugUtilsLabelEXT& vk_label);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsObjectNameInfoEXT.html
+    struct DebugObjectInfo
+    {
+        ObjectType type;
+        uint64_t handle;
+        std::string name;
+    };
+
+    DebugObjectInfo DebugObjectInfo_from_vk(
+        const VkDebugUtilsObjectNameInfoEXT& vk_info
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessengerCallbackDataEXT.html
+    struct DebugMessageData
+    {
+        std::string message_id_name;
+        int32_t message_id_number;
+        std::string message;
+        std::vector<DebugLabel> queue_labels;
+        std::vector<DebugLabel> cmd_buf_labels;
+        std::vector<DebugObjectInfo> objects;
+    };
+
+    DebugMessageData DebugMessageData_from_vk(
+        const VkDebugUtilsMessengerCallbackDataEXT& vk_data
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/PFN_vkDebugUtilsMessengerCallbackEXT.html
+    using DebugCallback = std::function<void(
+        DebugMessageSeverity,
+        DebugMessageTypeFlags,
+        const DebugMessageData&
+        )>;
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceQueueCreateInfo.html
+    struct QueueRequest
+    {
+        QueueRequestFlags flags;
+        uint32_t queue_family_index;
+        uint32_t num_queues_to_create;
+        std::vector<float> priorities; // * same size as num_queues_to_create
+    };
+
+    VkDeviceQueueCreateInfo QueueRequest_to_vk(
+        const QueueRequest& request
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceCreateInfo.html
+    struct DeviceConfig
+    {
+        std::vector<QueueRequest> queue_requests;
+        std::vector<std::string> extensions;
+        PhysicalDeviceFeatures enabled_features;
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSwapchainCreateFlagBitsKHR.html
+    struct SwapchainFlags
+    {
+        bool split_instance_bind_regions : 1 = false;
+        bool protected_ : 1 = false;
+        bool mutable_format : 1 = false;
+        bool deferred_memory_allocation : 1 = false;
+    };
+
+    VkSwapchainCreateFlagsKHR SwapchainFlags_to_vk(const SwapchainFlags& flags);
+
+    enum class SharingMode : uint8_t
+    {
+        Exclusive,
+        Concurrent,
+        _
+    };
+
+    static constexpr const char* SharingMode_string[]
+    {
+        "Exclusive",
+        "Concurrent"
+    };
+
+    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(SharingMode);
+
+    VkSharingMode SharingMode_to_vk(SharingMode mode);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSwapchainCreateInfoKHR.html
+    struct SwapchainConfig
+    {
+        SwapchainFlags flags;
+        uint32_t min_image_count;
+        Format image_format;
+        ColorSpace image_color_space;
+        Extent2d image_extent;
+        uint32_t image_array_layers;
+        ImageUsageFlags image_usage;
+        SharingMode image_sharing_mode;
+        std::vector<uint32_t> queue_family_indices;
+        SurfaceTransform pre_transform;
+        CompositeAlpha composite_alpha;
+        PresentMode present_mode;
+        bool clipped;
     };
 
 #pragma endregion
@@ -858,25 +1800,10 @@ namespace bv
     class Error
     {
     public:
-        constexpr Error()
-            : message("no error information provided"),
-            api_result(std::nullopt)
-        {}
-
-        constexpr Error(std::string message)
-            : message(std::move(message)),
-            api_result(std::nullopt)
-        {}
-
-        constexpr Error(ApiResult api_result)
-            : message(),
-            api_result(api_result)
-        {}
-
-        constexpr Error(std::string message, ApiResult api_result)
-            : message(std::move(message)),
-            api_result(api_result)
-        {}
+        Error();
+        Error(std::string message);
+        Error(ApiResult api_result);
+        Error(std::string message, ApiResult api_result);
 
         std::string to_string() const;
 
@@ -1020,302 +1947,7 @@ namespace bv
 
     };
 
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_MAKE_API_VERSION.html
-    struct Version
-    {
-        uint8_t variant : 8 = 0;
-        uint8_t major : 8 = 0;
-        uint8_t minor : 8 = 0;
-        uint8_t patch : 8 = 0;
-
-        Version() = default;
-
-        constexpr Version(
-            uint8_t variant,
-            uint8_t major,
-            uint8_t minor,
-            uint8_t patch
-        )
-            : variant(variant), major(major), minor(minor), patch(patch)
-        {}
-
-        constexpr Version(uint32_t encoded)
-            : variant(VK_API_VERSION_VARIANT(encoded)),
-            major(VK_API_VERSION_MAJOR(encoded)),
-            minor(VK_API_VERSION_MINOR(encoded)),
-            patch(VK_API_VERSION_PATCH(encoded))
-        {}
-
-        std::string to_string() const;
-
-    };
-
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtensionProperties.html
-    struct ExtensionProperties
-    {
-        std::string name;
-        uint32_t spec_version;
-    };
-
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkLayerProperties.html
-    struct LayerProperties
-    {
-        std::string name;
-        Version spec_version;
-        uint32_t implementation_version;
-        std::string description;
-    };
-
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
-    struct PhysicalDeviceLimits
-    {
-        uint32_t max_image_dimension1d;
-        uint32_t max_image_dimension2d;
-        uint32_t max_image_dimension3d;
-        uint32_t max_image_dimension_cube;
-        uint32_t max_image_array_layers;
-        uint32_t max_texel_buffer_elements;
-        uint32_t max_uniform_buffer_range;
-        uint32_t max_storage_buffer_range;
-        uint32_t max_push_constants_size;
-        uint32_t max_memory_allocation_count;
-        uint32_t max_sampler_allocation_count;
-        uint64_t buffer_image_granularity;
-        uint64_t sparse_address_space_size;
-        uint32_t max_bound_descriptor_sets;
-        uint32_t max_per_stage_descriptor_samplers;
-        uint32_t max_per_stage_descriptor_uniform_buffers;
-        uint32_t max_per_stage_descriptor_storage_buffers;
-        uint32_t max_per_stage_descriptor_sampled_images;
-        uint32_t max_per_stage_descriptor_storage_images;
-        uint32_t max_per_stage_descriptor_input_attachments;
-        uint32_t max_per_stage_resources;
-        uint32_t max_descriptor_set_samplers;
-        uint32_t max_descriptor_set_uniform_buffers;
-        uint32_t max_descriptor_set_uniform_buffers_dynamic;
-        uint32_t max_descriptor_set_storage_buffers;
-        uint32_t max_descriptor_set_storage_buffers_dynamic;
-        uint32_t max_descriptor_set_sampled_images;
-        uint32_t max_descriptor_set_storage_images;
-        uint32_t max_descriptor_set_input_attachments;
-        uint32_t max_vertex_input_attributes;
-        uint32_t max_vertex_input_bindings;
-        uint32_t max_vertex_input_attribute_offset;
-        uint32_t max_vertex_input_binding_stride;
-        uint32_t max_vertex_output_components;
-        uint32_t max_tessellation_generation_level;
-        uint32_t max_tessellation_patch_size;
-        uint32_t max_tessellation_control_per_vertex_input_components;
-        uint32_t max_tessellation_control_per_vertex_output_components;
-        uint32_t max_tessellation_control_per_patch_output_components;
-        uint32_t max_tessellation_control_total_output_components;
-        uint32_t max_tessellation_evaluation_input_components;
-        uint32_t max_tessellation_evaluation_output_components;
-        uint32_t max_geometry_shader_invocations;
-        uint32_t max_geometry_input_components;
-        uint32_t max_geometry_output_components;
-        uint32_t max_geometry_output_vertices;
-        uint32_t max_geometry_total_output_components;
-        uint32_t max_fragment_input_components;
-        uint32_t max_fragment_output_attachments;
-        uint32_t max_fragment_dual_src_attachments;
-        uint32_t max_fragment_combined_output_resources;
-        uint32_t max_compute_shared_memory_size;
-        std::array<uint32_t, 3> max_compute_work_group_count;
-        uint32_t max_compute_work_group_invocations;
-        std::array<uint32_t, 3> max_compute_work_group_size;
-        uint32_t sub_pixel_precision_bits;
-        uint32_t sub_texel_precision_bits;
-        uint32_t mipmap_precision_bits;
-        uint32_t max_draw_indexed_index_value;
-        uint32_t max_draw_indirect_count;
-        float max_sampler_lod_bias;
-        float max_sampler_anisotropy;
-        uint32_t max_viewports;
-        std::array<uint32_t, 2> max_viewport_dimensions;
-        std::array<float, 2> viewport_bounds_range;
-        uint32_t viewport_sub_pixel_bits;
-        size_t min_memory_map_alignment;
-        uint64_t min_texel_buffer_offset_alignment;
-        uint64_t min_uniform_buffer_offset_alignment;
-        uint64_t min_storage_buffer_offset_alignment;
-        int32_t min_texel_offset;
-        uint32_t max_texel_offset;
-        int32_t min_texel_gather_offset;
-        uint32_t max_texel_gather_offset;
-        float min_interpolation_offset;
-        float max_interpolation_offset;
-        uint32_t sub_pixel_interpolation_offset_bits;
-        uint32_t max_framebuffer_width;
-        uint32_t max_framebuffer_height;
-        uint32_t max_framebuffer_layers;
-        SampleCountFlags framebuffer_color_sample_counts;
-        SampleCountFlags framebuffer_depth_sample_counts;
-        SampleCountFlags framebuffer_stencil_sample_counts;
-        SampleCountFlags framebuffer_no_attachments_sample_counts;
-        uint32_t max_color_attachments;
-        SampleCountFlags sampled_image_color_sample_counts;
-        SampleCountFlags sampled_image_integer_sample_counts;
-        SampleCountFlags sampled_image_depth_sample_counts;
-        SampleCountFlags sampled_image_stencil_sample_counts;
-        SampleCountFlags storage_image_sample_counts;
-        uint32_t max_sample_mask_words;
-        bool timestamp_compute_and_graphics;
-        float timestamp_period;
-        uint32_t max_clip_distances;
-        uint32_t max_cull_distances;
-        uint32_t max_combined_clip_and_cull_distances;
-        uint32_t discrete_queue_priorities;
-        std::array<float, 2> point_size_range;
-        std::array<float, 2> line_width_range;
-        float point_size_granularity;
-        float line_width_granularity;
-        bool strict_lines;
-        bool standard_sample_locations;
-        uint64_t optimal_buffer_copy_offset_alignment;
-        uint64_t optimal_buffer_copy_row_pitch_alignment;
-        uint64_t non_coherent_atom_size;
-    };
-
-    PhysicalDeviceLimits PhysicalDeviceLimits_from_VkPhysicalDeviceLimits(
-        VkPhysicalDeviceLimits vk_physical_device_limits
-    );
-
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceSparseProperties.html
-    struct PhysicalDeviceSparseProperties
-    {
-        bool residency_standard2d_block_shape : 1;
-        bool residency_standard2d_multisample_block_shape : 1;
-        bool residency_standard3d_block_shape : 1;
-        bool residency_aligned_mip_size : 1;
-        bool residency_non_resident_strict : 1;
-    };
-
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceProperties.html
-    struct PhysicalDeviceProperties
-    {
-        Version api_version;
-        uint32_t driver_version;
-        uint32_t vendor_id;
-        uint32_t device_id;
-        PhysicalDeviceType device_type;
-        std::string device_name;
-        std::array<uint8_t, VK_UUID_SIZE> pipeline_cache_uuid;
-        PhysicalDeviceLimits limits;
-        PhysicalDeviceSparseProperties sparse_properties;
-    };
-
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceFeatures.html
-    struct PhysicalDeviceFeatures
-    {
-        bool robust_buffer_access : 1 = false;
-        bool full_draw_index_uint32 : 1 = false;
-        bool image_cube_array : 1 = false;
-        bool independent_blend : 1 = false;
-        bool geometry_shader : 1 = false;
-        bool tessellation_shader : 1 = false;
-        bool sample_rate_shading : 1 = false;
-        bool dual_src_blend : 1 = false;
-        bool logic_op : 1 = false;
-        bool multi_draw_indirect : 1 = false;
-        bool draw_indirect_first_instance : 1 = false;
-        bool depth_clamp : 1 = false;
-        bool depth_bias_clamp : 1 = false;
-        bool fill_mode_non_solid : 1 = false;
-        bool depth_bounds : 1 = false;
-        bool wide_lines : 1 = false;
-        bool large_points : 1 = false;
-        bool alpha_to_one : 1 = false;
-        bool multi_viewport : 1 = false;
-        bool sampler_anisotropy : 1 = false;
-        bool texture_compression_etc2 : 1 = false;
-        bool texture_compression_astc_ldr : 1 = false;
-        bool texture_compression_bc : 1 = false;
-        bool occlusion_query_precise : 1 = false;
-        bool pipeline_statistics_query : 1 = false;
-        bool vertex_pipeline_stores_and_atomics : 1 = false;
-        bool fragment_stores_and_atomics : 1 = false;
-        bool shader_tessellation_and_geometry_point_size : 1 = false;
-        bool shader_image_gather_extended : 1 = false;
-        bool shader_storage_image_extended_formats : 1 = false;
-        bool shader_storage_image_multisample : 1 = false;
-        bool shader_storage_image_read_without_format : 1 = false;
-        bool shader_storage_image_write_without_format : 1 = false;
-        bool shader_uniform_buffer_array_dynamic_indexing : 1 = false;
-        bool shader_sampled_image_array_dynamic_indexing : 1 = false;
-        bool shader_storage_buffer_array_dynamic_indexing : 1 = false;
-        bool shader_storage_image_array_dynamic_indexing : 1 = false;
-        bool shader_clip_distance : 1 = false;
-        bool shader_cull_distance : 1 = false;
-        bool shader_float64 : 1 = false;
-        bool shader_int64 : 1 = false;
-        bool shader_int16 : 1 = false;
-        bool shader_resource_residency : 1 = false;
-        bool shader_resource_min_lod : 1 = false;
-        bool sparse_binding : 1 = false;
-        bool sparse_residency_buffer : 1 = false;
-        bool sparse_residency_image2d : 1 = false;
-        bool sparse_residency_image3d : 1 = false;
-        bool sparse_residency2_samples : 1 = false;
-        bool sparse_residency4_samples : 1 = false;
-        bool sparse_residency8_samples : 1 = false;
-        bool sparse_residency16_samples : 1 = false;
-        bool sparse_residency_aliased : 1 = false;
-        bool variable_multisample_rate : 1 = false;
-        bool inherited_queries : 1 = false;
-    };
-
-    PhysicalDeviceFeatures
-        PhysicalDeviceFeatures_from_VkPhysicalDeviceFeatures(
-            VkPhysicalDeviceFeatures vk_physical_device_features
-        );
-
-    VkPhysicalDeviceFeatures
-        PhysicalDeviceFeatures_to_VkPhysicalDeviceFeatures(
-            PhysicalDeviceFeatures physical_device_features
-        );
-
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtent3D.html
-    struct Extent3D
-    {
-        uint32_t width;
-        uint32_t height;
-        uint32_t depth;
-
-        Extent3D() = default;
-
-    private:
-        constexpr Extent3D(const VkExtent3D& vk_extent_3d)
-            : width(vk_extent_3d.width),
-            height(vk_extent_3d.height),
-            depth(vk_extent_3d.depth)
-        {}
-
-        friend class Context;
-
-    };
-
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueueFamilyProperties.html
-    struct QueueFamily
-    {
-        QueueFlags queue_flags;
-        uint32_t queue_count;
-        uint32_t timestamp_valid_bits;
-        Extent3D min_image_transfer_granularity;
-    };
-
-    // index of the first queue family that supports the corresponding flag
-    struct QueueFamilyIndices
-    {
-        std::optional<uint32_t> graphics;
-        std::optional<uint32_t> present;
-        std::optional<uint32_t> compute;
-        std::optional<uint32_t> transfer;
-        std::optional<uint32_t> sparse_binding;
-        std::optional<uint32_t> protected_;
-        std::optional<uint32_t> video_decode;
-        std::optional<uint32_t> optical_flow_nv;
-    };
+    class Surface;
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDevice.html
     class PhysicalDevice
@@ -1345,13 +1977,26 @@ namespace bv
             return _queue_family_indices;
         }
 
+        // this will only have a value if:
+        // - this extension is available: VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        // - a surface was provided to Context::fetch_physical_devices()
+        const std::optional<SwapchainSupport>& swapchain_support() const
+        {
+            return _swapchain_support;
+        }
+
+        Result<std::vector<ExtensionProperties>> fetch_available_extensions(
+            const std::string& layer_name = ""
+        );
+
     protected:
-        VkPhysicalDevice vk_physical_device;
+        VkPhysicalDevice vk_physical_device = nullptr;
 
         PhysicalDeviceProperties _properties;
         PhysicalDeviceFeatures _features;
         std::vector<QueueFamily> _queue_families;
         QueueFamilyIndices _queue_family_indices;
+        std::optional<SwapchainSupport> _swapchain_support;
 
         PhysicalDevice(
             VkPhysicalDevice vk_physical_device,
@@ -1361,35 +2006,14 @@ namespace bv
             const QueueFamilyIndices& queue_family_indices
         );
 
+        Result<> check_swapchain_support(
+            const std::shared_ptr<Surface>& surface
+        );
+
         friend class Context;
         friend class Device;
 
     };
-
-    struct ContextConfig
-    {
-        // enables the VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR flag
-        // which specifies that the instance will enumerate available Vulkan
-        // Portability-compliant physical devices and groups in addition to the
-        // Vulkan physical devices and groups that are enumerated by default.
-        // you might want to enable the
-        // VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME extension when using
-        // this.
-        bool will_enumerate_portability = false;
-
-        std::string app_name;
-        Version app_version;
-
-        std::string engine_name;
-        Version engine_version;
-
-        VulkanApiVersion vulkan_api_version;
-
-        std::vector<std::string> layers;
-        std::vector<std::string> extensions;
-    };
-
-    class Surface;
 
     // manages a VkInstance and custom allocators, provides utility functions,
     // and is used by other classes
@@ -1411,11 +2035,12 @@ namespace bv
             const Allocator::ptr& allocator = nullptr
         );
 
-        static Result<std::vector<LayerProperties>> available_layers();
+        static Result<std::vector<LayerProperties>> fetch_available_layers();
 
-        static Result<std::vector<ExtensionProperties>> available_extensions(
-            const std::string& layer_name = ""
-        );
+        static Result<std::vector<ExtensionProperties>>
+            fetch_available_extensions(
+                const std::string& layer_name = ""
+            );
 
         constexpr const ContextConfig& config() const
         {
@@ -1453,11 +2078,8 @@ namespace bv
         //   they're using.
         const VkAllocationCallbacks* vk_allocator_ptr() const;
 
-        // fetch a list of supported physical devices
-        // * if surface == nullptr then the present flag in queue families will
-        //   always be disabled.
         Result<std::vector<PhysicalDevice::ptr>> fetch_physical_devices(
-            std::shared_ptr<Surface> surface = nullptr
+            const std::shared_ptr<Surface>& surface = nullptr
         );
 
         ~Context();
@@ -1465,7 +2087,7 @@ namespace bv
     protected:
         ContextConfig _config;
 
-        Allocator::ptr _allocator = nullptr;
+        Allocator::ptr _allocator;
         VkAllocationCallbacks _vk_allocator{};
 
         VkInstance _vk_instance = nullptr;
@@ -1476,39 +2098,6 @@ namespace bv
         );
 
     };
-
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsLabelEXT.html
-    struct DebugLabel
-    {
-        std::string name;
-        std::array<float, 4> color;
-    };
-
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsObjectNameInfoEXT.html
-    struct DebugObjectInfo
-    {
-        ObjectType type;
-        uint64_t handle;
-        std::string name;
-    };
-
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessengerCallbackDataEXT.html
-    struct DebugMessageData
-    {
-        std::string message_id_name;
-        int32_t message_id_number;
-        std::string message;
-        std::vector<DebugLabel> queue_labels;
-        std::vector<DebugLabel> cmd_buf_labels;
-        std::vector<DebugObjectInfo> objects;
-    };
-
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/PFN_vkDebugUtilsMessengerCallbackEXT.html
-    using DebugCallback = std::function<void(
-        DebugMessageSeverity,
-        DebugMessageType,
-        const DebugMessageData&
-        )>;
 
     // * requires extension VK_EXT_DEBUG_UTILS_EXTENSION_NAME
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessengerEXT.html
@@ -1522,8 +2111,8 @@ namespace bv
 
         static Result<DebugMessenger::ptr> create(
             const Context::ptr& context,
-            DebugMessageSeverityFilter message_severity_filter,
-            DebugMessageTypeFilter message_type_filter,
+            DebugMessageSeverityFlags message_severity_filter,
+            DebugMessageTypeFlags message_type_filter,
             const DebugCallback& callback
         );
 
@@ -1532,13 +2121,13 @@ namespace bv
             return _context;
         }
 
-        constexpr const DebugMessageSeverityFilter&
+        constexpr const DebugMessageSeverityFlags&
             message_severity_filter() const
         {
             return _message_severity_filter;
         }
 
-        constexpr const DebugMessageTypeFilter& message_type_filter() const
+        constexpr const DebugMessageTypeFlags& message_type_filter() const
         {
             return _message_type_filter;
         }
@@ -1552,16 +2141,16 @@ namespace bv
 
     protected:
         Context::ptr _context;
-        VkDebugUtilsMessengerEXT vk_debug_messenger;
+        VkDebugUtilsMessengerEXT vk_debug_messenger = nullptr;
 
-        DebugMessageSeverityFilter _message_severity_filter;
-        DebugMessageTypeFilter _message_type_filter;
+        DebugMessageSeverityFlags _message_severity_filter;
+        DebugMessageTypeFlags _message_type_filter;
         DebugCallback _callback;
 
         DebugMessenger(
             const Context::ptr& context,
-            const DebugMessageSeverityFilter& message_severity_filter,
-            const DebugMessageTypeFilter& message_type_filter,
+            const DebugMessageSeverityFlags& message_severity_filter,
+            const DebugMessageTypeFlags& message_type_filter,
             const DebugCallback& callback
         );
 
@@ -1604,6 +2193,8 @@ namespace bv
         );
 
         friend class Context;
+        friend class PhysicalDevice;
+        friend class Swapchain;
 
     };
 
@@ -1622,25 +2213,6 @@ namespace bv
 
         Queue(VkQueue vk_queue);
 
-        friend class Device;
-
-    };
-
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceQueueCreateInfo.html
-    struct QueueRequest
-    {
-        QueueRequestFlags flags;
-        uint32_t queue_family_index;
-        uint32_t num_queues_to_create;
-        std::vector<float> priorities; // * same size as num_queues_to_create
-    };
-
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceCreateInfo.html
-    struct DeviceConfig
-    {
-        std::vector<QueueRequest> queue_requests;
-        std::vector<std::string> extensions;
-        PhysicalDeviceFeatures enabled_features;
     };
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDevice.html
@@ -1685,12 +2257,94 @@ namespace bv
         Context::ptr _context;
         PhysicalDevice::ptr _physical_device;
         DeviceConfig _config;
-        VkDevice vk_device;
+        VkDevice vk_device = nullptr;
 
         Device(
             const Context::ptr& context,
             const PhysicalDevice::ptr& physical_device,
             const DeviceConfig& config
+        );
+
+        friend class Swapchain;
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImage.html
+    class Image
+    {
+    public:
+        using ptr = std::shared_ptr<Image>;
+
+        Image() = delete;
+        Image(const Image& other) = delete;
+        Image(Image&& other);
+
+    protected:
+        VkImage vk_image;
+
+        Image(VkImage vk_image);
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSwapchainKHR.html
+    class Swapchain
+    {
+    public:
+        using ptr = std::shared_ptr<Swapchain>;
+
+        Swapchain() = delete;
+        Swapchain(const Swapchain& other) = delete;
+        Swapchain(Swapchain&& other);
+
+        static Result<Swapchain::ptr> create(
+            const Device::ptr& device,
+            const Surface::ptr& surface,
+            const SwapchainConfig& config,
+            const Swapchain::ptr& old_swapchain = nullptr
+        );
+
+        constexpr const Device::ptr& device() const
+        {
+            return _device;
+        }
+
+        constexpr const Surface::ptr& surface() const
+        {
+            return _surface;
+        }
+
+        constexpr const SwapchainConfig& config() const
+        {
+            return _config;
+        }
+
+        constexpr const Swapchain::ptr& old_swapchain() const
+        {
+            return _old_swapchain;
+        }
+
+        const std::vector<Image::ptr>& images() const
+        {
+            return _images;
+        }
+
+        ~Swapchain();
+
+    protected:
+        Device::ptr _device;
+        Surface::ptr _surface;
+        SwapchainConfig _config;
+        Swapchain::ptr _old_swapchain;
+
+        VkSwapchainKHR vk_swapchain = nullptr;
+
+        std::vector<Image::ptr> _images;
+
+        Swapchain(
+            const Device::ptr& device,
+            const Surface::ptr& surface,
+            const SwapchainConfig& config,
+            const Swapchain::ptr& old_swapchain = nullptr
         );
 
     };
