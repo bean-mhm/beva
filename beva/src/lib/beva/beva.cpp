@@ -37,6 +37,7 @@ namespace bv
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Device);
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Image);
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Swapchain);
+    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(ImageView);
 
 #pragma region forward declarations
 
@@ -3008,6 +3009,150 @@ namespace bv
         }
     }
 
+    VkImageViewCreateFlags ImageViewFlags_to_vk(const ImageViewFlags& flags)
+    {
+        VkImageViewCreateFlags vk_flags = 0;
+        if (flags.fragment_density_map_dynamic)
+        {
+            vk_flags |=
+                VK_IMAGE_VIEW_CREATE_FRAGMENT_DENSITY_MAP_DYNAMIC_BIT_EXT;
+        }
+        if (flags.descriptor_buffer_capture_replay)
+        {
+            vk_flags |=
+                VK_IMAGE_VIEW_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT;
+        }
+        if (flags.fragment_density_map_deferred)
+        {
+            vk_flags |=
+                VK_IMAGE_VIEW_CREATE_FRAGMENT_DENSITY_MAP_DEFERRED_BIT_EXT;
+        }
+        return vk_flags;
+    }
+
+    VkImageViewType ImageViewType_to_vk(ImageViewType type)
+    {
+        switch (type)
+        {
+        case bv::ImageViewType::_1d:
+            return VK_IMAGE_VIEW_TYPE_1D;
+        case bv::ImageViewType::_2d:
+            return VK_IMAGE_VIEW_TYPE_2D;
+        case bv::ImageViewType::_3d:
+            return VK_IMAGE_VIEW_TYPE_3D;
+        case bv::ImageViewType::Cube:
+            return VK_IMAGE_VIEW_TYPE_CUBE;
+        case bv::ImageViewType::_1dArray:
+            return VK_IMAGE_VIEW_TYPE_1D_ARRAY;
+        case bv::ImageViewType::_2dArray:
+            return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+        case bv::ImageViewType::CubeArray:
+            return VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
+        default:
+            return VK_IMAGE_VIEW_TYPE_1D;
+        }
+    }
+
+    VkComponentSwizzle ComponentSwizzle_to_vk(ComponentSwizzle swizzle)
+    {
+        switch (swizzle)
+        {
+        case bv::ComponentSwizzle::Identity:
+            return VK_COMPONENT_SWIZZLE_IDENTITY;
+        case bv::ComponentSwizzle::Zero:
+            return VK_COMPONENT_SWIZZLE_ZERO;
+        case bv::ComponentSwizzle::One:
+            return VK_COMPONENT_SWIZZLE_ONE;
+        case bv::ComponentSwizzle::R:
+            return VK_COMPONENT_SWIZZLE_R;
+        case bv::ComponentSwizzle::G:
+            return VK_COMPONENT_SWIZZLE_G;
+        case bv::ComponentSwizzle::B:
+            return VK_COMPONENT_SWIZZLE_B;
+        case bv::ComponentSwizzle::A:
+            return VK_COMPONENT_SWIZZLE_A;
+        default:
+            return VK_COMPONENT_SWIZZLE_IDENTITY;
+        }
+    }
+
+    VkComponentMapping ComponentMapping_to_vk(const ComponentMapping& mapping)
+    {
+        return VkComponentMapping{
+            .r = ComponentSwizzle_to_vk(mapping.r),
+            .g = ComponentSwizzle_to_vk(mapping.g),
+            .b = ComponentSwizzle_to_vk(mapping.b),
+            .a = ComponentSwizzle_to_vk(mapping.a)
+        };
+    }
+
+    VkImageAspectFlags ImageAspectFlags_to_vk(const ImageAspectFlags& flags)
+    {
+        VkImageAspectFlags vk_flags = 0;
+        if (flags.color)
+        {
+            vk_flags |= VK_IMAGE_ASPECT_COLOR_BIT;
+        }
+        if (flags.depth)
+        {
+            vk_flags |= VK_IMAGE_ASPECT_DEPTH_BIT;
+        }
+        if (flags.stencil)
+        {
+            vk_flags |= VK_IMAGE_ASPECT_STENCIL_BIT;
+        }
+        if (flags.metadata)
+        {
+            vk_flags |= VK_IMAGE_ASPECT_METADATA_BIT;
+        }
+        if (flags.plane_0)
+        {
+            vk_flags |= VK_IMAGE_ASPECT_PLANE_0_BIT;
+        }
+        if (flags.plane_1)
+        {
+            vk_flags |= VK_IMAGE_ASPECT_PLANE_1_BIT;
+        }
+        if (flags.plane_2)
+        {
+            vk_flags |= VK_IMAGE_ASPECT_PLANE_2_BIT;
+        }
+        if (flags.none)
+        {
+            vk_flags |= VK_IMAGE_ASPECT_NONE;
+        }
+        if (flags.memory_plane_0)
+        {
+            vk_flags |= VK_IMAGE_ASPECT_MEMORY_PLANE_0_BIT_EXT;
+        }
+        if (flags.memory_plane_1)
+        {
+            vk_flags |= VK_IMAGE_ASPECT_MEMORY_PLANE_1_BIT_EXT;
+        }
+        if (flags.memory_plane_2)
+        {
+            vk_flags |= VK_IMAGE_ASPECT_MEMORY_PLANE_2_BIT_EXT;
+        }
+        if (flags.memory_plane_3)
+        {
+            vk_flags |= VK_IMAGE_ASPECT_MEMORY_PLANE_3_BIT_EXT;
+        }
+        return vk_flags;
+    }
+
+    VkImageSubresourceRange ImageSubresourceRange_to_vk(
+        const ImageSubresourceRange& range
+    )
+    {
+        return VkImageSubresourceRange{
+            .aspectMask = ImageAspectFlags_to_vk(range.aspect_mask),
+            .baseMipLevel = range.base_mip_level,
+            .levelCount = range.level_count,
+            .baseArrayLayer = range.base_array_layer,
+            .layerCount = range.layer_count
+        };
+    }
+
     Error::Error()
         : message("no error information provided"),
         api_result(std::nullopt)
@@ -3970,6 +4115,80 @@ namespace bv
         _old_swapchain(old_swapchain)
     {}
 
+    ImageView::ImageView(ImageView&& other)
+    {
+        _device = other._device;
+        other._device = nullptr;
+
+        _image = other._image;
+        other._image = nullptr;
+
+        _config = other._config;
+        other._config = ImageViewConfig{};
+
+        vk_image_view = other.vk_image_view;
+        other.vk_image_view = nullptr;
+    }
+
+    Result<ImageView::ptr> ImageView::create(
+        const Device::ptr& device,
+        const Image::ptr& image,
+        const ImageViewConfig& config
+    )
+    {
+        ImageView::ptr view = std::make_shared<ImageView_public_ctor>(
+            device,
+            image,
+            config
+        );
+
+        VkImageViewCreateInfo create_info{
+            .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = ImageViewFlags_to_vk(view->config().flags),
+            .image = view->image()->vk_image,
+            .viewType = ImageViewType_to_vk(view->config().view_type),
+            .format = Format_to_vk(view->config().format),
+            .components = ComponentMapping_to_vk(view->config().components),
+            .subresourceRange = ImageSubresourceRange_to_vk(
+                view->config().subresource_range
+            )
+        };
+
+        VkResult vk_result = vkCreateImageView(
+            view->device()->vk_device,
+            &create_info,
+            view->device()->context()->vk_allocator_ptr(),
+            &view->vk_image_view
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return view;
+    }
+
+    ImageView::~ImageView()
+    {
+        vkDestroyImageView(
+            device()->vk_device,
+            vk_image_view,
+            device()->context()->vk_allocator_ptr()
+        );
+    }
+
+    ImageView::ImageView(
+        const Device::ptr& device,
+        const Image::ptr& image,
+        const ImageViewConfig& config
+    )
+        : _device(device),
+        _image(image),
+        _config(config)
+    {}
+
+#pragma region Vulkan callbacks
+
     static void* vk_allocation_callback(
         void* p_user_data,
         size_t size,
@@ -4100,5 +4319,7 @@ namespace bv
 
         return VK_FALSE;
     }
+
+#pragma endregion
 
 }

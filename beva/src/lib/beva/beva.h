@@ -1793,6 +1793,126 @@ namespace bv
         bool clipped;
     };
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageViewCreateFlagBits.html
+    struct ImageViewFlags
+    {
+        bool fragment_density_map_dynamic : 1 = false;
+        bool descriptor_buffer_capture_replay : 1 = false;
+        bool fragment_density_map_deferred : 1 = false;
+    };
+
+    VkImageViewCreateFlags ImageViewFlags_to_vk(const ImageViewFlags& flags);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageViewType.html
+    enum class ImageViewType : uint8_t
+    {
+        _1d,
+        _2d,
+        _3d,
+        Cube,
+        _1dArray,
+        _2dArray,
+        CubeArray,
+        _
+    };
+
+    static constexpr const char* ImageViewType_string[]
+    {
+        "1D",
+        "2D",
+        "3D",
+        "Cube",
+        "1D Array",
+        "2D Array",
+        "Cube Array"
+    };
+
+    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(ImageViewType);
+
+    VkImageViewType ImageViewType_to_vk(ImageViewType type);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkComponentSwizzle.html
+    enum class ComponentSwizzle : uint8_t
+    {
+        Identity,
+        Zero,
+        One,
+        R,
+        G,
+        B,
+        A,
+        _
+    };
+
+    static constexpr const char* ComponentSwizzle_string[]
+    {
+        "Identity",
+        "Zero",
+        "One",
+        "R",
+        "G",
+        "B",
+        "A"
+    };
+
+    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(ComponentSwizzle);
+
+    VkComponentSwizzle ComponentSwizzle_to_vk(ComponentSwizzle swizzle);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkComponentMapping.html
+    struct ComponentMapping
+    {
+        ComponentSwizzle r = ComponentSwizzle::Identity;
+        ComponentSwizzle g = ComponentSwizzle::Identity;
+        ComponentSwizzle b = ComponentSwizzle::Identity;
+        ComponentSwizzle a = ComponentSwizzle::Identity;
+    };
+
+    VkComponentMapping ComponentMapping_to_vk(const ComponentMapping& mapping);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageAspectFlagBits.html
+    struct ImageAspectFlags
+    {
+        bool color : 1 = false;
+        bool depth : 1 = false;
+        bool stencil : 1 = false;
+        bool metadata : 1 = false;
+        bool plane_0 : 1 = false;
+        bool plane_1 : 1 = false;
+        bool plane_2 : 1 = false;
+        bool none : 1 = false;
+        bool memory_plane_0 : 1 = false;
+        bool memory_plane_1 : 1 = false;
+        bool memory_plane_2 : 1 = false;
+        bool memory_plane_3 : 1 = false;
+    };
+
+    VkImageAspectFlags ImageAspectFlags_to_vk(const ImageAspectFlags& flags);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageSubresourceRange.html
+    struct ImageSubresourceRange
+    {
+        ImageAspectFlags aspect_mask;
+        uint32_t base_mip_level;
+        uint32_t level_count;
+        uint32_t base_array_layer;
+        uint32_t layer_count;
+    };
+
+    VkImageSubresourceRange ImageSubresourceRange_to_vk(
+        const ImageSubresourceRange& range
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageViewCreateInfo.html
+    struct ImageViewConfig
+    {
+        ImageViewFlags flags;
+        ImageViewType view_type;
+        Format format;
+        ComponentMapping components;
+        ImageSubresourceRange subresource_range;
+    };
+
 #pragma endregion
 
 #pragma region error handling
@@ -2141,11 +2261,11 @@ namespace bv
 
     protected:
         Context::ptr _context;
-        VkDebugUtilsMessengerEXT vk_debug_messenger = nullptr;
-
         DebugMessageSeverityFlags _message_severity_filter;
         DebugMessageTypeFlags _message_type_filter;
         DebugCallback _callback;
+
+        VkDebugUtilsMessengerEXT vk_debug_messenger = nullptr;
 
         DebugMessenger(
             const Context::ptr& context,
@@ -2185,6 +2305,7 @@ namespace bv
 
     protected:
         Context::ptr _context;
+
         VkSurfaceKHR vk_surface;
 
         Surface(
@@ -2257,6 +2378,7 @@ namespace bv
         Context::ptr _context;
         PhysicalDevice::ptr _physical_device;
         DeviceConfig _config;
+
         VkDevice vk_device = nullptr;
 
         Device(
@@ -2266,6 +2388,7 @@ namespace bv
         );
 
         friend class Swapchain;
+        friend class ImageView;
 
     };
 
@@ -2283,6 +2406,8 @@ namespace bv
         VkImage vk_image;
 
         Image(VkImage vk_image);
+
+        friend class ImageView;
 
     };
 
@@ -2345,6 +2470,54 @@ namespace bv
             const Surface::ptr& surface,
             const SwapchainConfig& config,
             const Swapchain::ptr& old_swapchain = nullptr
+        );
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageView.html
+    class ImageView
+    {
+    public:
+        using ptr = std::shared_ptr<ImageView>;
+
+        ImageView() = delete;
+        ImageView(const ImageView& other) = delete;
+        ImageView(ImageView&& other);
+
+        static Result<ImageView::ptr> create(
+            const Device::ptr& device,
+            const Image::ptr& image,
+            const ImageViewConfig& config
+        );
+
+        constexpr const Device::ptr& device() const
+        {
+            return _device;
+        }
+
+        constexpr const Image::ptr& image() const
+        {
+            return _image;
+        }
+
+        constexpr const ImageViewConfig& config() const
+        {
+            return _config;
+        }
+
+        ~ImageView();
+
+    protected:
+        Device::ptr _device;
+        Image::ptr _image;
+        ImageViewConfig _config;
+
+        VkImageView vk_image_view = nullptr;
+
+        ImageView(
+            const Device::ptr& device,
+            const Image::ptr& image,
+            const ImageViewConfig& config
         );
 
     };

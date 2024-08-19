@@ -30,7 +30,9 @@ namespace beva_demo
         pick_physical_device();
         create_logical_device();
         create_swapchain();
+
         main_loop();
+
         cleanup();
     }
 
@@ -396,6 +398,39 @@ namespace beva_demo
             throw std::runtime_error(s.c_str());
         }
         swapchain = swapchain_result.value();
+
+        for (size_t i = 0; i < swapchain->images().size(); i++)
+        {
+            bv::ImageViewConfig config{
+                .flags = {},
+                    .view_type = bv::ImageViewType::_2d,
+                    .format = surface_format.format,
+                    .components = {},
+                    .subresource_range = bv::ImageSubresourceRange{
+                    .aspect_mask = { .color = true },
+                    .base_mip_level = 0,
+                    .level_count = 1,
+                    .base_array_layer = 0,
+                    .layer_count = 1
+                }
+            };
+
+            auto image_view_result = bv::ImageView::create(
+                device,
+                swapchain->images()[i],
+                config
+            );
+            if (!image_view_result.ok())
+            {
+                throw std::runtime_error(std::format(
+                    "failed to create image view for swapchain image at index "
+                    "{}: {}",
+                    i,
+                    image_view_result.error().to_string()
+                ).c_str());
+            }
+            swapchain_imgviews.push_back(image_view_result.value());
+        }
     }
 
     void App::main_loop()
@@ -413,6 +448,7 @@ namespace beva_demo
 
     void App::cleanup()
     {
+        swapchain_imgviews.clear();
         swapchain = nullptr;
         presentation_queue = nullptr;
         graphics_queue = nullptr;
