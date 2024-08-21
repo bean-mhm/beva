@@ -503,6 +503,82 @@ namespace beva_demo
             .entry_point = "main",
             .specialization_info = std::nullopt
             });
+
+        bv::VertexInputState vertex_input{
+            .binding_descriptions = {},
+            .attribute_descriptions = {}
+        };
+
+        bv::InputAssemblyState input_assembly{
+            .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+            .primitive_restart_enable = false
+        };
+
+        bv::Viewport viewport{
+            .x = 0.f,
+            .y = 0.f,
+            .width = (float)swapchain->config().image_extent.width,
+            .height = (float)swapchain->config().image_extent.height,
+            .min_depth = 0.f,
+            .max_depth = 1.f
+        };
+
+        bv::Rect2d scissor{
+            .offset = { 0, 0 },
+            .extent = swapchain->config().image_extent
+        };
+
+        bv::ViewportState viewport_state{
+            .viewports = { viewport },
+            .scissors = { scissor }
+        };
+
+        bv::DynamicStates dynamic_states{
+            VK_DYNAMIC_STATE_VIEWPORT,
+            VK_DYNAMIC_STATE_SCISSOR
+        };
+
+        bv::RasterizationState rasterization_state{
+            .depth_clamp_enable = false,
+            .rasterizer_discard_enable = false,
+            .polygon_mode = VK_POLYGON_MODE_FILL,
+            .cull_mode = VK_CULL_MODE_BACK_BIT,
+            .front_face = VK_FRONT_FACE_CLOCKWISE,
+            .depth_bias_enable = false,
+            .depth_bias_constant_factor = 0.f,
+            .depth_bias_clamp = 0.f,
+            .depth_bias_slope_factor = 0.f,
+            .line_width = 1.f
+        };
+
+        bv::MultisampleState multisample_state{
+            .rasterization_samples = VK_SAMPLE_COUNT_1_BIT,
+            .sample_shading_enable = false,
+            .min_sample_shading = 1.f,
+            .sample_mask = {},
+            .alpha_to_coverage_enable = false,
+            .alpha_to_one_enable = false
+        };
+
+        bv::ColorBlendAttachment color_blend_attachment{
+            .blend_enable = false,
+            .src_color_blend_factor = VK_BLEND_FACTOR_ONE,
+            .dst_color_blend_factor = VK_BLEND_FACTOR_ZERO,
+            .color_blend_op = VK_BLEND_OP_ADD,
+            .src_alpha_blend_factor = VK_BLEND_FACTOR_ONE,
+            .dst_alpha_blend_factor = VK_BLEND_FACTOR_ZERO,
+            .alpha_blend_op = VK_BLEND_OP_ADD,
+            .color_write_mask =
+            VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+            | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
+        };
+
+        bv::ColorBlendState color_blend_state{
+            .flags = 0,
+            .logic_op = std::nullopt,
+            .attachments = { color_blend_attachment },
+            .blend_constants = { 0.f, 0.f, 0.f, 0.f }
+        };
     }
 
     void App::main_loop()

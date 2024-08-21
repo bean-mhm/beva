@@ -1096,11 +1096,11 @@ namespace bv
         std::vector<uint8_t>& waste_data
     )
     {
-        waste_vk_map_entries.clear();
-        for (const auto& map_entry : info.map_entries)
+        waste_vk_map_entries.resize(info.map_entries.size());
+        for (size_t i = 0; i < info.map_entries.size(); i++)
         {
-            waste_vk_map_entries.push_back(
-                SpecializationMapEntry_to_vk(map_entry)
+            waste_vk_map_entries[i] = SpecializationMapEntry_to_vk(
+                info.map_entries[i]
             );
         }
 
@@ -1143,6 +1143,288 @@ namespace bv
             ? &waste_vk_specialization_info
             : nullptr
         };
+    }
+
+    VkPipelineDynamicStateCreateInfo DynamicStates_to_vk(
+        const DynamicStates& states,
+        std::vector<VkDynamicState>& waste_dynamic_states
+    )
+    {
+        waste_dynamic_states = states;
+        return VkPipelineDynamicStateCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .dynamicStateCount = (uint32_t)waste_dynamic_states.size(),
+            .pDynamicStates = waste_dynamic_states.data()
+        };
+    }
+
+    VkVertexInputBindingDescription VertexInputBindingDescription_to_vk(
+        const VertexInputBindingDescription& description
+    )
+    {
+        return VkVertexInputBindingDescription{
+            .binding = description.binding,
+            .stride = description.stride,
+            .inputRate = description.input_rate
+        };
+    }
+
+    VkVertexInputAttributeDescription VertexInputAttributeDescription_to_vk(
+        const VertexInputAttributeDescription& description
+    )
+    {
+        return VkVertexInputAttributeDescription{
+            .location = description.location,
+            .binding = description.binding,
+            .format = description.format,
+            .offset = description.offset
+        };
+    }
+
+    VkPipelineVertexInputStateCreateInfo VertexInputState_to_vk(
+        const VertexInputState& state,
+
+        std::vector<VkVertexInputBindingDescription>&
+        waste_vk_binding_descriptions,
+
+        std::vector<VkVertexInputAttributeDescription>&
+        waste_vk_attribute_descriptions
+    )
+    {
+        waste_vk_binding_descriptions.resize(state.binding_descriptions.size());
+        for (size_t i = 0; i < state.binding_descriptions.size(); i++)
+        {
+            waste_vk_binding_descriptions[i] =
+                VertexInputBindingDescription_to_vk(
+                    state.binding_descriptions[i]
+                );
+        }
+
+        waste_vk_attribute_descriptions.resize(
+            state.attribute_descriptions.size()
+        );
+        for (size_t i = 0; i < state.attribute_descriptions.size(); i++)
+        {
+            waste_vk_attribute_descriptions[i] =
+                VertexInputAttributeDescription_to_vk(
+                    state.attribute_descriptions[i]
+                );
+        }
+
+        return VkPipelineVertexInputStateCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+
+            .vertexBindingDescriptionCount =
+            (uint32_t)waste_vk_binding_descriptions.size(),
+
+            .pVertexBindingDescriptions = waste_vk_binding_descriptions.data(),
+
+            .vertexAttributeDescriptionCount =
+            (uint32_t)waste_vk_attribute_descriptions.size(),
+
+            .pVertexAttributeDescriptions =
+            waste_vk_attribute_descriptions.data()
+        };
+    }
+
+    VkPipelineInputAssemblyStateCreateInfo InputAssemblyState_to_vk(
+        const InputAssemblyState& state
+    )
+    {
+        return VkPipelineInputAssemblyStateCreateInfo{
+            .sType =
+            VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+
+            .pNext = nullptr,
+            .flags = 0,
+            .topology = state.topology,
+            .primitiveRestartEnable = state.primitive_restart_enable
+        };
+    }
+
+    VkViewport Viewport_to_vk(const Viewport& viewport)
+    {
+        return VkViewport{
+            .x = viewport.x,
+            .y = viewport.y,
+            .width = viewport.width,
+            .height = viewport.height,
+            .minDepth = viewport.min_depth,
+            .maxDepth = viewport.max_depth
+        };
+    }
+
+    VkOffset2D Offset2d_to_vk(const Offset2d& offset)
+    {
+        return VkOffset2D{
+            .x = offset.x,
+            .y = offset.y
+        };
+    }
+
+    VkOffset3D Offset3d_to_vk(const Offset3d& offset)
+    {
+        return VkOffset3D{
+            .x = offset.x,
+            .y = offset.y,
+            .z = offset.z
+        };
+    }
+
+    VkRect2D Rect2d_to_vk(const Rect2d& rect)
+    {
+        return VkRect2D{
+            .offset = Offset2d_to_vk(rect.offset),
+            .extent = Extent2d_to_vk(rect.extent)
+        };
+    }
+
+    VkPipelineViewportStateCreateInfo ViewportState_to_vk(
+        const ViewportState& state,
+        std::vector<VkViewport>& waste_vk_viewports,
+        std::vector<VkRect2D>& waste_vk_scissors
+    )
+    {
+        waste_vk_viewports.resize(state.viewports.size());
+        for (size_t i = 0; i < state.viewports.size(); i++)
+        {
+            waste_vk_viewports[i] = Viewport_to_vk(state.viewports[i]);
+        }
+
+        waste_vk_scissors.resize(state.scissors.size());
+        for (size_t i = 0; i < state.scissors.size(); i++)
+        {
+            waste_vk_scissors[i] = Rect2d_to_vk(state.scissors[i]);
+        }
+
+        return VkPipelineViewportStateCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .viewportCount = (uint32_t)waste_vk_viewports.size(),
+            .pViewports = waste_vk_viewports.data(),
+            .scissorCount = (uint32_t)waste_vk_scissors.size(),
+            .pScissors = waste_vk_scissors.data()
+        };
+    }
+
+    VkPipelineRasterizationStateCreateInfo RasterizationState_to_vk(
+        const RasterizationState& state
+    )
+    {
+        return VkPipelineRasterizationStateCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .depthClampEnable = state.depth_clamp_enable,
+            .rasterizerDiscardEnable = state.rasterizer_discard_enable,
+            .polygonMode = state.polygon_mode,
+            .cullMode = state.cull_mode,
+            .frontFace = state.front_face,
+            .depthBiasEnable = state.depth_bias_enable,
+            .depthBiasConstantFactor = state.depth_bias_constant_factor,
+            .depthBiasClamp = state.depth_bias_clamp,
+            .depthBiasSlopeFactor = state.depth_bias_slope_factor,
+            .lineWidth = state.line_width
+        };
+    }
+
+    VkPipelineMultisampleStateCreateInfo MultisampleState_to_vk(
+        const MultisampleState& state,
+        std::vector<VkSampleMask>& waste_sample_mask
+    )
+    {
+        waste_sample_mask = state.sample_mask;
+        return VkPipelineMultisampleStateCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .rasterizationSamples = state.rasterization_samples,
+            .sampleShadingEnable = state.sample_shading_enable,
+            .minSampleShading = state.min_sample_shading,
+            .pSampleMask = waste_sample_mask.data(),
+            .alphaToCoverageEnable = state.alpha_to_coverage_enable,
+            .alphaToOneEnable = state.alpha_to_one_enable
+        };
+    }
+
+    VkPipelineDepthStencilStateCreateInfo DepthStencilState_to_vk(
+        const DepthStencilState& state
+    )
+    {
+        return VkPipelineDepthStencilStateCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = state.flags,
+            .depthTestEnable = state.depth_test_enable,
+            .depthWriteEnable = state.depth_write_enable,
+            .depthCompareOp = state.depth_compare_op,
+            .depthBoundsTestEnable = state.depth_bounds_test_enable,
+            .stencilTestEnable = state.stencil_test_enable,
+            .front = state.front,
+            .back = state.back,
+            .minDepthBounds = state.min_depth_bounds,
+            .maxDepthBounds = state.max_depth_bounds
+        };
+    }
+
+    VkPipelineColorBlendAttachmentState ColorBlendAttachment_to_vk(
+        const ColorBlendAttachment& attachment
+    )
+    {
+        return VkPipelineColorBlendAttachmentState{
+            .blendEnable = attachment.blend_enable,
+            .srcColorBlendFactor = attachment.src_color_blend_factor,
+            .dstColorBlendFactor = attachment.dst_color_blend_factor,
+            .colorBlendOp = attachment.color_blend_op,
+            .srcAlphaBlendFactor = attachment.src_alpha_blend_factor,
+            .dstAlphaBlendFactor = attachment.dst_alpha_blend_factor,
+            .alphaBlendOp = attachment.alpha_blend_op,
+            .colorWriteMask = attachment.color_write_mask
+        };
+    }
+
+    VkPipelineColorBlendStateCreateInfo ColorBlendState_to_vk(
+        const ColorBlendState& state,
+
+        std::vector<VkPipelineColorBlendAttachmentState>&
+        waste_vk_color_blend_attachments
+    )
+    {
+        waste_vk_color_blend_attachments.resize(state.attachments.size());
+        for (size_t i = 0; i < state.attachments.size(); i++)
+        {
+            waste_vk_color_blend_attachments[i] = ColorBlendAttachment_to_vk(
+                state.attachments[i]
+            );
+        }
+
+        VkPipelineColorBlendStateCreateInfo info{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = state.flags,
+            .logicOpEnable = state.logic_op.has_value(),
+
+            .logicOp =
+            state.logic_op.has_value()
+            ? state.logic_op.value()
+            : VK_LOGIC_OP_COPY,
+
+            .attachmentCount =
+            (uint32_t)waste_vk_color_blend_attachments.size(),
+
+            .pAttachments = waste_vk_color_blend_attachments.data()
+        };
+        std::copy(
+            state.blend_constants.data(),
+            state.blend_constants.data() + 4,
+            info.blendConstants
+        );
+        return info;
     }
 
     Error::Error()

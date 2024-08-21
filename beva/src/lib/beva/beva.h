@@ -982,6 +982,208 @@ namespace bv
         std::vector<uint8_t>& waste_data
     );
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineDynamicStateCreateInfo.html
+    using DynamicStates = std::vector<VkDynamicState>;
+
+    VkPipelineDynamicStateCreateInfo DynamicStates_to_vk(
+        const DynamicStates& states,
+        std::vector<VkDynamicState>& waste_dynamic_states
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkVertexInputBindingDescription.html
+    struct VertexInputBindingDescription
+    {
+        uint32_t binding;
+        uint32_t stride;
+        VkVertexInputRate input_rate;
+    };
+
+    VkVertexInputBindingDescription VertexInputBindingDescription_to_vk(
+        const VertexInputBindingDescription& description
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkVertexInputAttributeDescription.html
+    struct VertexInputAttributeDescription
+    {
+        uint32_t location;
+        uint32_t binding;
+        VkFormat format;
+        uint32_t offset;
+    };
+
+    VkVertexInputAttributeDescription VertexInputAttributeDescription_to_vk(
+        const VertexInputAttributeDescription& description
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineVertexInputStateCreateInfo.html
+    struct VertexInputState
+    {
+        std::vector<VertexInputBindingDescription> binding_descriptions;
+        std::vector<VertexInputAttributeDescription> attribute_descriptions;
+    };
+
+    VkPipelineVertexInputStateCreateInfo VertexInputState_to_vk(
+        const VertexInputState& state,
+
+        std::vector<VkVertexInputBindingDescription>&
+        waste_vk_binding_descriptions,
+
+        std::vector<VkVertexInputAttributeDescription>&
+        waste_vk_attribute_descriptions
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineInputAssemblyStateCreateInfo.html
+    struct InputAssemblyState
+    {
+        VkPrimitiveTopology topology;
+        bool primitive_restart_enable;
+    };
+
+    VkPipelineInputAssemblyStateCreateInfo InputAssemblyState_to_vk(
+        const InputAssemblyState& state
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkViewport.html
+    struct Viewport
+    {
+        float x;
+        float y;
+        float width;
+        float height;
+        float min_depth;
+        float max_depth;
+    };
+
+    VkViewport Viewport_to_vk(const Viewport& viewport);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkOffset2D.html
+    struct Offset2d
+    {
+        int32_t x;
+        int32_t y;
+    };
+
+    VkOffset2D Offset2d_to_vk(const Offset2d& offset);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkOffset3D.html
+    struct Offset3d
+    {
+        int32_t x;
+        int32_t y;
+        int32_t z;
+    };
+
+    VkOffset3D Offset3d_to_vk(const Offset3d& offset);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkRect2D.html
+    struct Rect2d
+    {
+        Offset2d offset;
+        Extent2d extent;
+    };
+
+    VkRect2D Rect2d_to_vk(const Rect2d& rect);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineViewportStateCreateInfo.html
+    struct ViewportState
+    {
+        std::vector<Viewport> viewports;
+        std::vector<Rect2d> scissors;
+    };
+
+    VkPipelineViewportStateCreateInfo ViewportState_to_vk(
+        const ViewportState& state,
+        std::vector<VkViewport>& waste_vk_viewports,
+        std::vector<VkRect2D>& waste_vk_scissors
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineRasterizationStateCreateInfo.html
+    struct RasterizationState
+    {
+        bool depth_clamp_enable;
+        bool rasterizer_discard_enable;
+        VkPolygonMode polygon_mode;
+        VkCullModeFlags cull_mode;
+        VkFrontFace front_face;
+        bool depth_bias_enable;
+        float depth_bias_constant_factor;
+        float depth_bias_clamp;
+        float depth_bias_slope_factor;
+        float line_width;
+    };
+
+    VkPipelineRasterizationStateCreateInfo RasterizationState_to_vk(
+        const RasterizationState& state
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineMultisampleStateCreateInfo.html
+    struct MultisampleState
+    {
+        VkSampleCountFlagBits rasterization_samples;
+        bool sample_shading_enable;
+        float min_sample_shading;
+        std::vector<VkSampleMask> sample_mask;
+        bool alpha_to_coverage_enable;
+        bool alpha_to_one_enable;
+    };
+
+    VkPipelineMultisampleStateCreateInfo MultisampleState_to_vk(
+        const MultisampleState& state,
+        std::vector<VkSampleMask>& waste_sample_mask
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineDepthStencilStateCreateInfo.html
+    struct DepthStencilState
+    {
+        VkPipelineDepthStencilStateCreateFlags flags;
+        bool depth_test_enable;
+        bool depth_write_enable;
+        VkCompareOp depth_compare_op;
+        bool depth_bounds_test_enable;
+        bool stencil_test_enable;
+        VkStencilOpState front;
+        VkStencilOpState back;
+        float min_depth_bounds;
+        float max_depth_bounds;
+    };
+
+    VkPipelineDepthStencilStateCreateInfo DepthStencilState_to_vk(
+        const DepthStencilState& state
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineColorBlendAttachmentState.html
+    struct ColorBlendAttachment
+    {
+        bool blend_enable;
+        VkBlendFactor src_color_blend_factor;
+        VkBlendFactor dst_color_blend_factor;
+        VkBlendOp color_blend_op;
+        VkBlendFactor src_alpha_blend_factor;
+        VkBlendFactor dst_alpha_blend_factor;
+        VkBlendOp alpha_blend_op;
+        VkColorComponentFlags color_write_mask;
+    };
+
+    VkPipelineColorBlendAttachmentState ColorBlendAttachment_to_vk(
+        const ColorBlendAttachment& attachment
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineColorBlendStateCreateInfo.html
+    struct ColorBlendState
+    {
+        VkPipelineColorBlendStateCreateFlags flags;
+        std::optional<VkLogicOp> logic_op;
+        std::vector<ColorBlendAttachment> attachments;
+        std::array<float, 4> blend_constants;
+    };
+
+    VkPipelineColorBlendStateCreateInfo ColorBlendState_to_vk(
+        const ColorBlendState& state,
+
+        std::vector<VkPipelineColorBlendAttachmentState>&
+        waste_vk_color_blend_attachments
+    );
+
 #pragma endregion
 
 #pragma region error handling
