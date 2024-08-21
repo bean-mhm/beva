@@ -42,6 +42,7 @@ namespace beva_demo
         void pick_physical_device();
         void create_logical_device();
         void create_swapchain();
+        void create_graphics_pipeline();
 
         void main_loop();
 

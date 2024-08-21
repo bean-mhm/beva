@@ -4,6 +4,7 @@
 #include <string>
 #include <format>
 #include <array>
+#include <unordered_map>
 #include <memory>
 #include <any>
 #include <optional>
@@ -21,26 +22,10 @@ namespace bv
 
 #pragma region data-only structs, enums, and type aliases
 
-    // defines a string conversion function for an enum that meets the following
-    // requirements:
-    // - enum must have a value named _ at the end
-    // - enum must be based on uint8_t
-    // - there must be a static constexpr const char* array named
-    //   EnumName_string representing the enum values as strings.
-    // - the enum values must start from 0 and increase by one (ordered)
-#define BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(EnumName) \
-    constexpr const char* EnumName##_to_string( \
-        EnumName v \
-    ) \
-    { \
-        if (v >= EnumName::_) \
-        { \
-            throw std::exception( \
-                "invalid enum value, this should never happen" \
-            ); \
-        } \
-        return EnumName##_string[(uint8_t)v]; \
-    }
+    using Flags = uint32_t;
+
+    template<typename Enum>
+    using EnumStrMap = const std::unordered_map<Enum, std::string>;
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_MAKE_API_VERSION.html
     struct Version
@@ -78,317 +63,453 @@ namespace bv
     };
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkResult.html
-    enum class ApiResultType : uint8_t
+    enum class ApiResult : int32_t
     {
-        Success,
-        NotReady,
-        Timeout,
-        EventSet,
-        EventReset,
-        Incomplete,
-        ErrorOutOfHostMemory,
-        ErrorOutOfDeviceMemory,
-        ErrorInitializationFailed,
-        ErrorDeviceLost,
-        ErrorMemoryMapFailed,
-        ErrorLayerNotPresent,
-        ErrorExtensionNotPresent,
-        ErrorFeatureNotPresent,
-        ErrorIncompatibleDriver,
-        ErrorTooManyObjects,
-        ErrorFormatNotSupported,
-        ErrorFragmentedPool,
-        ErrorUnknown,
-        ErrorOutOfPoolMemory,
-        ErrorInvalidExternalHandle,
-        ErrorFragmentation,
-        ErrorInvalidOpaqueCaptureAddress,
-        PipelineCompileRequired,
-        ErrorSurfaceLostKhr,
-        ErrorNativeWindowInUseKhr,
-        SuboptimalKhr,
-        ErrorOutOfDateKhr,
-        ErrorIncompatibleDisplayKhr,
-        ErrorValidationFailedExt,
-        ErrorInvalidShaderNv,
-        ErrorImageUsageNotSupportedKhr,
-        ErrorVideoPictureLayoutNotSupportedKhr,
-        ErrorVideoProfileOperationNotSupportedKhr,
-        ErrorVideoProfileFormatNotSupportedKhr,
-        ErrorVideoProfileCodecNotSupportedKhr,
-        ErrorVideoStdVersionNotSupportedKhr,
-        ErrorNotPermittedKhr,
-        ErrorFullScreenExclusiveModeLostExt,
-        ThreadIdleKhr,
-        ThreadDoneKhr,
-        OperationDeferredKhr,
-        OperationNotDeferredKhr,
-        ErrorCompressionExhaustedExt,
-        ErrorIncompatibleShaderBinaryExt,
-        UndocumentedVkResult,
-        _
+        Success = 0,
+        NotReady = 1,
+        Timeout = 2,
+        EventSet = 3,
+        EventReset = 4,
+        Incomplete = 5,
+        ErrorOutOfHostMemory = -1,
+        ErrorOutOfDeviceMemory = -2,
+        ErrorInitializationFailed = -3,
+        ErrorDeviceLost = -4,
+        ErrorMemoryMapFailed = -5,
+        ErrorLayerNotPresent = -6,
+        ErrorExtensionNotPresent = -7,
+        ErrorFeatureNotPresent = -8,
+        ErrorIncompatibleDriver = -9,
+        ErrorTooManyObjects = -10,
+        ErrorFormatNotSupported = -11,
+        ErrorFragmentedPool = -12,
+        ErrorUnknown = -13,
+
+        // provided by VK_VERSION_1_1
+        ErrorOutOfPoolMemory = -1000069000,
+
+        // provided by VK_VERSION_1_1
+        ErrorInvalidExternalHandle = -1000072003,
+
+        // provided by VK_VERSION_1_2
+        ErrorFragmentation = -1000161000,
+
+        // provided by VK_VERSION_1_2
+        ErrorInvalidOpaqueCaptureAddress = -1000257000,
+
+        // provided by VK_VERSION_1_3
+        PipelineCompileRequired = 1000297000,
+
+        // provided by VK_KHR_surface
+        ErrorSurfaceLostKhr = -1000000000,
+
+        // provided by VK_KHR_surface
+        ErrorNativeWindowInUseKhr = -1000000001,
+
+        // provided by VK_KHR_swapchain
+        SuboptimalKhr = 1000001003,
+
+        // provided by VK_KHR_swapchain
+        ErrorOutOfDateKhr = -1000001004,
+
+        // provided by VK_KHR_display_swapchain
+        ErrorIncompatibleDisplayKhr = -1000003001,
+
+        // provided by VK_EXT_debug_report
+        ErrorValidationFailedExt = -1000011001,
+
+        // provided by VK_NV_glsl_shader
+        ErrorInvalidShaderNv = -1000012000,
+
+        // provided by VK_KHR_video_queue
+        ErrorImageUsageNotSupportedKhr = -1000023000,
+
+        // provided by VK_KHR_video_queue
+        ErrorVideoPictureLayoutNotSupportedKhr = -1000023001,
+
+        // provided by VK_KHR_video_queue
+        ErrorVideoProfileOperationNotSupportedKhr = -1000023002,
+
+        // provided by VK_KHR_video_queue
+        ErrorVideoProfileFormatNotSupportedKhr = -1000023003,
+
+        // provided by VK_KHR_video_queue
+        ErrorVideoProfileCodecNotSupportedKhr = -1000023004,
+
+        // provided by VK_KHR_video_queue
+        ErrorVideoStdVersionNotSupportedKhr = -1000023005,
+
+        // provided by VK_EXT_image_drm_format_modifier
+        ErrorInvalidDrmFormatModifierPlaneLayoutExt = -1000158000,
+
+        // provided by VK_KHR_global_priority
+        ErrorNotPermittedKhr = -1000174001,
+
+        // provided by VK_EXT_full_screen_exclusive
+        ErrorFullScreenExclusiveModeLostExt = -1000255000,
+
+        // provided by VK_KHR_deferred_host_operations
+        ThreadIdleKhr = 1000268000,
+
+        // provided by VK_KHR_deferred_host_operations
+        ThreadDoneKhr = 1000268001,
+
+        // provided by VK_KHR_deferred_host_operations
+        OperationDeferredKhr = 1000268002,
+
+        // provided by VK_KHR_deferred_host_operations
+        OperationNotDeferredKhr = 1000268003,
+
+        // provided by VK_KHR_video_encode_queue
+        ErrorInvalidVideoStdParametersKhr = -1000299000,
+
+        // provided by VK_EXT_image_compression_control
+        ErrorCompressionExhaustedExt = -1000338000,
+
+        // provided by VK_EXT_shader_object
+        IncompatibleShaderBinaryExt = 1000482000,
+
+        // provided by VK_KHR_maintenance1
+        ErrorOutOfPoolMemoryKhr = ErrorOutOfPoolMemory,
+
+        // provided by VK_KHR_external_memory
+        ErrorInvalidExternalHandleKhr = ErrorInvalidExternalHandle,
+
+        // provided by VK_EXT_descriptor_indexing
+        ErrorFragmentationExt = ErrorFragmentation,
+
+        // provided by VK_EXT_global_priority
+        ErrorNotPermittedExt = ErrorNotPermittedKhr,
+
+        // provided by VK_EXT_buffer_device_address
+        ErrorInvalidDeviceAddressExt = ErrorInvalidOpaqueCaptureAddress,
+
+        // provided by VK_KHR_buffer_device_address
+        ErrorInvalidOpaqueCaptureAddressKhr = ErrorInvalidOpaqueCaptureAddress,
+
+        // provided by VK_EXT_pipeline_creation_cache_control
+        PipelineCompileRequiredExt = PipelineCompileRequired,
+
+        // provided by VK_EXT_pipeline_creation_cache_control
+        ErrorPipelineCompileRequiredExt = PipelineCompileRequired,
+
+        // provided by VK_EXT_shader_object
+        // VK_ERROR_INCOMPATIBLE_SHADER_BINARY_EXT is a deprecated alias
+        ErrorIncompatibleShaderBinaryExt = IncompatibleShaderBinaryExt
     };
 
-    static constexpr const char* ApiResultType_string[]
-    {
-        "Success: command successfully completed",
-        "NotReady: a fence or query has not yet completed",
-        "Timeout: a wait operation has not completed in the specified time",
-        "EventSet: an event is signaled",
-        "EventReset: an event is unsignaled",
-        "Incomplete: a return array was too small for the result",
-        "ErrorOutOfHostMemory: a host memory allocation has failed.",
-        "ErrorOutOfDeviceMemory: a device memory allocation has failed.",
-
-        "ErrorInitializationFailed: initialization of an object could not be "
-        "completed for implementation-specific reasons.",
-
-        "ErrorDeviceLost: the logical or physical device has been lost.",
-        "ErrorMemoryMapFailed: mapping of a memory object has failed.",
-
-        "ErrorLayerNotPresent: a requested layer is not present or could not "
-        "be loaded.",
-
-        "ErrorExtensionNotPresent: a requested extension is not supported.",
-        "ErrorFeatureNotPresent: a requested feature is not supported.",
-
-        "ErrorIncompatibleDriver: the requested version of Vulkan is not "
-        "supported by the driver or is otherwise incompatible for "
-        "implementation-specific reasons.",
-
-        "ErrorTooManyObjects: too many objects of the type have already been "
-        "created.",
-
-        "ErrorFormatNotSupported: a requested format is not supported on this "
-        "device.",
-
-        "ErrorFragmentedPool: a pool allocation has failed due to "
-        "fragmentation of the pool’s memory. this must only be returned if no "
-        "attempt to allocate host or device memory was made to accommodate the "
-        "new allocation. this should be returned in preference to "
-        "VK_ERROR_OUT_OF_POOL_MEMORY, but only if the implementation is "
-        "certain that the pool allocation failure was due to fragmentation.",
-
-        "ErrorUnknown: an unknown error has occurred; either the application "
-        "has provided invalid input, or an implementation failure has "
-        "occurred.",
-
-        "ErrorOutOfPoolMemory: a pool memory allocation has failed. this must "
-        "only be returned if no attempt to allocate host or device memory was "
-        "made to accommodate the new allocation. if the failure was definitely "
-        "due to fragmentation of the pool, VK_ERROR_FRAGMENTED_POOL should be "
-        "returned instead.",
-
-        "ErrorInvalidExternalHandle: an external handle is not a valid handle "
-        "of the specified type.",
-
-        "ErrorFragmentation: a descriptor pool creation has failed due to "
-        "fragmentation.",
-
-        "ErrorInvalidOpaqueCaptureAddress: a buffer creation or memory "
-        "allocation failed because the requested address is not available. a "
-        "shader group handle assignment failed because the requested shader "
-        "group handle information is no longer valid.",
-
-        "PipelineCompileRequired: a requested pipeline creation would have "
-        "required compilation, but the application requested compilation to "
-        "not be performed.",
-
-        "ErrorSurfaceLostKhr: a surface is no longer available.",
-
-        "ErrorNativeWindowInUseKhr: the requested window is already in use by "
-        "Vulkan or another API in a manner which prevents it from being used "
-        "again.",
-
-        "SuboptimalKhr: a swapchain no longer matches the surface properties "
-        "exactly, but can still be used to present to the surface "
-        "successfully.",
-
-        "ErrorOutOfDateKhr: a surface has changed in such a way that it is no "
-        "longer compatible with the swapchain, and further presentation "
-        "requests using the swapchain will fail. applications must query the "
-        "new surface properties and recreate their swapchain if they wish to "
-        "continue presenting to the surface.",
-
-        "ErrorIncompatibleDisplayKhr: the display used by a swapchain does not "
-        "use the same presentable image layout, or is incompatible in a way "
-        "that prevents sharing an image.",
-
-        "ErrorValidationFailedExt: a command failed because invalid usage was "
-        "detected by the implementation or a validation-layer.",
-
-        "ErrorInvalidShaderNv: one or more shaders failed to compile or link. "
-        "more details are reported back to the application via "
-        "VK_EXT_debug_report if enabled.",
-
-        "ErrorImageUsageNotSupportedKhr: the requested VkImageUsageFlags are "
-        "not supported.",
-
-        "ErrorVideoPictureLayoutNotSupportedKhr: the requested video picture "
-        "layout is not supported.",
-
-        "ErrorVideoProfileOperationNotSupportedKhr: a video profile operation "
-        "specified via VkVideoProfileInfoKHR::videoCodecOperation is not "
-        "supported.",
-
-        "ErrorVideoProfileFormatNotSupportedKhr: format parameters in a "
-        "requested VkVideoProfileInfoKHR chain are not supported.",
-
-        "ErrorVideoProfileCodecNotSupportedKhr: codec-specific parameters in a "
-        "requested VkVideoProfileInfoKHR chain are not supported.",
-
-        "ErrorVideoStdVersionNotSupportedKhr: the specified video Std header "
-        "version is not supported.",
-
-        "ErrorNotPermittedKhr: the driver implementation has denied a request "
-        "to acquire a priority above the default priority "
-        "(VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_EXT) because the application does "
-        "not have sufficient privileges.",
-
-        "ErrorFullScreenExclusiveModeLostExt: an operation on a swapchain "
-        "created with VK_FULL_SCREEN_EXCLUSIVE_APPLICATION_CONTROLLED_EXT "
-        "failed as it did not have exclusive full-screen access. this may "
-        "occur due to implementation-dependent reasons, outside of the "
-        "application’s control.",
-
-        "ThreadIdleKhr: a deferred operation is not complete but there is "
-        "currently no work for this thread to do at the time of this call.",
-
-        "ThreadDoneKhr: a deferred operation is not complete but there is no "
-        "work remaining to assign to additional threads.",
-
-        "OperationDeferredKhr: a deferred operation was requested and at least "
-        "some of the work was deferred.",
-
-        "OperationNotDeferredKhr: a deferred operation was requested and no "
-        "operations were deferred.",
-
-        "ErrorCompressionExhaustedExt: an image creation failed because "
-        "internal resources required for compression are exhausted. this must "
-        "only be returned when fixed-rate compression is requested.",
-
-        "ErrorIncompatibleShaderBinaryExt: the provided binary shader code is "
-        "not compatible with this device.",
-    };
-
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkResult.html
-    class ApiResult
-    {
-    public:
-        ApiResult(VkResult vk_result);
-
-        constexpr ApiResultType type() const
+    static EnumStrMap<ApiResult> ApiResult_strmap{
         {
-            return _type;
-        }
-
-        constexpr VkResult undocumented_vk_result() const
-        {
-            return _undocumented_vk_result;
-        }
-
-        std::string to_string() const;
-
-    private:
-        ApiResultType _type;
-        VkResult _undocumented_vk_result;
-
+            ApiResult::Success,
+            "Success: command successfully completed"
+        },
+{
+    ApiResult::NotReady,
+    "NotReady: a fence or query has not yet completed"
+},
+{
+    ApiResult::Timeout,
+    "Timeout: a wait operation has not completed in the specified time"
+},
+{
+    ApiResult::EventSet,
+    "EventSet: an event is signaled"
+},
+{
+    ApiResult::EventReset,
+    "EventReset: an event is unsignaled"
+},
+{
+    ApiResult::Incomplete,
+    "Incomplete: a return array was too small for the result"
+},
+{
+    ApiResult::ErrorOutOfHostMemory,
+    "ErrorOutOfHostMemory: a host memory allocation has failed"
+},
+{
+    ApiResult::ErrorOutOfDeviceMemory,
+    "ErrorOutOfDeviceMemory: a device memory allocation has failed"
+},
+{
+    ApiResult::ErrorInitializationFailed,
+    "ErrorInitializationFailed: initialization of an object could not be "
+    "completed for implementation-specific reasons."
+},
+{
+    ApiResult::ErrorDeviceLost,
+    "ErrorDeviceLost: the logical or physical device has been lost"
+},
+{
+    ApiResult::ErrorMemoryMapFailed,
+    "ErrorMemoryMapFailed: mapping of a memory object has failed"
+},
+{
+    ApiResult::ErrorLayerNotPresent,
+    "ErrorLayerNotPresent: a requested layer is not present or could not be "
+    "loaded"
+},
+{
+    ApiResult::ErrorExtensionNotPresent,
+    "ErrorExtensionNotPresent: a requested extension is not supported"
+},
+{
+    ApiResult::ErrorFeatureNotPresent,
+    "ErrorFeatureNotPresent: a requested feature is not supported"
+},
+{
+    ApiResult::ErrorIncompatibleDriver,
+    "ErrorIncompatibleDriver: the requested version of Vulkan is not supported "
+    "by the driver or is otherwise incompatible for implementation-specific "
+        "reasons."
+},
+{
+    ApiResult::ErrorTooManyObjects,
+    "ErrorTooManyObjects: too many objects of the type have already been "
+    "created"
+},
+{
+    ApiResult::ErrorFormatNotSupported,
+    "ErrorFormatNotSupported: a requested format is not supported on this "
+    "device"
+},
+{
+    ApiResult::ErrorFragmentedPool,
+    "ErrorFragmentedPool: a pool allocation has failed due to fragmentation of "
+    "the pool’s memory. this must only be returned if no attempt to allocate "
+        "host or device memory was made to accommodate the new allocation. "
+        "this should be returned in preference to VK_ERROR_OUT_OF_POOL_MEMORY, "
+        "but only if the implementation is certain that the pool allocation "
+        "failure was due to fragmentation."
+},
+{
+    ApiResult::ErrorUnknown,
+    "ErrorUnknown: an unknown error has occurred; either the application has "
+    "provided invalid input, or an implementation failure has occurred."
+},
+{
+    ApiResult::ErrorOutOfPoolMemory,
+    "ErrorOutOfPoolMemory: a pool memory allocation has failed. this must only "
+    "be returned if no attempt to allocate host or device memory was made to "
+        "accommodate the new allocation. if the failure was definitely due to "
+        "fragmentation of the pool, VK_ERROR_FRAGMENTED_POOL should be "
+        "returned instead."
+},
+{
+    ApiResult::ErrorInvalidExternalHandle,
+    "ErrorInvalidExternalHandle: an external handle is not a valid handle of "
+    "the specified type."
+},
+{
+    ApiResult::ErrorFragmentation,
+    "ErrorFragmentation: a descriptor pool creation has failed due to "
+    "fragmentation"
+},
+{
+    ApiResult::ErrorInvalidOpaqueCaptureAddress,
+    "ErrorInvalidOpaqueCaptureAddress: a buffer creation or memory allocation "
+    "failed because the requested address is not available. a shader group "
+        "handle assignment failed because the requested shader group handle "
+        "information is no longer valid."
+},
+{
+    ApiResult::PipelineCompileRequired,
+    "PipelineCompileRequired: a requested pipeline creation would have "
+    "required compilation, but the application requested compilation to not be "
+        "performed."
+},
+{
+    ApiResult::ErrorSurfaceLostKhr,
+    "ErrorSurfaceLostKhr: a surface is no longer available"
+},
+{
+    ApiResult::ErrorNativeWindowInUseKhr,
+    "ErrorNativeWindowInUseKhr: the requested window is already in use by "
+    "Vulkan or another API in a manner which prevents it from being used again."
+},
+{
+    ApiResult::SuboptimalKhr,
+    "SuboptimalKhr: a swapchain no longer matches the surface properties "
+    "exactly, but can still be used to present to the surface successfully."
+},
+{
+    ApiResult::ErrorOutOfDateKhr,
+    "ErrorOutOfDateKhr: a surface has changed in such a way that it is no "
+    "longer compatible with the swapchain, and further presentation requests "
+        "using the swapchain will fail. applications must query the new surface "
+        "properties and recreate their swapchain if they wish to continue "
+        "presenting to the surface."
+},
+{
+    ApiResult::ErrorIncompatibleDisplayKhr,
+    "ErrorIncompatibleDisplayKhr: the display used by a swapchain does not use "
+    "the same presentable image layout, or is incompatible in a way that "
+        "prevents sharing an image."
+},
+{
+    ApiResult::ErrorValidationFailedExt,
+    "ErrorValidationFailedExt: a command failed because invalid usage was "
+    "detected by the implementation or a validation-layer."
+},
+{
+    ApiResult::ErrorInvalidShaderNv,
+    "ErrorInvalidShaderNv: one or more shaders failed to compile or link. more "
+    "details are reported back to the application via VK_EXT_debug_report if "
+        "enabled."
+},
+{
+    ApiResult::ErrorImageUsageNotSupportedKhr,
+    "ErrorImageUsageNotSupportedKhr: the requested VkImageUsageFlags are not "
+    "supported"
+},
+{
+    ApiResult::ErrorVideoPictureLayoutNotSupportedKhr,
+    "ErrorVideoPictureLayoutNotSupportedKhr: the requested video picture "
+    "layout is not supported."
+},
+{
+    ApiResult::ErrorVideoProfileOperationNotSupportedKhr,
+    "ErrorVideoProfileOperationNotSupportedKhr: a video profile operation "
+    "specified via VkVideoProfileInfoKHR::videoCodecOperation is not supported."
+},
+{
+    ApiResult::ErrorVideoProfileFormatNotSupportedKhr,
+    "ErrorVideoProfileFormatNotSupportedKhr: format parameters in a requested "
+    "VkVideoProfileInfoKHR chain are not supported."
+},
+{
+    ApiResult::ErrorVideoProfileCodecNotSupportedKhr,
+    "ErrorVideoProfileCodecNotSupportedKhr: codec-specific parameters in a "
+    "requested VkVideoProfileInfoKHR chain are not supported."
+},
+{
+    ApiResult::ErrorVideoStdVersionNotSupportedKhr,
+    "ErrorVideoStdVersionNotSupportedKhr: the specified video Std header "
+    "version is not supported."
+},
+{
+    ApiResult::ErrorInvalidDrmFormatModifierPlaneLayoutExt,
+    "ErrorInvalidDrmFormatModifierPlaneLayoutExt"
+},
+{
+    ApiResult::ErrorNotPermittedKhr,
+    "ErrorNotPermittedKhr: the driver implementation has denied a request to "
+    "acquire a priority above the default priority "
+        "(VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_EXT) because the application does not "
+        "have sufficient privileges."
+},
+{
+    ApiResult::ErrorFullScreenExclusiveModeLostExt,
+    "ErrorFullScreenExclusiveModeLostExt: an operation on a swapchain created "
+    "with VK_FULL_SCREEN_EXCLUSIVE_APPLICATION_CONTROLLED_EXT failed as it did "
+        "not have exclusive full-screen access. this may occur due to "
+        "implementation-dependent reasons, outside of the application’s control."
+},
+{
+    ApiResult::ThreadIdleKhr,
+    "ThreadIdleKhr: a deferred operation is not complete but there is "
+    "currently no work for this thread to do at the time of this call."
+},
+{
+    ApiResult::ThreadDoneKhr,
+    "ThreadDoneKhr: a deferred operation is not complete but there is no work "
+    "remaining to assign to additional threads."
+},
+{
+    ApiResult::OperationDeferredKhr,
+    "OperationDeferredKhr: a deferred operation was requested and at least "
+    "some of the work was deferred."
+},
+{
+    ApiResult::OperationNotDeferredKhr,
+    "OperationNotDeferredKhr: a deferred operation was requested and no "
+    "operations were deferred."
+},
+{
+    ApiResult::ErrorInvalidVideoStdParametersKhr,
+    "ErrorInvalidVideoStdParametersKhr: the specified Video Std parameters do "
+    "not adhere to the syntactic or semantic requirements of the used video "
+        "compression standard, or values derived from parameters according to the "
+        "rules defined by the used video compression standard do not adhere to the "
+        "capabilities of the video compression standard or the implementation."
+},
+{
+    ApiResult::ErrorCompressionExhaustedExt,
+    "ErrorCompressionExhaustedExt: an image creation failed because internal "
+    "resources required for compression are exhausted. this must only be "
+        "returned when fixed-rate compression is requested."
+},
+{
+    ApiResult::IncompatibleShaderBinaryExt,
+    "IncompatibleShaderBinaryExt: the provided binary shader code is not "
+    "compatible with this device."
+}
     };
+
+    std::string ApiResult_to_string(ApiResult result);
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSystemAllocationScope.html
-    enum class AllocationScope : uint8_t
+    enum class AllocationScope : int32_t
     {
-        Command,
-        Object,
-        Cache,
-        Device,
-        Instance,
-        Unknown,
-        _
+        Command = 0,
+        Object = 1,
+        Cache = 2,
+        Device = 3,
+        Instance = 4
     };
 
-    static constexpr const char* AllocationScope_string[]
-    {
-        "Command",
-        "Object",
-        "Cache",
-        "Device",
-        "Instance",
-        "Unknown"
+    static EnumStrMap<AllocationScope> AllocationScope_strmap{
+        { AllocationScope::Command, "Command" },
+        { AllocationScope::Object, "Object" },
+        { AllocationScope::Cache, "Cache" },
+        { AllocationScope::Device, "Device" },
+        { AllocationScope::Instance, "Instance" }
     };
-
-    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(AllocationScope);
-
-    AllocationScope AllocationScope_from_vk(
-        VkSystemAllocationScope vk_scope
-    );
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkInternalAllocationType.html
-    enum class InternalAllocationType : uint8_t
+    enum class InternalAllocationType : int32_t
     {
-        Executable,
-        Unknown,
-        _
+        Executable = 0
     };
 
-    static constexpr const char* InternalAllocationType_string[]
-    {
-        "Executable",
-        "Unknown"
+    static EnumStrMap<InternalAllocationType> InternalAllocationType_strmap{
+        { InternalAllocationType::Executable, "Executable" }
     };
 
-    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(InternalAllocationType);
-
-    InternalAllocationType InternalAllocationType_from_vk(
-        VkInternalAllocationType vk_type
-    );
-
-    enum class VulkanApiVersion : uint8_t
+    enum class VulkanApiVersion : int32_t
     {
         Vulkan1_0,
         Vulkan1_1,
         Vulkan1_2,
-        Vulkan1_3,
-        _
+        Vulkan1_3
     };
 
-    static constexpr const char* VulkanApiVersion_string[]
-    {
-        "Vulkan 1.0",
-        "Vulkan 1.1",
-        "Vulkan 1.2",
-        "Vulkan 1.3"
+    static EnumStrMap<VulkanApiVersion> VulkanApiVersion_strmap{
+        { VulkanApiVersion::Vulkan1_0, "Vulkan 1.0" },
+        { VulkanApiVersion::Vulkan1_1, "Vulkan 1.1" },
+        { VulkanApiVersion::Vulkan1_2, "Vulkan 1.2" },
+        { VulkanApiVersion::Vulkan1_3, "Vulkan 1.3" }
     };
 
-    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(VulkanApiVersion);
-
-    uint32_t VulkanApiVersion_to_vk(VulkanApiVersion version);
+    uint32_t VulkanApiVersion_encode(VulkanApiVersion version);
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceType.html
-    enum class PhysicalDeviceType : uint8_t
+    enum class PhysicalDeviceType : int32_t
     {
-        Other,
-        IntegratedGpu,
-        DiscreteGpu,
-        VirtualGpu,
-        Cpu,
-        _
+        Other = 0,
+        IntegratedGpu = 1,
+        DiscreteGpu = 2,
+        VirtualGpu = 3,
+        Cpu = 4
     };
 
-    static constexpr const char* PhysicalDeviceType_string[]
-    {
-        "Other",
-        "Integrated GPU",
-        "Discrete GPU",
-        "Virtual GPU",
-        "CPU"
+    static EnumStrMap<PhysicalDeviceType> PhysicalDeviceType_strmap{
+        { PhysicalDeviceType::Other, "Other" },
+        { PhysicalDeviceType::IntegratedGpu, "Integrated GPU" },
+        { PhysicalDeviceType::DiscreteGpu, "Discrete GPU" },
+        { PhysicalDeviceType::VirtualGpu, "Virtual GPU" },
+        { PhysicalDeviceType::Cpu, "CPU" }
     };
-
-    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(PhysicalDeviceType);
-
-    PhysicalDeviceType PhysicalDeviceType_from_vk(
-        VkPhysicalDeviceType vk_type
-    );
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSampleCountFlagBits.html
     struct SampleCountFlags
@@ -402,45 +523,10 @@ namespace bv
         bool _64 : 1 = false;
     };
 
-    SampleCountFlags SampleCountFlags_from_vk(
-        VkSampleCountFlags vk_flags
-    );
-
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSampleCountFlagBits.html
-    enum class SampleCount : uint8_t
-    {
-        _1,
-        _2,
-        _4,
-        _8,
-        _16,
-        _32,
-        _64,
-        _
-    };
-
-    static constexpr const char* SampleCount_string[]
-    {
-        "1",
-        "2",
-        "4",
-        "8",
-        "16",
-        "32",
-        "64"
-    };
-
-    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(SampleCount);
-
-    SampleCount SampleCount_from_vk(VkSampleCountFlagBits vk_sample_count);
-    VkSampleCountFlagBits SampleCount_to_vk(SampleCount sample_count);
-
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueueFlagBits.html
-    // present: https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceSupportKHR.html
     struct QueueFlags
     {
         bool graphics : 1 = false;
-        bool presentation : 1 = false;
         bool compute : 1 = false;
         bool transfer : 1 = false;
         bool sparse_binding : 1 = false;
@@ -449,123 +535,186 @@ namespace bv
         bool optical_flow_nv : 1 = false;
     };
 
-    QueueFlags QueueFlags_from_vk(
-        const VkQueueFlags& vk_queue_flags,
-        VkBool32 vk_presentation_support
-    );
-
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkObjectType.html
-    enum class ObjectType : uint8_t
+    enum class ObjectType : int32_t
     {
-        Unknown,
-        Instance,
-        PhysicalDevice,
-        Device,
-        Queue,
-        Semaphore,
-        CommandBuffer,
-        Fence,
-        DeviceMemory,
-        Buffer,
-        Image,
-        Event,
-        QueryPool,
-        BufferView,
-        ImageView,
-        ShaderModule,
-        PipelineCache,
-        PipelineLayout,
-        RenderPass,
-        Pipeline,
-        DescriptorSetLayout,
-        Sampler,
-        DescriptorPool,
-        DescriptorSet,
-        Framebuffer,
-        CommandPool,
-        SamplerYcbcrConversion,
-        DescriptorUpdateTemplate,
-        PrivateDataSlot,
-        Surface,
-        Swapchain,
-        Display,
-        DisplayMode,
-        DebugReportCallback,
-        VideoSession,
-        VideoSessionParameters,
-        CuModuleNvx,
-        CuFunctionNvx,
-        DebugMessenger,
-        AccelerationStructure,
-        ValidationCache,
-        AccelerationStructureNv,
-        PerformanceConfigurationIntel,
-        DeferredOperation,
-        IndirectCommandsLayoutNv,
-        BufferCollectionFuchsia,
-        Micromap,
-        OpticalFlowSessionNv,
-        Shader,
-        _
+        Unknown = 0,
+        Instance = 1,
+        PhysicalDevice = 2,
+        Device = 3,
+        Queue = 4,
+        Semaphore = 5,
+        CommandBuffer = 6,
+        Fence = 7,
+        DeviceMemory = 8,
+        Buffer = 9,
+        Image = 10,
+        Event = 11,
+        QueryPool = 12,
+        BufferView = 13,
+        ImageView = 14,
+        ShaderModule = 15,
+        PipelineCache = 16,
+        PipelineLayout = 17,
+        RenderPass = 18,
+        Pipeline = 19,
+        DescriptorSetLayout = 20,
+        Sampler = 21,
+        DescriptorPool = 22,
+        DescriptorSet = 23,
+        Framebuffer = 24,
+        CommandPool = 25,
+
+        // provided by VK_VERSION_1_1
+        SamplerYcbcrConversion = 1000156000,
+
+        // provided by VK_VERSION_1_1
+        DescriptorUpdateTemplate = 1000085000,
+
+        // provided by VK_VERSION_1_3
+        PrivateDataSlot = 1000295000,
+
+        // provided by VK_KHR_surface
+        SurfaceKhr = 1000000000,
+
+        // provided by VK_KHR_swapchain
+        SwapchainKhr = 1000001000,
+
+        // provided by VK_KHR_display
+        DisplayKhr = 1000002000,
+
+        // provided by VK_KHR_display
+        DisplayModeKhr = 1000002001,
+
+        // provided by VK_EXT_debug_report
+        DebugReportCallbackExt = 1000011000,
+
+        // provided by VK_KHR_video_queue
+        VideoSessionKhr = 1000023000,
+
+        // provided by VK_KHR_video_queue
+        VideoSessionParametersKhr = 1000023001,
+
+        // provided by VK_NVX_binary_import
+        CuModuleNvx = 1000029000,
+
+        // provided by VK_NVX_binary_import
+        CuFunctionNvx = 1000029001,
+
+        // provided by VK_EXT_debug_utils
+        DebugUtilsMessengerExt = 1000128000,
+
+        // provided by VK_KHR_acceleration_structure
+        AccelerationStructureKhr = 1000150000,
+
+        // provided by VK_EXT_validation_cache
+        ValidationCacheExt = 1000160000,
+
+        // provided by VK_NV_ray_tracing
+        AccelerationStructureNv = 1000165000,
+
+        // provided by VK_INTEL_performance_query
+        PerformanceConfigurationIntel = 1000210000,
+
+        // provided by VK_KHR_deferred_host_operations
+        DeferredOperationKhr = 1000268000,
+
+        // provided by VK_NV_device_generated_commands
+        IndirectCommandsLayoutNv = 1000277000,
+
+        // provided by VK_NV_cuda_kernel_launch
+        CudaModuleNv = 1000307000,
+
+        // provided by VK_NV_cuda_kernel_launch
+        CudaFunctionNv = 1000307001,
+
+        // provided by VK_FUCHSIA_buffer_collection
+        BufferCollectionFuchsia = 1000366000,
+
+        // provided by VK_EXT_opacity_micromap
+        MicromapExt = 1000396000,
+
+        // provided by VK_NV_optical_flow
+        OpticalFlowSessionNv = 1000464000,
+
+        // provided by VK_EXT_shader_object
+        ShaderExt = 1000482000,
+
+        // provided by VK_KHR_descriptor_update_template
+        DescriptorUpdateTemplateKhr = DescriptorUpdateTemplate,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        SamplerYcbcrConversionKhr = SamplerYcbcrConversion,
+
+        // provided by VK_EXT_private_data
+        PrivateDataSlotExt = PrivateDataSlot
     };
 
-    static constexpr const char* ObjectType_string[]
+    static EnumStrMap<ObjectType> ObjectType_strmap
     {
-        "Unknown",
-        "Instance",
-        "PhysicalDevice",
-        "Device",
-        "Queue",
-        "Semaphore",
-        "CommandBuffer",
-        "Fence",
-        "DeviceMemory",
-        "Buffer",
-        "Image",
-        "Event",
-        "QueryPool",
-        "BufferView",
-        "ImageView",
-        "ShaderModule",
-        "PipelineCache",
-        "PipelineLayout",
-        "RenderPass",
-        "Pipeline",
-        "DescriptorSetLayout",
-        "Sampler",
-        "DescriptorPool",
-        "DescriptorSet",
-        "Framebuffer",
-        "CommandPool",
-        "SamplerYcbcrConversion",
-        "DescriptorUpdateTemplate",
-        "PrivateDataSlot",
-        "Surface",
-        "Swapchain",
-        "Display",
-        "DisplayMode",
-        "DebugReportCallback",
-        "VideoSession",
-        "VideoSessionParameters",
-        "CuModuleNvx",
-        "CuFunctionNvx",
-        "DebugMessenger",
-        "AccelerationStructure",
-        "ValidationCache",
-        "AccelerationStructureNv",
-        "PerformanceConfigurationIntel",
-        "DeferredOperation",
-        "IndirectCommandsLayoutNv",
-        "BufferCollectionFuchsia",
-        "Micromap",
-        "OpticalFlowSessionNv",
-        "Shader"
+        { ObjectType::Unknown, "Unknown" },
+        { ObjectType::Instance, "Instance" },
+        { ObjectType::PhysicalDevice, "PhysicalDevice" },
+        { ObjectType::Device, "Device" },
+        { ObjectType::Queue, "Queue" },
+        { ObjectType::Semaphore, "Semaphore" },
+        { ObjectType::CommandBuffer, "CommandBuffer" },
+        { ObjectType::Fence, "Fence" },
+        { ObjectType::DeviceMemory, "DeviceMemory" },
+        { ObjectType::Buffer, "Buffer" },
+        { ObjectType::Image, "Image" },
+        { ObjectType::Event, "Event" },
+        { ObjectType::QueryPool, "QueryPool" },
+        { ObjectType::BufferView, "BufferView" },
+        { ObjectType::ImageView, "ImageView" },
+        { ObjectType::ShaderModule, "ShaderModule" },
+        { ObjectType::PipelineCache, "PipelineCache" },
+        { ObjectType::PipelineLayout, "PipelineLayout" },
+        { ObjectType::RenderPass, "RenderPass" },
+        { ObjectType::Pipeline, "Pipeline" },
+        { ObjectType::DescriptorSetLayout, "DescriptorSetLayout" },
+        { ObjectType::Sampler, "Sampler" },
+        { ObjectType::DescriptorPool, "DescriptorPool" },
+        { ObjectType::DescriptorSet, "DescriptorSet" },
+        { ObjectType::Framebuffer, "Framebuffer" },
+        { ObjectType::CommandPool, "CommandPool" },
+        { ObjectType::SamplerYcbcrConversion, "SamplerYcbcrConversion" },
+        { ObjectType::DescriptorUpdateTemplate, "DescriptorUpdateTemplate" },
+        { ObjectType::PrivateDataSlot, "PrivateDataSlot" },
+        { ObjectType::SurfaceKhr, "SurfaceKhr" },
+        { ObjectType::SwapchainKhr, "SwapchainKhr" },
+        { ObjectType::DisplayKhr, "DisplayKhr" },
+        { ObjectType::DisplayModeKhr, "DisplayModeKhr" },
+        { ObjectType::DebugReportCallbackExt, "DebugReportCallbackExt" },
+        { ObjectType::VideoSessionKhr, "VideoSessionKhr" },
+        { ObjectType::VideoSessionParametersKhr, "VideoSessionParametersKhr" },
+        { ObjectType::CuModuleNvx, "CuModuleNvx" },
+        { ObjectType::CuFunctionNvx, "CuFunctionNvx" },
+        { ObjectType::DebugUtilsMessengerExt, "DebugUtilsMessengerExt" },
+        { ObjectType::AccelerationStructureKhr, "AccelerationStructureKhr" },
+        { ObjectType::ValidationCacheExt, "ValidationCacheExt" },
+        { ObjectType::AccelerationStructureNv, "AccelerationStructureNv" },
+        {
+            ObjectType::PerformanceConfigurationIntel,
+            "PerformanceConfigurationIntel"
+        },
+        { ObjectType::DeferredOperationKhr, "DeferredOperationKhr" },
+        { ObjectType::IndirectCommandsLayoutNv, "IndirectCommandsLayoutNv" },
+        { ObjectType::CudaModuleNv, "CudaModuleNv" },
+        { ObjectType::CudaFunctionNv, "CudaFunctionNv" },
+        { ObjectType::BufferCollectionFuchsia, "BufferCollectionFuchsia" },
+        { ObjectType::MicromapExt, "MicromapExt" },
+        { ObjectType::OpticalFlowSessionNv, "OpticalFlowSessionNv" },
+        { ObjectType::ShaderExt, "ShaderExt" },
+        {
+            ObjectType::DescriptorUpdateTemplateKhr,
+            "DescriptorUpdateTemplateKhr"
+        },
+        { ObjectType::SamplerYcbcrConversionKhr, "SamplerYcbcrConversionKhr" },
+        { ObjectType::PrivateDataSlotExt, "PrivateDataSlotExt" }
     };
 
-    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(ObjectType);
-
-    ObjectType ObjectType_from_vk(VkObjectType vk_type);
-
+    // provided by VK_EXT_debug_utils
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessageSeverityFlagBitsEXT.html
     struct DebugMessageSeverityFlags
     {
@@ -575,10 +724,7 @@ namespace bv
         bool error : 1 = false;
     };
 
-    VkDebugUtilsMessageSeverityFlagsEXT DebugMessageSeverityFlags_to_vk(
-        const DebugMessageSeverityFlags& flags
-    );
-
+    // provided by VK_EXT_debug_utils
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessageTypeFlagBitsEXT.html
     struct DebugMessageTypeFlags
     {
@@ -588,47 +734,12 @@ namespace bv
         bool device_address_binding : 1 = false;
     };
 
-    DebugMessageTypeFlags DebugMessageTypeFlags_from_vk(
-        VkDebugUtilsMessageTypeFlagsEXT vk_flags
-    );
-
-    VkDebugUtilsMessageTypeFlagsEXT DebugMessageTypeFlags_to_vk(
-        const DebugMessageTypeFlags& flags
-    );
-
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessageSeverityFlagBitsEXT.html
-    enum class DebugMessageSeverity : uint8_t
-    {
-        Verbose,
-        Info,
-        Warning,
-        Error,
-        _
-    };
-
-    static constexpr const char* DebugMessageSeverity_string[]
-    {
-        "Verbose",
-        "Info",
-        "Warning",
-        "Error"
-    };
-
-    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(DebugMessageSeverity);
-
-    DebugMessageSeverity DebugMessageSeverity_from_vk(
-        VkDebugUtilsMessageSeverityFlagBitsEXT vk_severity
-    );
-
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceQueueCreateFlagBits.html
     struct QueueRequestFlags
     {
+        // provided by VK_VERSION_1_1
         bool protected_ : 1 = false;
     };
-
-    VkDeviceQueueCreateFlags QueueRequestFlags_to_vk(
-        const QueueRequestFlags& flags
-    );
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkExtensionProperties.html
     struct ExtensionProperties
@@ -918,6 +1029,7 @@ namespace bv
         std::optional<uint32_t> optical_flow_nv;
     };
 
+    // provided by VK_KHR_surface
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceTransformFlagBitsKHR.html
     struct SurfaceTransformFlags
     {
@@ -932,48 +1044,7 @@ namespace bv
         bool inherit : 1 = false;
     };
 
-    SurfaceTransformFlags SurfaceTransformFlags_from_vk(
-        const VkSurfaceTransformFlagsKHR& vk_flags
-    );
-
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceTransformFlagBitsKHR.html
-    enum class SurfaceTransform : uint8_t
-    {
-        Identity,
-        Rotate90,
-        Rotate180,
-        Rotate270,
-        HorizontalMirror,
-        HorizontalMirrorRotate90,
-        HorizontalMirrorRotate180,
-        HorizontalMirrorRotate270,
-        Inherit,
-        _
-    };
-
-    static constexpr const char* SurfaceTransform_string[]
-    {
-        "Identity",
-        "Rotate 90",
-        "Rotate 180",
-        "Rotate 270",
-        "Horizontal Mirror",
-        "Horizontal Mirror Rotate 90",
-        "Horizontal Mirror Rotate 180",
-        "Horizontal Mirror Rotate 270",
-        "Inherit"
-    };
-
-    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(SurfaceTransform);
-
-    SurfaceTransform SurfaceTransform_from_vk(
-        VkSurfaceTransformFlagBitsKHR vk_transform
-    );
-
-    VkSurfaceTransformFlagBitsKHR SurfaceTransform_to_vk(
-        SurfaceTransform transform
-    );
-
+    // provided by VK_KHR_surface
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCompositeAlphaFlagBitsKHR.html
     struct CompositeAlphaFlags
     {
@@ -982,32 +1053,6 @@ namespace bv
         bool post_multiplied : 1 = false;
         bool inherit : 1 = false;
     };
-
-    CompositeAlphaFlags CompositeAlphaFlags_from_vk(
-        VkCompositeAlphaFlagsKHR vk_flags
-    );
-
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCompositeAlphaFlagBitsKHR.html
-    enum class CompositeAlpha : uint8_t
-    {
-        Opaque,
-        PreMultiplied,
-        PostMultiplied,
-        Inherit,
-        _
-    };
-
-    static constexpr const char* CompositeAlpha_string[]
-    {
-        "Opaque",
-        "Pre-Multiplied",
-        "Post-Multiplied",
-        "Inherit"
-    };
-
-    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(CompositeAlpha);
-
-    VkCompositeAlphaFlagBitsKHR CompositeAlpha_to_vk(CompositeAlpha alpha);
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageUsageFlagBits.html
     struct ImageUsageFlags
@@ -1031,9 +1076,7 @@ namespace bv
         bool sample_block_match_qcom : 1 = false;
     };
 
-    ImageUsageFlags ImageUsageFlags_from_vk(VkImageUsageFlags vk_flags);
-    VkImageUsageFlags ImageUsageFlags_to_vk(const ImageUsageFlags& flags);
-
+    // provided by VK_KHR_surface
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceCapabilitiesKHR.html
     struct SurfaceCapabilities
     {
@@ -1054,563 +1097,942 @@ namespace bv
     );
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFormat.html
-    enum class Format : uint8_t
+    enum class Format : int32_t
     {
-        Undefined,
-        R4G4_UNORM_PACK8,
-        R4G4B4A4_UNORM_PACK16,
-        B4G4R4A4_UNORM_PACK16,
-        R5G6B5_UNORM_PACK16,
-        B5G6R5_UNORM_PACK16,
-        R5G5B5A1_UNORM_PACK16,
-        B5G5R5A1_UNORM_PACK16,
-        A1R5G5B5_UNORM_PACK16,
-        R8_UNORM,
-        R8_SNORM,
-        R8_USCALED,
-        R8_SSCALED,
-        R8_UINT,
-        R8_SINT,
-        R8_SRGB,
-        R8G8_UNORM,
-        R8G8_SNORM,
-        R8G8_USCALED,
-        R8G8_SSCALED,
-        R8G8_UINT,
-        R8G8_SINT,
-        R8G8_SRGB,
-        R8G8B8_UNORM,
-        R8G8B8_SNORM,
-        R8G8B8_USCALED,
-        R8G8B8_SSCALED,
-        R8G8B8_UINT,
-        R8G8B8_SINT,
-        R8G8B8_SRGB,
-        B8G8R8_UNORM,
-        B8G8R8_SNORM,
-        B8G8R8_USCALED,
-        B8G8R8_SSCALED,
-        B8G8R8_UINT,
-        B8G8R8_SINT,
-        B8G8R8_SRGB,
-        R8G8B8A8_UNORM,
-        R8G8B8A8_SNORM,
-        R8G8B8A8_USCALED,
-        R8G8B8A8_SSCALED,
-        R8G8B8A8_UINT,
-        R8G8B8A8_SINT,
-        R8G8B8A8_SRGB,
-        B8G8R8A8_UNORM,
-        B8G8R8A8_SNORM,
-        B8G8R8A8_USCALED,
-        B8G8R8A8_SSCALED,
-        B8G8R8A8_UINT,
-        B8G8R8A8_SINT,
-        B8G8R8A8_SRGB,
-        A8B8G8R8_UNORM_PACK32,
-        A8B8G8R8_SNORM_PACK32,
-        A8B8G8R8_USCALED_PACK32,
-        A8B8G8R8_SSCALED_PACK32,
-        A8B8G8R8_UINT_PACK32,
-        A8B8G8R8_SINT_PACK32,
-        A8B8G8R8_SRGB_PACK32,
-        A2R10G10B10_UNORM_PACK32,
-        A2R10G10B10_SNORM_PACK32,
-        A2R10G10B10_USCALED_PACK32,
-        A2R10G10B10_SSCALED_PACK32,
-        A2R10G10B10_UINT_PACK32,
-        A2R10G10B10_SINT_PACK32,
-        A2B10G10R10_UNORM_PACK32,
-        A2B10G10R10_SNORM_PACK32,
-        A2B10G10R10_USCALED_PACK32,
-        A2B10G10R10_SSCALED_PACK32,
-        A2B10G10R10_UINT_PACK32,
-        A2B10G10R10_SINT_PACK32,
-        R16_UNORM,
-        R16_SNORM,
-        R16_USCALED,
-        R16_SSCALED,
-        R16_UINT,
-        R16_SINT,
-        R16_SFLOAT,
-        R16G16_UNORM,
-        R16G16_SNORM,
-        R16G16_USCALED,
-        R16G16_SSCALED,
-        R16G16_UINT,
-        R16G16_SINT,
-        R16G16_SFLOAT,
-        R16G16B16_UNORM,
-        R16G16B16_SNORM,
-        R16G16B16_USCALED,
-        R16G16B16_SSCALED,
-        R16G16B16_UINT,
-        R16G16B16_SINT,
-        R16G16B16_SFLOAT,
-        R16G16B16A16_UNORM,
-        R16G16B16A16_SNORM,
-        R16G16B16A16_USCALED,
-        R16G16B16A16_SSCALED,
-        R16G16B16A16_UINT,
-        R16G16B16A16_SINT,
-        R16G16B16A16_SFLOAT,
-        R32_UINT,
-        R32_SINT,
-        R32_SFLOAT,
-        R32G32_UINT,
-        R32G32_SINT,
-        R32G32_SFLOAT,
-        R32G32B32_UINT,
-        R32G32B32_SINT,
-        R32G32B32_SFLOAT,
-        R32G32B32A32_UINT,
-        R32G32B32A32_SINT,
-        R32G32B32A32_SFLOAT,
-        R64_UINT,
-        R64_SINT,
-        R64_SFLOAT,
-        R64G64_UINT,
-        R64G64_SINT,
-        R64G64_SFLOAT,
-        R64G64B64_UINT,
-        R64G64B64_SINT,
-        R64G64B64_SFLOAT,
-        R64G64B64A64_UINT,
-        R64G64B64A64_SINT,
-        R64G64B64A64_SFLOAT,
-        B10G11R11_UFLOAT_PACK32,
-        E5B9G9R9_UFLOAT_PACK32,
-        D16_UNORM,
-        X8_D24_UNORM_PACK32,
-        D32_SFLOAT,
-        S8_UINT,
-        D16_UNORM_S8_UINT,
-        D24_UNORM_S8_UINT,
-        D32_SFLOAT_S8_UINT,
-        BC1_RGB_UNORM_BLOCK,
-        BC1_RGB_SRGB_BLOCK,
-        BC1_RGBA_UNORM_BLOCK,
-        BC1_RGBA_SRGB_BLOCK,
-        BC2_UNORM_BLOCK,
-        BC2_SRGB_BLOCK,
-        BC3_UNORM_BLOCK,
-        BC3_SRGB_BLOCK,
-        BC4_UNORM_BLOCK,
-        BC4_SNORM_BLOCK,
-        BC5_UNORM_BLOCK,
-        BC5_SNORM_BLOCK,
-        BC6H_UFLOAT_BLOCK,
-        BC6H_SFLOAT_BLOCK,
-        BC7_UNORM_BLOCK,
-        BC7_SRGB_BLOCK,
-        ETC2_R8G8B8_UNORM_BLOCK,
-        ETC2_R8G8B8_SRGB_BLOCK,
-        ETC2_R8G8B8A1_UNORM_BLOCK,
-        ETC2_R8G8B8A1_SRGB_BLOCK,
-        ETC2_R8G8B8A8_UNORM_BLOCK,
-        ETC2_R8G8B8A8_SRGB_BLOCK,
-        EAC_R11_UNORM_BLOCK,
-        EAC_R11_SNORM_BLOCK,
-        EAC_R11G11_UNORM_BLOCK,
-        EAC_R11G11_SNORM_BLOCK,
-        ASTC_4x4_UNORM_BLOCK,
-        ASTC_4x4_SRGB_BLOCK,
-        ASTC_5x4_UNORM_BLOCK,
-        ASTC_5x4_SRGB_BLOCK,
-        ASTC_5x5_UNORM_BLOCK,
-        ASTC_5x5_SRGB_BLOCK,
-        ASTC_6x5_UNORM_BLOCK,
-        ASTC_6x5_SRGB_BLOCK,
-        ASTC_6x6_UNORM_BLOCK,
-        ASTC_6x6_SRGB_BLOCK,
-        ASTC_8x5_UNORM_BLOCK,
-        ASTC_8x5_SRGB_BLOCK,
-        ASTC_8x6_UNORM_BLOCK,
-        ASTC_8x6_SRGB_BLOCK,
-        ASTC_8x8_UNORM_BLOCK,
-        ASTC_8x8_SRGB_BLOCK,
-        ASTC_10x5_UNORM_BLOCK,
-        ASTC_10x5_SRGB_BLOCK,
-        ASTC_10x6_UNORM_BLOCK,
-        ASTC_10x6_SRGB_BLOCK,
-        ASTC_10x8_UNORM_BLOCK,
-        ASTC_10x8_SRGB_BLOCK,
-        ASTC_10x10_UNORM_BLOCK,
-        ASTC_10x10_SRGB_BLOCK,
-        ASTC_12x10_UNORM_BLOCK,
-        ASTC_12x10_SRGB_BLOCK,
-        ASTC_12x12_UNORM_BLOCK,
-        ASTC_12x12_SRGB_BLOCK,
-        G8B8G8R8_422_UNORM,
-        B8G8R8G8_422_UNORM,
-        G8_B8_R8_3PLANE_420_UNORM,
-        G8_B8R8_2PLANE_420_UNORM,
-        G8_B8_R8_3PLANE_422_UNORM,
-        G8_B8R8_2PLANE_422_UNORM,
-        G8_B8_R8_3PLANE_444_UNORM,
-        R10X6_UNORM_PACK16,
-        R10X6G10X6_UNORM_2PACK16,
-        R10X6G10X6B10X6A10X6_UNORM_4PACK16,
-        G10X6B10X6G10X6R10X6_422_UNORM_4PACK16,
-        B10X6G10X6R10X6G10X6_422_UNORM_4PACK16,
-        G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16,
-        G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16,
-        G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16,
-        G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16,
-        G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16,
-        R12X4_UNORM_PACK16,
-        R12X4G12X4_UNORM_2PACK16,
-        R12X4G12X4B12X4A12X4_UNORM_4PACK16,
-        G12X4B12X4G12X4R12X4_422_UNORM_4PACK16,
-        B12X4G12X4R12X4G12X4_422_UNORM_4PACK16,
-        G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16,
-        G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16,
-        G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16,
-        G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16,
-        G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16,
-        G16B16G16R16_422_UNORM,
-        B16G16R16G16_422_UNORM,
-        G16_B16_R16_3PLANE_420_UNORM,
-        G16_B16R16_2PLANE_420_UNORM,
-        G16_B16_R16_3PLANE_422_UNORM,
-        G16_B16R16_2PLANE_422_UNORM,
-        G16_B16_R16_3PLANE_444_UNORM,
-        G8_B8R8_2PLANE_444_UNORM,
-        G10X6_B10X6R10X6_2PLANE_444_UNORM_3PACK16,
-        G12X4_B12X4R12X4_2PLANE_444_UNORM_3PACK16,
-        G16_B16R16_2PLANE_444_UNORM,
-        A4R4G4B4_UNORM_PACK16,
-        A4B4G4R4_UNORM_PACK16,
-        ASTC_4x4_SFLOAT_BLOCK,
-        ASTC_5x4_SFLOAT_BLOCK,
-        ASTC_5x5_SFLOAT_BLOCK,
-        ASTC_6x5_SFLOAT_BLOCK,
-        ASTC_6x6_SFLOAT_BLOCK,
-        ASTC_8x5_SFLOAT_BLOCK,
-        ASTC_8x6_SFLOAT_BLOCK,
-        ASTC_8x8_SFLOAT_BLOCK,
-        ASTC_10x5_SFLOAT_BLOCK,
-        ASTC_10x6_SFLOAT_BLOCK,
-        ASTC_10x8_SFLOAT_BLOCK,
-        ASTC_10x10_SFLOAT_BLOCK,
-        ASTC_12x10_SFLOAT_BLOCK,
-        ASTC_12x12_SFLOAT_BLOCK,
-        PVRTC1_2BPP_UNORM_BLOCK_IMG,
-        PVRTC1_4BPP_UNORM_BLOCK_IMG,
-        PVRTC2_2BPP_UNORM_BLOCK_IMG,
-        PVRTC2_4BPP_UNORM_BLOCK_IMG,
-        PVRTC1_2BPP_SRGB_BLOCK_IMG,
-        PVRTC1_4BPP_SRGB_BLOCK_IMG,
-        PVRTC2_2BPP_SRGB_BLOCK_IMG,
-        PVRTC2_4BPP_SRGB_BLOCK_IMG,
-        R16G16_S10_5_NV,
-        _
+        Undefined = 0,
+        R4G4_UNORM_PACK8 = 1,
+        R4G4B4A4_UNORM_PACK16 = 2,
+        B4G4R4A4_UNORM_PACK16 = 3,
+        R5G6B5_UNORM_PACK16 = 4,
+        B5G6R5_UNORM_PACK16 = 5,
+        R5G5B5A1_UNORM_PACK16 = 6,
+        B5G5R5A1_UNORM_PACK16 = 7,
+        A1R5G5B5_UNORM_PACK16 = 8,
+        R8_UNORM = 9,
+        R8_SNORM = 10,
+        R8_USCALED = 11,
+        R8_SSCALED = 12,
+        R8_UINT = 13,
+        R8_SINT = 14,
+        R8_SRGB = 15,
+        R8G8_UNORM = 16,
+        R8G8_SNORM = 17,
+        R8G8_USCALED = 18,
+        R8G8_SSCALED = 19,
+        R8G8_UINT = 20,
+        R8G8_SINT = 21,
+        R8G8_SRGB = 22,
+        R8G8B8_UNORM = 23,
+        R8G8B8_SNORM = 24,
+        R8G8B8_USCALED = 25,
+        R8G8B8_SSCALED = 26,
+        R8G8B8_UINT = 27,
+        R8G8B8_SINT = 28,
+        R8G8B8_SRGB = 29,
+        B8G8R8_UNORM = 30,
+        B8G8R8_SNORM = 31,
+        B8G8R8_USCALED = 32,
+        B8G8R8_SSCALED = 33,
+        B8G8R8_UINT = 34,
+        B8G8R8_SINT = 35,
+        B8G8R8_SRGB = 36,
+        R8G8B8A8_UNORM = 37,
+        R8G8B8A8_SNORM = 38,
+        R8G8B8A8_USCALED = 39,
+        R8G8B8A8_SSCALED = 40,
+        R8G8B8A8_UINT = 41,
+        R8G8B8A8_SINT = 42,
+        R8G8B8A8_SRGB = 43,
+        B8G8R8A8_UNORM = 44,
+        B8G8R8A8_SNORM = 45,
+        B8G8R8A8_USCALED = 46,
+        B8G8R8A8_SSCALED = 47,
+        B8G8R8A8_UINT = 48,
+        B8G8R8A8_SINT = 49,
+        B8G8R8A8_SRGB = 50,
+        A8B8G8R8_UNORM_PACK32 = 51,
+        A8B8G8R8_SNORM_PACK32 = 52,
+        A8B8G8R8_USCALED_PACK32 = 53,
+        A8B8G8R8_SSCALED_PACK32 = 54,
+        A8B8G8R8_UINT_PACK32 = 55,
+        A8B8G8R8_SINT_PACK32 = 56,
+        A8B8G8R8_SRGB_PACK32 = 57,
+        A2R10G10B10_UNORM_PACK32 = 58,
+        A2R10G10B10_SNORM_PACK32 = 59,
+        A2R10G10B10_USCALED_PACK32 = 60,
+        A2R10G10B10_SSCALED_PACK32 = 61,
+        A2R10G10B10_UINT_PACK32 = 62,
+        A2R10G10B10_SINT_PACK32 = 63,
+        A2B10G10R10_UNORM_PACK32 = 64,
+        A2B10G10R10_SNORM_PACK32 = 65,
+        A2B10G10R10_USCALED_PACK32 = 66,
+        A2B10G10R10_SSCALED_PACK32 = 67,
+        A2B10G10R10_UINT_PACK32 = 68,
+        A2B10G10R10_SINT_PACK32 = 69,
+        R16_UNORM = 70,
+        R16_SNORM = 71,
+        R16_USCALED = 72,
+        R16_SSCALED = 73,
+        R16_UINT = 74,
+        R16_SINT = 75,
+        R16_SFLOAT = 76,
+        R16G16_UNORM = 77,
+        R16G16_SNORM = 78,
+        R16G16_USCALED = 79,
+        R16G16_SSCALED = 80,
+        R16G16_UINT = 81,
+        R16G16_SINT = 82,
+        R16G16_SFLOAT = 83,
+        R16G16B16_UNORM = 84,
+        R16G16B16_SNORM = 85,
+        R16G16B16_USCALED = 86,
+        R16G16B16_SSCALED = 87,
+        R16G16B16_UINT = 88,
+        R16G16B16_SINT = 89,
+        R16G16B16_SFLOAT = 90,
+        R16G16B16A16_UNORM = 91,
+        R16G16B16A16_SNORM = 92,
+        R16G16B16A16_USCALED = 93,
+        R16G16B16A16_SSCALED = 94,
+        R16G16B16A16_UINT = 95,
+        R16G16B16A16_SINT = 96,
+        R16G16B16A16_SFLOAT = 97,
+        R32_UINT = 98,
+        R32_SINT = 99,
+        R32_SFLOAT = 100,
+        R32G32_UINT = 101,
+        R32G32_SINT = 102,
+        R32G32_SFLOAT = 103,
+        R32G32B32_UINT = 104,
+        R32G32B32_SINT = 105,
+        R32G32B32_SFLOAT = 106,
+        R32G32B32A32_UINT = 107,
+        R32G32B32A32_SINT = 108,
+        R32G32B32A32_SFLOAT = 109,
+        R64_UINT = 110,
+        R64_SINT = 111,
+        R64_SFLOAT = 112,
+        R64G64_UINT = 113,
+        R64G64_SINT = 114,
+        R64G64_SFLOAT = 115,
+        R64G64B64_UINT = 116,
+        R64G64B64_SINT = 117,
+        R64G64B64_SFLOAT = 118,
+        R64G64B64A64_UINT = 119,
+        R64G64B64A64_SINT = 120,
+        R64G64B64A64_SFLOAT = 121,
+        B10G11R11_UFLOAT_PACK32 = 122,
+        E5B9G9R9_UFLOAT_PACK32 = 123,
+        D16_UNORM = 124,
+        X8_D24_UNORM_PACK32 = 125,
+        D32_SFLOAT = 126,
+        S8_UINT = 127,
+        D16_UNORM_S8_UINT = 128,
+        D24_UNORM_S8_UINT = 129,
+        D32_SFLOAT_S8_UINT = 130,
+        BC1_RGB_UNORM_BLOCK = 131,
+        BC1_RGB_SRGB_BLOCK = 132,
+        BC1_RGBA_UNORM_BLOCK = 133,
+        BC1_RGBA_SRGB_BLOCK = 134,
+        BC2_UNORM_BLOCK = 135,
+        BC2_SRGB_BLOCK = 136,
+        BC3_UNORM_BLOCK = 137,
+        BC3_SRGB_BLOCK = 138,
+        BC4_UNORM_BLOCK = 139,
+        BC4_SNORM_BLOCK = 140,
+        BC5_UNORM_BLOCK = 141,
+        BC5_SNORM_BLOCK = 142,
+        BC6H_UFLOAT_BLOCK = 143,
+        BC6H_SFLOAT_BLOCK = 144,
+        BC7_UNORM_BLOCK = 145,
+        BC7_SRGB_BLOCK = 146,
+        ETC2_R8G8B8_UNORM_BLOCK = 147,
+        ETC2_R8G8B8_SRGB_BLOCK = 148,
+        ETC2_R8G8B8A1_UNORM_BLOCK = 149,
+        ETC2_R8G8B8A1_SRGB_BLOCK = 150,
+        ETC2_R8G8B8A8_UNORM_BLOCK = 151,
+        ETC2_R8G8B8A8_SRGB_BLOCK = 152,
+        EAC_R11_UNORM_BLOCK = 153,
+        EAC_R11_SNORM_BLOCK = 154,
+        EAC_R11G11_UNORM_BLOCK = 155,
+        EAC_R11G11_SNORM_BLOCK = 156,
+        ASTC_4x4_UNORM_BLOCK = 157,
+        ASTC_4x4_SRGB_BLOCK = 158,
+        ASTC_5x4_UNORM_BLOCK = 159,
+        ASTC_5x4_SRGB_BLOCK = 160,
+        ASTC_5x5_UNORM_BLOCK = 161,
+        ASTC_5x5_SRGB_BLOCK = 162,
+        ASTC_6x5_UNORM_BLOCK = 163,
+        ASTC_6x5_SRGB_BLOCK = 164,
+        ASTC_6x6_UNORM_BLOCK = 165,
+        ASTC_6x6_SRGB_BLOCK = 166,
+        ASTC_8x5_UNORM_BLOCK = 167,
+        ASTC_8x5_SRGB_BLOCK = 168,
+        ASTC_8x6_UNORM_BLOCK = 169,
+        ASTC_8x6_SRGB_BLOCK = 170,
+        ASTC_8x8_UNORM_BLOCK = 171,
+        ASTC_8x8_SRGB_BLOCK = 172,
+        ASTC_10x5_UNORM_BLOCK = 173,
+        ASTC_10x5_SRGB_BLOCK = 174,
+        ASTC_10x6_UNORM_BLOCK = 175,
+        ASTC_10x6_SRGB_BLOCK = 176,
+        ASTC_10x8_UNORM_BLOCK = 177,
+        ASTC_10x8_SRGB_BLOCK = 178,
+        ASTC_10x10_UNORM_BLOCK = 179,
+        ASTC_10x10_SRGB_BLOCK = 180,
+        ASTC_12x10_UNORM_BLOCK = 181,
+        ASTC_12x10_SRGB_BLOCK = 182,
+        ASTC_12x12_UNORM_BLOCK = 183,
+        ASTC_12x12_SRGB_BLOCK = 184,
+
+        // provided by VK_VERSION_1_1
+        G8B8G8R8_422_UNORM = 1000156000,
+
+        // provided by VK_VERSION_1_1
+        B8G8R8G8_422_UNORM = 1000156001,
+
+        // provided by VK_VERSION_1_1
+        G8_B8_R8_3PLANE_420_UNORM = 1000156002,
+
+        // provided by VK_VERSION_1_1
+        G8_B8R8_2PLANE_420_UNORM = 1000156003,
+
+        // provided by VK_VERSION_1_1
+        G8_B8_R8_3PLANE_422_UNORM = 1000156004,
+
+        // provided by VK_VERSION_1_1
+        G8_B8R8_2PLANE_422_UNORM = 1000156005,
+
+        // provided by VK_VERSION_1_1
+        G8_B8_R8_3PLANE_444_UNORM = 1000156006,
+
+        // provided by VK_VERSION_1_1
+        R10X6_UNORM_PACK16 = 1000156007,
+
+        // provided by VK_VERSION_1_1
+        R10X6G10X6_UNORM_2PACK16 = 1000156008,
+
+        // provided by VK_VERSION_1_1
+        R10X6G10X6B10X6A10X6_UNORM_4PACK16 = 1000156009,
+
+        // provided by VK_VERSION_1_1
+        G10X6B10X6G10X6R10X6_422_UNORM_4PACK16 = 1000156010,
+
+        // provided by VK_VERSION_1_1
+        B10X6G10X6R10X6G10X6_422_UNORM_4PACK16 = 1000156011,
+
+        // provided by VK_VERSION_1_1
+        G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16 = 1000156012,
+
+        // provided by VK_VERSION_1_1
+        G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16 = 1000156013,
+
+        // provided by VK_VERSION_1_1
+        G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16 = 1000156014,
+
+        // provided by VK_VERSION_1_1
+        G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16 = 1000156015,
+
+        // provided by VK_VERSION_1_1
+        G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16 = 1000156016,
+
+        // provided by VK_VERSION_1_1
+        R12X4_UNORM_PACK16 = 1000156017,
+
+        // provided by VK_VERSION_1_1
+        R12X4G12X4_UNORM_2PACK16 = 1000156018,
+
+        // provided by VK_VERSION_1_1
+        R12X4G12X4B12X4A12X4_UNORM_4PACK16 = 1000156019,
+
+        // provided by VK_VERSION_1_1
+        G12X4B12X4G12X4R12X4_422_UNORM_4PACK16 = 1000156020,
+
+        // provided by VK_VERSION_1_1
+        B12X4G12X4R12X4G12X4_422_UNORM_4PACK16 = 1000156021,
+
+        // provided by VK_VERSION_1_1
+        G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16 = 1000156022,
+
+        // provided by VK_VERSION_1_1
+        G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16 = 1000156023,
+
+        // provided by VK_VERSION_1_1
+        G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16 = 1000156024,
+
+        // provided by VK_VERSION_1_1
+        G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16 = 1000156025,
+
+        // provided by VK_VERSION_1_1
+        G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16 = 1000156026,
+
+        // provided by VK_VERSION_1_1
+        G16B16G16R16_422_UNORM = 1000156027,
+
+        // provided by VK_VERSION_1_1
+        B16G16R16G16_422_UNORM = 1000156028,
+
+        // provided by VK_VERSION_1_1
+        G16_B16_R16_3PLANE_420_UNORM = 1000156029,
+
+        // provided by VK_VERSION_1_1
+        G16_B16R16_2PLANE_420_UNORM = 1000156030,
+
+        // provided by VK_VERSION_1_1
+        G16_B16_R16_3PLANE_422_UNORM = 1000156031,
+
+        // provided by VK_VERSION_1_1
+        G16_B16R16_2PLANE_422_UNORM = 1000156032,
+
+        // provided by VK_VERSION_1_1
+        G16_B16_R16_3PLANE_444_UNORM = 1000156033,
+
+        // provided by VK_VERSION_1_3
+        G8_B8R8_2PLANE_444_UNORM = 1000330000,
+
+        // provided by VK_VERSION_1_3
+        G10X6_B10X6R10X6_2PLANE_444_UNORM_3PACK16 = 1000330001,
+
+        // provided by VK_VERSION_1_3
+        G12X4_B12X4R12X4_2PLANE_444_UNORM_3PACK16 = 1000330002,
+
+        // provided by VK_VERSION_1_3
+        G16_B16R16_2PLANE_444_UNORM = 1000330003,
+
+        // provided by VK_VERSION_1_3
+        A4R4G4B4_UNORM_PACK16 = 1000340000,
+
+        // provided by VK_VERSION_1_3
+        A4B4G4R4_UNORM_PACK16 = 1000340001,
+
+        // provided by VK_VERSION_1_3
+        ASTC_4x4_SFLOAT_BLOCK = 1000066000,
+
+        // provided by VK_VERSION_1_3
+        ASTC_5x4_SFLOAT_BLOCK = 1000066001,
+
+        // provided by VK_VERSION_1_3
+        ASTC_5x5_SFLOAT_BLOCK = 1000066002,
+
+        // provided by VK_VERSION_1_3
+        ASTC_6x5_SFLOAT_BLOCK = 1000066003,
+
+        // provided by VK_VERSION_1_3
+        ASTC_6x6_SFLOAT_BLOCK = 1000066004,
+
+        // provided by VK_VERSION_1_3
+        ASTC_8x5_SFLOAT_BLOCK = 1000066005,
+
+        // provided by VK_VERSION_1_3
+        ASTC_8x6_SFLOAT_BLOCK = 1000066006,
+
+        // provided by VK_VERSION_1_3
+        ASTC_8x8_SFLOAT_BLOCK = 1000066007,
+
+        // provided by VK_VERSION_1_3
+        ASTC_10x5_SFLOAT_BLOCK = 1000066008,
+
+        // provided by VK_VERSION_1_3
+        ASTC_10x6_SFLOAT_BLOCK = 1000066009,
+
+        // provided by VK_VERSION_1_3
+        ASTC_10x8_SFLOAT_BLOCK = 1000066010,
+
+        // provided by VK_VERSION_1_3
+        ASTC_10x10_SFLOAT_BLOCK = 1000066011,
+
+        // provided by VK_VERSION_1_3
+        ASTC_12x10_SFLOAT_BLOCK = 1000066012,
+
+        // provided by VK_VERSION_1_3
+        ASTC_12x12_SFLOAT_BLOCK = 1000066013,
+
+        // provided by VK_IMG_format_pvrtc
+        PVRTC1_2BPP_UNORM_BLOCK_IMG = 1000054000,
+
+        // provided by VK_IMG_format_pvrtc
+        PVRTC1_4BPP_UNORM_BLOCK_IMG = 1000054001,
+
+        // provided by VK_IMG_format_pvrtc
+        PVRTC2_2BPP_UNORM_BLOCK_IMG = 1000054002,
+
+        // provided by VK_IMG_format_pvrtc
+        PVRTC2_4BPP_UNORM_BLOCK_IMG = 1000054003,
+
+        // provided by VK_IMG_format_pvrtc
+        PVRTC1_2BPP_SRGB_BLOCK_IMG = 1000054004,
+
+        // provided by VK_IMG_format_pvrtc
+        PVRTC1_4BPP_SRGB_BLOCK_IMG = 1000054005,
+
+        // provided by VK_IMG_format_pvrtc
+        PVRTC2_2BPP_SRGB_BLOCK_IMG = 1000054006,
+
+        // provided by VK_IMG_format_pvrtc
+        PVRTC2_4BPP_SRGB_BLOCK_IMG = 1000054007,
+
+        // provided by VK_NV_optical_flow
+        R16G16_SFIXED5_NV = 1000464000,
+
+        // provided by VK_KHR_maintenance5
+        A1B5G5R5_UNORM_PACK16_KHR = 1000470000,
+
+        // provided by VK_KHR_maintenance5
+        A8_UNORM_KHR = 1000470001,
+
+        // provided by VK_EXT_texture_compression_astc_hdr
+        ASTC_4x4_SFLOAT_BLOCK_EXT = ASTC_4x4_SFLOAT_BLOCK,
+
+        // provided by VK_EXT_texture_compression_astc_hdr
+        ASTC_5x4_SFLOAT_BLOCK_EXT = ASTC_5x4_SFLOAT_BLOCK,
+
+        // provided by VK_EXT_texture_compression_astc_hdr
+        ASTC_5x5_SFLOAT_BLOCK_EXT = ASTC_5x5_SFLOAT_BLOCK,
+
+        // provided by VK_EXT_texture_compression_astc_hdr
+        ASTC_6x5_SFLOAT_BLOCK_EXT = ASTC_6x5_SFLOAT_BLOCK,
+
+        // provided by VK_EXT_texture_compression_astc_hdr
+        ASTC_6x6_SFLOAT_BLOCK_EXT = ASTC_6x6_SFLOAT_BLOCK,
+
+        // provided by VK_EXT_texture_compression_astc_hdr
+        ASTC_8x5_SFLOAT_BLOCK_EXT = ASTC_8x5_SFLOAT_BLOCK,
+
+        // provided by VK_EXT_texture_compression_astc_hdr
+        ASTC_8x6_SFLOAT_BLOCK_EXT = ASTC_8x6_SFLOAT_BLOCK,
+
+        // provided by VK_EXT_texture_compression_astc_hdr
+        ASTC_8x8_SFLOAT_BLOCK_EXT = ASTC_8x8_SFLOAT_BLOCK,
+
+        // provided by VK_EXT_texture_compression_astc_hdr
+        ASTC_10x5_SFLOAT_BLOCK_EXT = ASTC_10x5_SFLOAT_BLOCK,
+
+        // provided by VK_EXT_texture_compression_astc_hdr
+        ASTC_10x6_SFLOAT_BLOCK_EXT = ASTC_10x6_SFLOAT_BLOCK,
+
+        // provided by VK_EXT_texture_compression_astc_hdr
+        ASTC_10x8_SFLOAT_BLOCK_EXT = ASTC_10x8_SFLOAT_BLOCK,
+
+        // provided by VK_EXT_texture_compression_astc_hdr
+        ASTC_10x10_SFLOAT_BLOCK_EXT = ASTC_10x10_SFLOAT_BLOCK,
+
+        // provided by VK_EXT_texture_compression_astc_hdr
+        ASTC_12x10_SFLOAT_BLOCK_EXT = ASTC_12x10_SFLOAT_BLOCK,
+
+        // provided by VK_EXT_texture_compression_astc_hdr
+        ASTC_12x12_SFLOAT_BLOCK_EXT = ASTC_12x12_SFLOAT_BLOCK,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G8B8G8R8_422_UNORM_KHR = G8B8G8R8_422_UNORM,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        B8G8R8G8_422_UNORM_KHR = B8G8R8G8_422_UNORM,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G8_B8_R8_3PLANE_420_UNORM_KHR = G8_B8_R8_3PLANE_420_UNORM,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G8_B8R8_2PLANE_420_UNORM_KHR = G8_B8R8_2PLANE_420_UNORM,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G8_B8_R8_3PLANE_422_UNORM_KHR = G8_B8_R8_3PLANE_422_UNORM,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G8_B8R8_2PLANE_422_UNORM_KHR = G8_B8R8_2PLANE_422_UNORM,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G8_B8_R8_3PLANE_444_UNORM_KHR = G8_B8_R8_3PLANE_444_UNORM,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        R10X6_UNORM_PACK16_KHR = R10X6_UNORM_PACK16,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        R10X6G10X6_UNORM_2PACK16_KHR = R10X6G10X6_UNORM_2PACK16,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        R10X6G10X6B10X6A10X6_UNORM_4PACK16_KHR = R10X6G10X6B10X6A10X6_UNORM_4PACK16,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G10X6B10X6G10X6R10X6_422_UNORM_4PACK16_KHR = G10X6B10X6G10X6R10X6_422_UNORM_4PACK16,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        B10X6G10X6R10X6G10X6_422_UNORM_4PACK16_KHR = B10X6G10X6R10X6G10X6_422_UNORM_4PACK16,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16_KHR = G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16_KHR = G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16_KHR = G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16_KHR = G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16_KHR = G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        R12X4_UNORM_PACK16_KHR = R12X4_UNORM_PACK16,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        R12X4G12X4_UNORM_2PACK16_KHR = R12X4G12X4_UNORM_2PACK16,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        R12X4G12X4B12X4A12X4_UNORM_4PACK16_KHR = R12X4G12X4B12X4A12X4_UNORM_4PACK16,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G12X4B12X4G12X4R12X4_422_UNORM_4PACK16_KHR = G12X4B12X4G12X4R12X4_422_UNORM_4PACK16,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        B12X4G12X4R12X4G12X4_422_UNORM_4PACK16_KHR = B12X4G12X4R12X4G12X4_422_UNORM_4PACK16,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16_KHR = G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16_KHR = G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16_KHR = G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16_KHR = G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16_KHR = G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G16B16G16R16_422_UNORM_KHR = G16B16G16R16_422_UNORM,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        B16G16R16G16_422_UNORM_KHR = B16G16R16G16_422_UNORM,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G16_B16_R16_3PLANE_420_UNORM_KHR = G16_B16_R16_3PLANE_420_UNORM,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G16_B16R16_2PLANE_420_UNORM_KHR = G16_B16R16_2PLANE_420_UNORM,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G16_B16_R16_3PLANE_422_UNORM_KHR = G16_B16_R16_3PLANE_422_UNORM,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G16_B16R16_2PLANE_422_UNORM_KHR = G16_B16R16_2PLANE_422_UNORM,
+
+        // provided by VK_KHR_sampler_ycbcr_conversion
+        G16_B16_R16_3PLANE_444_UNORM_KHR = G16_B16_R16_3PLANE_444_UNORM,
+
+        // provided by VK_EXT_ycbcr_2plane_444_formats
+        G8_B8R8_2PLANE_444_UNORM_EXT = G8_B8R8_2PLANE_444_UNORM,
+
+        // provided by VK_EXT_ycbcr_2plane_444_formats
+        G10X6_B10X6R10X6_2PLANE_444_UNORM_3PACK16_EXT = G10X6_B10X6R10X6_2PLANE_444_UNORM_3PACK16,
+
+        // provided by VK_EXT_ycbcr_2plane_444_formats
+        G12X4_B12X4R12X4_2PLANE_444_UNORM_3PACK16_EXT = G12X4_B12X4R12X4_2PLANE_444_UNORM_3PACK16,
+
+        // provided by VK_EXT_ycbcr_2plane_444_formats
+        G16_B16R16_2PLANE_444_UNORM_EXT = G16_B16R16_2PLANE_444_UNORM,
+
+        // provided by VK_EXT_4444_formats
+        A4R4G4B4_UNORM_PACK16_EXT = A4R4G4B4_UNORM_PACK16,
+
+        // provided by VK_EXT_4444_formats
+        A4B4G4R4_UNORM_PACK16_EXT = A4B4G4R4_UNORM_PACK16,
+
+        // provided by VK_NV_optical_flow
+        // VK_FORMAT_R16G16_S10_5_NV  is a deprecated alias
+        R16G16_S10_5_NV = R16G16_SFIXED5_NV
     };
 
-    static constexpr const char* Format_string[]
-    {
-        "Undefined",
-        "R4G4_UNORM_PACK8",
-        "R4G4B4A4_UNORM_PACK16",
-        "B4G4R4A4_UNORM_PACK16",
-        "R5G6B5_UNORM_PACK16",
-        "B5G6R5_UNORM_PACK16",
-        "R5G5B5A1_UNORM_PACK16",
-        "B5G5R5A1_UNORM_PACK16",
-        "A1R5G5B5_UNORM_PACK16",
-        "R8_UNORM",
-        "R8_SNORM",
-        "R8_USCALED",
-        "R8_SSCALED",
-        "R8_UINT",
-        "R8_SINT",
-        "R8_SRGB",
-        "R8G8_UNORM",
-        "R8G8_SNORM",
-        "R8G8_USCALED",
-        "R8G8_SSCALED",
-        "R8G8_UINT",
-        "R8G8_SINT",
-        "R8G8_SRGB",
-        "R8G8B8_UNORM",
-        "R8G8B8_SNORM",
-        "R8G8B8_USCALED",
-        "R8G8B8_SSCALED",
-        "R8G8B8_UINT",
-        "R8G8B8_SINT",
-        "R8G8B8_SRGB",
-        "B8G8R8_UNORM",
-        "B8G8R8_SNORM",
-        "B8G8R8_USCALED",
-        "B8G8R8_SSCALED",
-        "B8G8R8_UINT",
-        "B8G8R8_SINT",
-        "B8G8R8_SRGB",
-        "R8G8B8A8_UNORM",
-        "R8G8B8A8_SNORM",
-        "R8G8B8A8_USCALED",
-        "R8G8B8A8_SSCALED",
-        "R8G8B8A8_UINT",
-        "R8G8B8A8_SINT",
-        "R8G8B8A8_SRGB",
-        "B8G8R8A8_UNORM",
-        "B8G8R8A8_SNORM",
-        "B8G8R8A8_USCALED",
-        "B8G8R8A8_SSCALED",
-        "B8G8R8A8_UINT",
-        "B8G8R8A8_SINT",
-        "B8G8R8A8_SRGB",
-        "A8B8G8R8_UNORM_PACK32",
-        "A8B8G8R8_SNORM_PACK32",
-        "A8B8G8R8_USCALED_PACK32",
-        "A8B8G8R8_SSCALED_PACK32",
-        "A8B8G8R8_UINT_PACK32",
-        "A8B8G8R8_SINT_PACK32",
-        "A8B8G8R8_SRGB_PACK32",
-        "A2R10G10B10_UNORM_PACK32",
-        "A2R10G10B10_SNORM_PACK32",
-        "A2R10G10B10_USCALED_PACK32",
-        "A2R10G10B10_SSCALED_PACK32",
-        "A2R10G10B10_UINT_PACK32",
-        "A2R10G10B10_SINT_PACK32",
-        "A2B10G10R10_UNORM_PACK32",
-        "A2B10G10R10_SNORM_PACK32",
-        "A2B10G10R10_USCALED_PACK32",
-        "A2B10G10R10_SSCALED_PACK32",
-        "A2B10G10R10_UINT_PACK32",
-        "A2B10G10R10_SINT_PACK32",
-        "R16_UNORM",
-        "R16_SNORM",
-        "R16_USCALED",
-        "R16_SSCALED",
-        "R16_UINT",
-        "R16_SINT",
-        "R16_SFLOAT",
-        "R16G16_UNORM",
-        "R16G16_SNORM",
-        "R16G16_USCALED",
-        "R16G16_SSCALED",
-        "R16G16_UINT",
-        "R16G16_SINT",
-        "R16G16_SFLOAT",
-        "R16G16B16_UNORM",
-        "R16G16B16_SNORM",
-        "R16G16B16_USCALED",
-        "R16G16B16_SSCALED",
-        "R16G16B16_UINT",
-        "R16G16B16_SINT",
-        "R16G16B16_SFLOAT",
-        "R16G16B16A16_UNORM",
-        "R16G16B16A16_SNORM",
-        "R16G16B16A16_USCALED",
-        "R16G16B16A16_SSCALED",
-        "R16G16B16A16_UINT",
-        "R16G16B16A16_SINT",
-        "R16G16B16A16_SFLOAT",
-        "R32_UINT",
-        "R32_SINT",
-        "R32_SFLOAT",
-        "R32G32_UINT",
-        "R32G32_SINT",
-        "R32G32_SFLOAT",
-        "R32G32B32_UINT",
-        "R32G32B32_SINT",
-        "R32G32B32_SFLOAT",
-        "R32G32B32A32_UINT",
-        "R32G32B32A32_SINT",
-        "R32G32B32A32_SFLOAT",
-        "R64_UINT",
-        "R64_SINT",
-        "R64_SFLOAT",
-        "R64G64_UINT",
-        "R64G64_SINT",
-        "R64G64_SFLOAT",
-        "R64G64B64_UINT",
-        "R64G64B64_SINT",
-        "R64G64B64_SFLOAT",
-        "R64G64B64A64_UINT",
-        "R64G64B64A64_SINT",
-        "R64G64B64A64_SFLOAT",
-        "B10G11R11_UFLOAT_PACK32",
-        "E5B9G9R9_UFLOAT_PACK32",
-        "D16_UNORM",
-        "X8_D24_UNORM_PACK32",
-        "D32_SFLOAT",
-        "S8_UINT",
-        "D16_UNORM_S8_UINT",
-        "D24_UNORM_S8_UINT",
-        "D32_SFLOAT_S8_UINT",
-        "BC1_RGB_UNORM_BLOCK",
-        "BC1_RGB_SRGB_BLOCK",
-        "BC1_RGBA_UNORM_BLOCK",
-        "BC1_RGBA_SRGB_BLOCK",
-        "BC2_UNORM_BLOCK",
-        "BC2_SRGB_BLOCK",
-        "BC3_UNORM_BLOCK",
-        "BC3_SRGB_BLOCK",
-        "BC4_UNORM_BLOCK",
-        "BC4_SNORM_BLOCK",
-        "BC5_UNORM_BLOCK",
-        "BC5_SNORM_BLOCK",
-        "BC6H_UFLOAT_BLOCK",
-        "BC6H_SFLOAT_BLOCK",
-        "BC7_UNORM_BLOCK",
-        "BC7_SRGB_BLOCK",
-        "ETC2_R8G8B8_UNORM_BLOCK",
-        "ETC2_R8G8B8_SRGB_BLOCK",
-        "ETC2_R8G8B8A1_UNORM_BLOCK",
-        "ETC2_R8G8B8A1_SRGB_BLOCK",
-        "ETC2_R8G8B8A8_UNORM_BLOCK",
-        "ETC2_R8G8B8A8_SRGB_BLOCK",
-        "EAC_R11_UNORM_BLOCK",
-        "EAC_R11_SNORM_BLOCK",
-        "EAC_R11G11_UNORM_BLOCK",
-        "EAC_R11G11_SNORM_BLOCK",
-        "ASTC_4x4_UNORM_BLOCK",
-        "ASTC_4x4_SRGB_BLOCK",
-        "ASTC_5x4_UNORM_BLOCK",
-        "ASTC_5x4_SRGB_BLOCK",
-        "ASTC_5x5_UNORM_BLOCK",
-        "ASTC_5x5_SRGB_BLOCK",
-        "ASTC_6x5_UNORM_BLOCK",
-        "ASTC_6x5_SRGB_BLOCK",
-        "ASTC_6x6_UNORM_BLOCK",
-        "ASTC_6x6_SRGB_BLOCK",
-        "ASTC_8x5_UNORM_BLOCK",
-        "ASTC_8x5_SRGB_BLOCK",
-        "ASTC_8x6_UNORM_BLOCK",
-        "ASTC_8x6_SRGB_BLOCK",
-        "ASTC_8x8_UNORM_BLOCK",
-        "ASTC_8x8_SRGB_BLOCK",
-        "ASTC_10x5_UNORM_BLOCK",
-        "ASTC_10x5_SRGB_BLOCK",
-        "ASTC_10x6_UNORM_BLOCK",
-        "ASTC_10x6_SRGB_BLOCK",
-        "ASTC_10x8_UNORM_BLOCK",
-        "ASTC_10x8_SRGB_BLOCK",
-        "ASTC_10x10_UNORM_BLOCK",
-        "ASTC_10x10_SRGB_BLOCK",
-        "ASTC_12x10_UNORM_BLOCK",
-        "ASTC_12x10_SRGB_BLOCK",
-        "ASTC_12x12_UNORM_BLOCK",
-        "ASTC_12x12_SRGB_BLOCK",
-        "G8B8G8R8_422_UNORM",
-        "B8G8R8G8_422_UNORM",
-        "G8_B8_R8_3PLANE_420_UNORM",
-        "G8_B8R8_2PLANE_420_UNORM",
-        "G8_B8_R8_3PLANE_422_UNORM",
-        "G8_B8R8_2PLANE_422_UNORM",
-        "G8_B8_R8_3PLANE_444_UNORM",
-        "R10X6_UNORM_PACK16",
-        "R10X6G10X6_UNORM_2PACK16",
-        "R10X6G10X6B10X6A10X6_UNORM_4PACK16",
-        "G10X6B10X6G10X6R10X6_422_UNORM_4PACK16",
-        "B10X6G10X6R10X6G10X6_422_UNORM_4PACK16",
-        "G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16",
-        "G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16",
-        "G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16",
-        "G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16",
-        "G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16",
-        "R12X4_UNORM_PACK16",
-        "R12X4G12X4_UNORM_2PACK16",
-        "R12X4G12X4B12X4A12X4_UNORM_4PACK16",
-        "G12X4B12X4G12X4R12X4_422_UNORM_4PACK16",
-        "B12X4G12X4R12X4G12X4_422_UNORM_4PACK16",
-        "G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16",
-        "G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16",
-        "G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16",
-        "G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16",
-        "G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16",
-        "G16B16G16R16_422_UNORM",
-        "B16G16R16G16_422_UNORM",
-        "G16_B16_R16_3PLANE_420_UNORM",
-        "G16_B16R16_2PLANE_420_UNORM",
-        "G16_B16_R16_3PLANE_422_UNORM",
-        "G16_B16R16_2PLANE_422_UNORM",
-        "G16_B16_R16_3PLANE_444_UNORM",
-        "G8_B8R8_2PLANE_444_UNORM",
-        "G10X6_B10X6R10X6_2PLANE_444_UNORM_3PACK16",
-        "G12X4_B12X4R12X4_2PLANE_444_UNORM_3PACK16",
-        "G16_B16R16_2PLANE_444_UNORM",
-        "A4R4G4B4_UNORM_PACK16",
-        "A4B4G4R4_UNORM_PACK16",
-        "ASTC_4x4_SFLOAT_BLOCK",
-        "ASTC_5x4_SFLOAT_BLOCK",
-        "ASTC_5x5_SFLOAT_BLOCK",
-        "ASTC_6x5_SFLOAT_BLOCK",
-        "ASTC_6x6_SFLOAT_BLOCK",
-        "ASTC_8x5_SFLOAT_BLOCK",
-        "ASTC_8x6_SFLOAT_BLOCK",
-        "ASTC_8x8_SFLOAT_BLOCK",
-        "ASTC_10x5_SFLOAT_BLOCK",
-        "ASTC_10x6_SFLOAT_BLOCK",
-        "ASTC_10x8_SFLOAT_BLOCK",
-        "ASTC_10x10_SFLOAT_BLOCK",
-        "ASTC_12x10_SFLOAT_BLOCK",
-        "ASTC_12x12_SFLOAT_BLOCK",
-        "PVRTC1_2BPP_UNORM_BLOCK_IMG",
-        "PVRTC1_4BPP_UNORM_BLOCK_IMG",
-        "PVRTC2_2BPP_UNORM_BLOCK_IMG",
-        "PVRTC2_4BPP_UNORM_BLOCK_IMG",
-        "PVRTC1_2BPP_SRGB_BLOCK_IMG",
-        "PVRTC1_4BPP_SRGB_BLOCK_IMG",
-        "PVRTC2_2BPP_SRGB_BLOCK_IMG",
-        "PVRTC2_4BPP_SRGB_BLOCK_IMG",
-        "R16G16_S10_5_NV"
+    static EnumStrMap<Format> Format_strmap{
+        { Format::Undefined, "Undefined" },
+        { Format::R4G4_UNORM_PACK8, "R4G4_UNORM_PACK8" },
+        { Format::R4G4B4A4_UNORM_PACK16, "R4G4B4A4_UNORM_PACK16" },
+        { Format::B4G4R4A4_UNORM_PACK16, "B4G4R4A4_UNORM_PACK16" },
+        { Format::R5G6B5_UNORM_PACK16, "R5G6B5_UNORM_PACK16" },
+        { Format::B5G6R5_UNORM_PACK16, "B5G6R5_UNORM_PACK16" },
+        { Format::R5G5B5A1_UNORM_PACK16, "R5G5B5A1_UNORM_PACK16" },
+        { Format::B5G5R5A1_UNORM_PACK16, "B5G5R5A1_UNORM_PACK16" },
+        { Format::A1R5G5B5_UNORM_PACK16, "A1R5G5B5_UNORM_PACK16" },
+        { Format::R8_UNORM, "R8_UNORM" },
+        { Format::R8_SNORM, "R8_SNORM" },
+        { Format::R8_USCALED, "R8_USCALED" },
+        { Format::R8_SSCALED, "R8_SSCALED" },
+        { Format::R8_UINT, "R8_UINT" },
+        { Format::R8_SINT, "R8_SINT" },
+        { Format::R8_SRGB, "R8_SRGB" },
+        { Format::R8G8_UNORM, "R8G8_UNORM" },
+        { Format::R8G8_SNORM, "R8G8_SNORM" },
+        { Format::R8G8_USCALED, "R8G8_USCALED" },
+        { Format::R8G8_SSCALED, "R8G8_SSCALED" },
+        { Format::R8G8_UINT, "R8G8_UINT" },
+        { Format::R8G8_SINT, "R8G8_SINT" },
+        { Format::R8G8_SRGB, "R8G8_SRGB" },
+        { Format::R8G8B8_UNORM, "R8G8B8_UNORM" },
+        { Format::R8G8B8_SNORM, "R8G8B8_SNORM" },
+        { Format::R8G8B8_USCALED, "R8G8B8_USCALED" },
+        { Format::R8G8B8_SSCALED, "R8G8B8_SSCALED" },
+        { Format::R8G8B8_UINT, "R8G8B8_UINT" },
+        { Format::R8G8B8_SINT, "R8G8B8_SINT" },
+        { Format::R8G8B8_SRGB, "R8G8B8_SRGB" },
+        { Format::B8G8R8_UNORM, "B8G8R8_UNORM" },
+        { Format::B8G8R8_SNORM, "B8G8R8_SNORM" },
+        { Format::B8G8R8_USCALED, "B8G8R8_USCALED" },
+        { Format::B8G8R8_SSCALED, "B8G8R8_SSCALED" },
+        { Format::B8G8R8_UINT, "B8G8R8_UINT" },
+        { Format::B8G8R8_SINT, "B8G8R8_SINT" },
+        { Format::B8G8R8_SRGB, "B8G8R8_SRGB" },
+        { Format::R8G8B8A8_UNORM, "R8G8B8A8_UNORM" },
+        { Format::R8G8B8A8_SNORM, "R8G8B8A8_SNORM" },
+        { Format::R8G8B8A8_USCALED, "R8G8B8A8_USCALED" },
+        { Format::R8G8B8A8_SSCALED, "R8G8B8A8_SSCALED" },
+        { Format::R8G8B8A8_UINT, "R8G8B8A8_UINT" },
+        { Format::R8G8B8A8_SINT, "R8G8B8A8_SINT" },
+        { Format::R8G8B8A8_SRGB, "R8G8B8A8_SRGB" },
+        { Format::B8G8R8A8_UNORM, "B8G8R8A8_UNORM" },
+        { Format::B8G8R8A8_SNORM, "B8G8R8A8_SNORM" },
+        { Format::B8G8R8A8_USCALED, "B8G8R8A8_USCALED" },
+        { Format::B8G8R8A8_SSCALED, "B8G8R8A8_SSCALED" },
+        { Format::B8G8R8A8_UINT, "B8G8R8A8_UINT" },
+        { Format::B8G8R8A8_SINT, "B8G8R8A8_SINT" },
+        { Format::B8G8R8A8_SRGB, "B8G8R8A8_SRGB" },
+        { Format::A8B8G8R8_UNORM_PACK32, "A8B8G8R8_UNORM_PACK32" },
+        { Format::A8B8G8R8_SNORM_PACK32, "A8B8G8R8_SNORM_PACK32" },
+        { Format::A8B8G8R8_USCALED_PACK32, "A8B8G8R8_USCALED_PACK32" },
+        { Format::A8B8G8R8_SSCALED_PACK32, "A8B8G8R8_SSCALED_PACK32" },
+        { Format::A8B8G8R8_UINT_PACK32, "A8B8G8R8_UINT_PACK32" },
+        { Format::A8B8G8R8_SINT_PACK32, "A8B8G8R8_SINT_PACK32" },
+        { Format::A8B8G8R8_SRGB_PACK32, "A8B8G8R8_SRGB_PACK32" },
+        { Format::A2R10G10B10_UNORM_PACK32, "A2R10G10B10_UNORM_PACK32" },
+        { Format::A2R10G10B10_SNORM_PACK32, "A2R10G10B10_SNORM_PACK32" },
+        { Format::A2R10G10B10_USCALED_PACK32, "A2R10G10B10_USCALED_PACK32" },
+        { Format::A2R10G10B10_SSCALED_PACK32, "A2R10G10B10_SSCALED_PACK32" },
+        { Format::A2R10G10B10_UINT_PACK32, "A2R10G10B10_UINT_PACK32" },
+        { Format::A2R10G10B10_SINT_PACK32, "A2R10G10B10_SINT_PACK32" },
+        { Format::A2B10G10R10_UNORM_PACK32, "A2B10G10R10_UNORM_PACK32" },
+        { Format::A2B10G10R10_SNORM_PACK32, "A2B10G10R10_SNORM_PACK32" },
+        { Format::A2B10G10R10_USCALED_PACK32, "A2B10G10R10_USCALED_PACK32" },
+        { Format::A2B10G10R10_SSCALED_PACK32, "A2B10G10R10_SSCALED_PACK32" },
+        { Format::A2B10G10R10_UINT_PACK32, "A2B10G10R10_UINT_PACK32" },
+        { Format::A2B10G10R10_SINT_PACK32, "A2B10G10R10_SINT_PACK32" },
+        { Format::R16_UNORM, "R16_UNORM" },
+        { Format::R16_SNORM, "R16_SNORM" },
+        { Format::R16_USCALED, "R16_USCALED" },
+        { Format::R16_SSCALED, "R16_SSCALED" },
+        { Format::R16_UINT, "R16_UINT" },
+        { Format::R16_SINT, "R16_SINT" },
+        { Format::R16_SFLOAT, "R16_SFLOAT" },
+        { Format::R16G16_UNORM, "R16G16_UNORM" },
+        { Format::R16G16_SNORM, "R16G16_SNORM" },
+        { Format::R16G16_USCALED, "R16G16_USCALED" },
+        { Format::R16G16_SSCALED, "R16G16_SSCALED" },
+        { Format::R16G16_UINT, "R16G16_UINT" },
+        { Format::R16G16_SINT, "R16G16_SINT" },
+        { Format::R16G16_SFLOAT, "R16G16_SFLOAT" },
+        { Format::R16G16B16_UNORM, "R16G16B16_UNORM" },
+        { Format::R16G16B16_SNORM, "R16G16B16_SNORM" },
+        { Format::R16G16B16_USCALED, "R16G16B16_USCALED" },
+        { Format::R16G16B16_SSCALED, "R16G16B16_SSCALED" },
+        { Format::R16G16B16_UINT, "R16G16B16_UINT" },
+        { Format::R16G16B16_SINT, "R16G16B16_SINT" },
+        { Format::R16G16B16_SFLOAT, "R16G16B16_SFLOAT" },
+        { Format::R16G16B16A16_UNORM, "R16G16B16A16_UNORM" },
+        { Format::R16G16B16A16_SNORM, "R16G16B16A16_SNORM" },
+        { Format::R16G16B16A16_USCALED, "R16G16B16A16_USCALED" },
+        { Format::R16G16B16A16_SSCALED, "R16G16B16A16_SSCALED" },
+        { Format::R16G16B16A16_UINT, "R16G16B16A16_UINT" },
+        { Format::R16G16B16A16_SINT, "R16G16B16A16_SINT" },
+        { Format::R16G16B16A16_SFLOAT, "R16G16B16A16_SFLOAT" },
+        { Format::R32_UINT, "R32_UINT" },
+        { Format::R32_SINT, "R32_SINT" },
+        { Format::R32_SFLOAT, "R32_SFLOAT" },
+        { Format::R32G32_UINT, "R32G32_UINT" },
+        { Format::R32G32_SINT, "R32G32_SINT" },
+        { Format::R32G32_SFLOAT, "R32G32_SFLOAT" },
+        { Format::R32G32B32_UINT, "R32G32B32_UINT" },
+        { Format::R32G32B32_SINT, "R32G32B32_SINT" },
+        { Format::R32G32B32_SFLOAT, "R32G32B32_SFLOAT" },
+        { Format::R32G32B32A32_UINT, "R32G32B32A32_UINT" },
+        { Format::R32G32B32A32_SINT, "R32G32B32A32_SINT" },
+        { Format::R32G32B32A32_SFLOAT, "R32G32B32A32_SFLOAT" },
+        { Format::R64_UINT, "R64_UINT" },
+        { Format::R64_SINT, "R64_SINT" },
+        { Format::R64_SFLOAT, "R64_SFLOAT" },
+        { Format::R64G64_UINT, "R64G64_UINT" },
+        { Format::R64G64_SINT, "R64G64_SINT" },
+        { Format::R64G64_SFLOAT, "R64G64_SFLOAT" },
+        { Format::R64G64B64_UINT, "R64G64B64_UINT" },
+        { Format::R64G64B64_SINT, "R64G64B64_SINT" },
+        { Format::R64G64B64_SFLOAT, "R64G64B64_SFLOAT" },
+        { Format::R64G64B64A64_UINT, "R64G64B64A64_UINT" },
+        { Format::R64G64B64A64_SINT, "R64G64B64A64_SINT" },
+        { Format::R64G64B64A64_SFLOAT, "R64G64B64A64_SFLOAT" },
+        { Format::B10G11R11_UFLOAT_PACK32, "B10G11R11_UFLOAT_PACK32" },
+        { Format::E5B9G9R9_UFLOAT_PACK32, "E5B9G9R9_UFLOAT_PACK32" },
+        { Format::D16_UNORM, "D16_UNORM" },
+        { Format::X8_D24_UNORM_PACK32, "X8_D24_UNORM_PACK32" },
+        { Format::D32_SFLOAT, "D32_SFLOAT" },
+        { Format::S8_UINT, "S8_UINT" },
+        { Format::D16_UNORM_S8_UINT, "D16_UNORM_S8_UINT" },
+        { Format::D24_UNORM_S8_UINT, "D24_UNORM_S8_UINT" },
+        { Format::D32_SFLOAT_S8_UINT, "D32_SFLOAT_S8_UINT" },
+        { Format::BC1_RGB_UNORM_BLOCK, "BC1_RGB_UNORM_BLOCK" },
+        { Format::BC1_RGB_SRGB_BLOCK, "BC1_RGB_SRGB_BLOCK" },
+        { Format::BC1_RGBA_UNORM_BLOCK, "BC1_RGBA_UNORM_BLOCK" },
+        { Format::BC1_RGBA_SRGB_BLOCK, "BC1_RGBA_SRGB_BLOCK" },
+        { Format::BC2_UNORM_BLOCK, "BC2_UNORM_BLOCK" },
+        { Format::BC2_SRGB_BLOCK, "BC2_SRGB_BLOCK" },
+        { Format::BC3_UNORM_BLOCK, "BC3_UNORM_BLOCK" },
+        { Format::BC3_SRGB_BLOCK, "BC3_SRGB_BLOCK" },
+        { Format::BC4_UNORM_BLOCK, "BC4_UNORM_BLOCK" },
+        { Format::BC4_SNORM_BLOCK, "BC4_SNORM_BLOCK" },
+        { Format::BC5_UNORM_BLOCK, "BC5_UNORM_BLOCK" },
+        { Format::BC5_SNORM_BLOCK, "BC5_SNORM_BLOCK" },
+        { Format::BC6H_UFLOAT_BLOCK, "BC6H_UFLOAT_BLOCK" },
+        { Format::BC6H_SFLOAT_BLOCK, "BC6H_SFLOAT_BLOCK" },
+        { Format::BC7_UNORM_BLOCK, "BC7_UNORM_BLOCK" },
+        { Format::BC7_SRGB_BLOCK, "BC7_SRGB_BLOCK" },
+        { Format::ETC2_R8G8B8_UNORM_BLOCK, "ETC2_R8G8B8_UNORM_BLOCK" },
+        { Format::ETC2_R8G8B8_SRGB_BLOCK, "ETC2_R8G8B8_SRGB_BLOCK" },
+        { Format::ETC2_R8G8B8A1_UNORM_BLOCK, "ETC2_R8G8B8A1_UNORM_BLOCK" },
+        { Format::ETC2_R8G8B8A1_SRGB_BLOCK, "ETC2_R8G8B8A1_SRGB_BLOCK" },
+        { Format::ETC2_R8G8B8A8_UNORM_BLOCK, "ETC2_R8G8B8A8_UNORM_BLOCK" },
+        { Format::ETC2_R8G8B8A8_SRGB_BLOCK, "ETC2_R8G8B8A8_SRGB_BLOCK" },
+        { Format::EAC_R11_UNORM_BLOCK, "EAC_R11_UNORM_BLOCK" },
+        { Format::EAC_R11_SNORM_BLOCK, "EAC_R11_SNORM_BLOCK" },
+        { Format::EAC_R11G11_UNORM_BLOCK, "EAC_R11G11_UNORM_BLOCK" },
+        { Format::EAC_R11G11_SNORM_BLOCK, "EAC_R11G11_SNORM_BLOCK" },
+        { Format::ASTC_4x4_UNORM_BLOCK, "ASTC_4x4_UNORM_BLOCK" },
+        { Format::ASTC_4x4_SRGB_BLOCK, "ASTC_4x4_SRGB_BLOCK" },
+        { Format::ASTC_5x4_UNORM_BLOCK, "ASTC_5x4_UNORM_BLOCK" },
+        { Format::ASTC_5x4_SRGB_BLOCK, "ASTC_5x4_SRGB_BLOCK" },
+        { Format::ASTC_5x5_UNORM_BLOCK, "ASTC_5x5_UNORM_BLOCK" },
+        { Format::ASTC_5x5_SRGB_BLOCK, "ASTC_5x5_SRGB_BLOCK" },
+        { Format::ASTC_6x5_UNORM_BLOCK, "ASTC_6x5_UNORM_BLOCK" },
+        { Format::ASTC_6x5_SRGB_BLOCK, "ASTC_6x5_SRGB_BLOCK" },
+        { Format::ASTC_6x6_UNORM_BLOCK, "ASTC_6x6_UNORM_BLOCK" },
+        { Format::ASTC_6x6_SRGB_BLOCK, "ASTC_6x6_SRGB_BLOCK" },
+        { Format::ASTC_8x5_UNORM_BLOCK, "ASTC_8x5_UNORM_BLOCK" },
+        { Format::ASTC_8x5_SRGB_BLOCK, "ASTC_8x5_SRGB_BLOCK" },
+        { Format::ASTC_8x6_UNORM_BLOCK, "ASTC_8x6_UNORM_BLOCK" },
+        { Format::ASTC_8x6_SRGB_BLOCK, "ASTC_8x6_SRGB_BLOCK" },
+        { Format::ASTC_8x8_UNORM_BLOCK, "ASTC_8x8_UNORM_BLOCK" },
+        { Format::ASTC_8x8_SRGB_BLOCK, "ASTC_8x8_SRGB_BLOCK" },
+        { Format::ASTC_10x5_UNORM_BLOCK, "ASTC_10x5_UNORM_BLOCK" },
+        { Format::ASTC_10x5_SRGB_BLOCK, "ASTC_10x5_SRGB_BLOCK" },
+        { Format::ASTC_10x6_UNORM_BLOCK, "ASTC_10x6_UNORM_BLOCK" },
+        { Format::ASTC_10x6_SRGB_BLOCK, "ASTC_10x6_SRGB_BLOCK" },
+        { Format::ASTC_10x8_UNORM_BLOCK, "ASTC_10x8_UNORM_BLOCK" },
+        { Format::ASTC_10x8_SRGB_BLOCK, "ASTC_10x8_SRGB_BLOCK" },
+        { Format::ASTC_10x10_UNORM_BLOCK, "ASTC_10x10_UNORM_BLOCK" },
+        { Format::ASTC_10x10_SRGB_BLOCK, "ASTC_10x10_SRGB_BLOCK" },
+        { Format::ASTC_12x10_UNORM_BLOCK, "ASTC_12x10_UNORM_BLOCK" },
+        { Format::ASTC_12x10_SRGB_BLOCK, "ASTC_12x10_SRGB_BLOCK" },
+        { Format::ASTC_12x12_UNORM_BLOCK, "ASTC_12x12_UNORM_BLOCK" },
+        { Format::ASTC_12x12_SRGB_BLOCK, "ASTC_12x12_SRGB_BLOCK" },
+        { Format::G8B8G8R8_422_UNORM, "G8B8G8R8_422_UNORM" },
+        { Format::B8G8R8G8_422_UNORM, "B8G8R8G8_422_UNORM" },
+        { Format::G8_B8_R8_3PLANE_420_UNORM, "G8_B8_R8_3PLANE_420_UNORM" },
+        { Format::G8_B8R8_2PLANE_420_UNORM, "G8_B8R8_2PLANE_420_UNORM" },
+        { Format::G8_B8_R8_3PLANE_422_UNORM, "G8_B8_R8_3PLANE_422_UNORM" },
+        { Format::G8_B8R8_2PLANE_422_UNORM, "G8_B8R8_2PLANE_422_UNORM" },
+        { Format::G8_B8_R8_3PLANE_444_UNORM, "G8_B8_R8_3PLANE_444_UNORM" },
+        { Format::R10X6_UNORM_PACK16, "R10X6_UNORM_PACK16" },
+        { Format::R10X6G10X6_UNORM_2PACK16, "R10X6G10X6_UNORM_2PACK16" },
+        {
+            Format::R10X6G10X6B10X6A10X6_UNORM_4PACK16,
+            "R10X6G10X6B10X6A10X6_UNORM_4PACK16"
+        },
+        {
+            Format::G10X6B10X6G10X6R10X6_422_UNORM_4PACK16,
+            "G10X6B10X6G10X6R10X6_422_UNORM_4PACK16"
+        },
+        {
+            Format::B10X6G10X6R10X6G10X6_422_UNORM_4PACK16,
+            "B10X6G10X6R10X6G10X6_422_UNORM_4PACK16"
+        },
+        {
+            Format::G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16,
+            "G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16"
+        },
+        {
+            Format::G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16,
+            "G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16"
+        },
+        {
+            Format::G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16,
+            "G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16"
+        },
+        {
+            Format::G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16,
+            "G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16"
+        },
+        {
+            Format::G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16,
+            "G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16"
+        },
+        { Format::R12X4_UNORM_PACK16, "R12X4_UNORM_PACK16" },
+        { Format::R12X4G12X4_UNORM_2PACK16, "R12X4G12X4_UNORM_2PACK16" },
+        {
+            Format::R12X4G12X4B12X4A12X4_UNORM_4PACK16,
+            "R12X4G12X4B12X4A12X4_UNORM_4PACK16"
+        },
+        {
+            Format::G12X4B12X4G12X4R12X4_422_UNORM_4PACK16,
+            "G12X4B12X4G12X4R12X4_422_UNORM_4PACK16"
+        },
+        {
+            Format::B12X4G12X4R12X4G12X4_422_UNORM_4PACK16,
+            "B12X4G12X4R12X4G12X4_422_UNORM_4PACK16"
+        },
+        {
+            Format::G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16,
+            "G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16"
+        },
+        {
+            Format::G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16,
+            "G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16"
+        },
+        {
+            Format::G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16,
+            "G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16"
+        },
+        {
+            Format::G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16,
+            "G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16"
+        },
+        {
+            Format::G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16,
+            "G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16"
+        },
+        { Format::G16B16G16R16_422_UNORM, "G16B16G16R16_422_UNORM" },
+        { Format::B16G16R16G16_422_UNORM, "B16G16R16G16_422_UNORM" },
+        { Format::G16_B16_R16_3PLANE_420_UNORM, "G16_B16_R16_3PLANE_420_UNORM" },
+        { Format::G16_B16R16_2PLANE_420_UNORM, "G16_B16R16_2PLANE_420_UNORM" },
+        { Format::G16_B16_R16_3PLANE_422_UNORM, "G16_B16_R16_3PLANE_422_UNORM" },
+        { Format::G16_B16R16_2PLANE_422_UNORM, "G16_B16R16_2PLANE_422_UNORM" },
+        { Format::G16_B16_R16_3PLANE_444_UNORM, "G16_B16_R16_3PLANE_444_UNORM" },
+        { Format::G8_B8R8_2PLANE_444_UNORM, "G8_B8R8_2PLANE_444_UNORM" },
+        {
+            Format::G10X6_B10X6R10X6_2PLANE_444_UNORM_3PACK16,
+            "G10X6_B10X6R10X6_2PLANE_444_UNORM_3PACK16"
+        },
+        {
+            Format::G12X4_B12X4R12X4_2PLANE_444_UNORM_3PACK16,
+            "G12X4_B12X4R12X4_2PLANE_444_UNORM_3PACK16"
+        },
+        { Format::G16_B16R16_2PLANE_444_UNORM, "G16_B16R16_2PLANE_444_UNORM" },
+        { Format::A4R4G4B4_UNORM_PACK16, "A4R4G4B4_UNORM_PACK16" },
+        { Format::A4B4G4R4_UNORM_PACK16, "A4B4G4R4_UNORM_PACK16" },
+        { Format::ASTC_4x4_SFLOAT_BLOCK, "ASTC_4x4_SFLOAT_BLOCK" },
+        { Format::ASTC_5x4_SFLOAT_BLOCK, "ASTC_5x4_SFLOAT_BLOCK" },
+        { Format::ASTC_5x5_SFLOAT_BLOCK, "ASTC_5x5_SFLOAT_BLOCK" },
+        { Format::ASTC_6x5_SFLOAT_BLOCK, "ASTC_6x5_SFLOAT_BLOCK" },
+        { Format::ASTC_6x6_SFLOAT_BLOCK, "ASTC_6x6_SFLOAT_BLOCK" },
+        { Format::ASTC_8x5_SFLOAT_BLOCK, "ASTC_8x5_SFLOAT_BLOCK" },
+        { Format::ASTC_8x6_SFLOAT_BLOCK, "ASTC_8x6_SFLOAT_BLOCK" },
+        { Format::ASTC_8x8_SFLOAT_BLOCK, "ASTC_8x8_SFLOAT_BLOCK" },
+        { Format::ASTC_10x5_SFLOAT_BLOCK, "ASTC_10x5_SFLOAT_BLOCK" },
+        { Format::ASTC_10x6_SFLOAT_BLOCK, "ASTC_10x6_SFLOAT_BLOCK" },
+        { Format::ASTC_10x8_SFLOAT_BLOCK, "ASTC_10x8_SFLOAT_BLOCK" },
+        { Format::ASTC_10x10_SFLOAT_BLOCK, "ASTC_10x10_SFLOAT_BLOCK" },
+        { Format::ASTC_12x10_SFLOAT_BLOCK, "ASTC_12x10_SFLOAT_BLOCK" },
+        { Format::ASTC_12x12_SFLOAT_BLOCK, "ASTC_12x12_SFLOAT_BLOCK" },
+        { Format::PVRTC1_2BPP_UNORM_BLOCK_IMG, "PVRTC1_2BPP_UNORM_BLOCK_IMG" },
+        { Format::PVRTC1_4BPP_UNORM_BLOCK_IMG, "PVRTC1_4BPP_UNORM_BLOCK_IMG" },
+        { Format::PVRTC2_2BPP_UNORM_BLOCK_IMG, "PVRTC2_2BPP_UNORM_BLOCK_IMG" },
+        { Format::PVRTC2_4BPP_UNORM_BLOCK_IMG, "PVRTC2_4BPP_UNORM_BLOCK_IMG" },
+        { Format::PVRTC1_2BPP_SRGB_BLOCK_IMG, "PVRTC1_2BPP_SRGB_BLOCK_IMG" },
+        { Format::PVRTC1_4BPP_SRGB_BLOCK_IMG, "PVRTC1_4BPP_SRGB_BLOCK_IMG" },
+        { Format::PVRTC2_2BPP_SRGB_BLOCK_IMG, "PVRTC2_2BPP_SRGB_BLOCK_IMG" },
+        { Format::PVRTC2_4BPP_SRGB_BLOCK_IMG, "PVRTC2_4BPP_SRGB_BLOCK_IMG" },
+        { Format::R16G16_SFIXED5_NV, "R16G16_SFIXED5_NV" },
+        { Format::A1B5G5R5_UNORM_PACK16_KHR, "A1B5G5R5_UNORM_PACK16_KHR" },
+        { Format::A8_UNORM_KHR, "A8_UNORM_KHR" }
     };
 
-    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(Format);
-
-    Format Format_from_vk(VkFormat vk_format);
-    VkFormat Format_to_vk(Format format);
-
+    // provided by VK_KHR_surface
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkColorSpaceKHR.html
-    enum class ColorSpace : uint8_t
+    enum class ColorSpace : int32_t
     {
-        SrgbNonlinear,
-        DisplayP3Nonlinear,
-        ExtendedSrgbLinear,
-        DisplayP3Linear,
-        DciP3Nonlinear,
-        Bt709Linear,
-        Bt709Nonlinear,
-        Bt2020Linear,
-        Hdr10St2084,
-        DolbyVision,
-        Hdr10Hlg,
-        AdobeRgbLinear,
-        AdobeRgbNonlinear,
-        PassThrough,
-        ExtendedSrgbNonlinear,
-        DisplayNativeAmd,
-        _
+        SrgbNonlinearKhr = 0,
+
+        // provided by VK_EXT_swapchain_colorspace
+        DisplayP3NonlinearExt = 1000104001,
+
+        // provided by VK_EXT_swapchain_colorspace
+        ExtendedSrgbLinearExt = 1000104002,
+
+        // provided by VK_EXT_swapchain_colorspace
+        DisplayP3LinearExt = 1000104003,
+
+        // provided by VK_EXT_swapchain_colorspace
+        DciP3NonlinearExt = 1000104004,
+
+        // provided by VK_EXT_swapchain_colorspace
+        Bt709LinearExt = 1000104005,
+
+        // provided by VK_EXT_swapchain_colorspace
+        Bt709NonlinearExt = 1000104006,
+
+        // provided by VK_EXT_swapchain_colorspace
+        Bt2020LinearExt = 1000104007,
+
+        // provided by VK_EXT_swapchain_colorspace
+        Hdr10St2084Ext = 1000104008,
+
+        // provided by VK_EXT_swapchain_colorspace
+        DolbyVisionExt = 1000104009,
+
+        // provided by VK_EXT_swapchain_colorspace
+        Hdr10HlgExt = 1000104010,
+
+        // provided by VK_EXT_swapchain_colorspace
+        AdobeRgbLinearExt = 1000104011,
+
+        // provided by VK_EXT_swapchain_colorspace
+        AdobeRgbNonlinearExt = 1000104012,
+
+        // provided by VK_EXT_swapchain_colorspace
+        PassThroughExt = 1000104013,
+
+        // provided by VK_EXT_swapchain_colorspace
+        ExtendedSrgbNonlinearExt = 1000104014,
+
+        // provided by VK_AMD_display_native_hdr
+        DisplayNativeAmd = 1000213000,
+
+        // VK_COLORSPACE_SRGB_NONLINEAR_KHR is a deprecated alias
+        RgbNonlinearKhr = SrgbNonlinearKhr,
+
+        // provided by VK_EXT_swapchain_colorspace
+        // VK_COLOR_SPACE_DCI_P3_LINEAR_EXT is a deprecated alias
+        DciP3LinearExt = DisplayP3LinearExt
     };
 
-    static constexpr const char* ColorSpace_string[]
-    {
-        "sRGB Nonlinear",
-        "Display P3 Nonlinear",
-        "Extended sRGB Linear",
-        "Display P3 Linear",
-        "DCI-P3 Nonlinear",
-        "BT.709 Linear",
-        "BT.709 Nonlinear",
-        "BT.2020 Linear",
-        "HDR10 ST.2084",
-        "Dolby Vision",
-        "HDR10 HLG",
-        "Adobe RGB Linear",
-        "Adobe RGB Nonlinear",
-        "Pass Through",
-        "Extended sRGB Nonlinear",
-        "Display Native AMD"
+    static EnumStrMap<ColorSpace> ColorSpace_strmap{
+        { ColorSpace::SrgbNonlinearKhr, "sRGB Nonlinear KHR" },
+        { ColorSpace::DisplayP3NonlinearExt, "Display P3 Nonlinear EXT" },
+        { ColorSpace::ExtendedSrgbLinearExt, "Extended sRGB Linear EXT" },
+        { ColorSpace::DisplayP3LinearExt, "Display P3 Linear EXT" },
+        { ColorSpace::DciP3NonlinearExt, "DCI-P3 Nonlinear EXT" },
+        { ColorSpace::Bt709LinearExt, "BT.709 Linear EXT" },
+        { ColorSpace::Bt709NonlinearExt, "BT.709 Nonlinear EXT" },
+        { ColorSpace::Bt2020LinearExt, "BT.2020 Linear EXT" },
+        { ColorSpace::Hdr10St2084Ext, "HDR10 ST.2084 EXT" },
+        { ColorSpace::DolbyVisionExt, "DolbyVision EXT" },
+        { ColorSpace::Hdr10HlgExt, "HDR10 HLG EXT" },
+        { ColorSpace::AdobeRgbLinearExt, "Adobe RGB Linear EXT" },
+        { ColorSpace::AdobeRgbNonlinearExt, "Adobe RGB Nonlinear EXT" },
+        { ColorSpace::PassThroughExt, "Pass Through EXT" },
+        { ColorSpace::ExtendedSrgbNonlinearExt, "Extended sRGB Nonlinear EXT" },
+        { ColorSpace::DisplayNativeAmd, "Display Native AMD" }
     };
 
-    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(ColorSpace);
-
-    ColorSpace ColorSpace_from_vk(VkColorSpaceKHR vk_space);
-    VkColorSpaceKHR ColorSpace_to_vk(ColorSpace space);
-
+    // provided by VK_KHR_surface
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceFormatKHR.html
     struct SurfaceFormat
     {
@@ -1622,33 +2044,35 @@ namespace bv
         const VkSurfaceFormatKHR& vk_surface_format
     );
 
+    // provided by VK_KHR_surface
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentModeKHR.html
-    enum class PresentMode : uint8_t
+    enum class PresentMode : int32_t
     {
-        Immediate,
-        Mailbox,
-        Fifo,
-        FifoRelaxed,
-        SharedDemandRefresh,
-        SharedContinuousRefresh,
-        _
+        ImmediateKhr = 0,
+        MailboxKhr = 1,
+        FifoKhr = 2,
+        FifoRelaxedKhr = 3,
+
+        // provided by VK_KHR_shared_presentable_image
+        SharedDemandRefreshKhr = 1000111000,
+
+        // provided by VK_KHR_shared_presentable_image
+        SharedContinuousRefreshKhr = 1000111001
     };
 
-    static constexpr const char* PresentMode_string[]
-    {
-        "Immediate",
-        "Mailbox",
-        "FIFO",
-        "FIFO Relaxed",
-        "Shared Demand Refresh",
-        "Shared Continuous Refresh"
+    static EnumStrMap<PresentMode> PresentMode_strmap{
+        { PresentMode::ImmediateKhr, "Immediate KHR" },
+        { PresentMode::MailboxKhr, "Mailbox KHR" },
+        { PresentMode::FifoKhr, "FIFO KHR" },
+        { PresentMode::FifoRelaxedKhr, "FIFO Relaxed KHR" },
+        { PresentMode::SharedDemandRefreshKhr, "Shared Demand Refresh KHR" },
+        {
+            PresentMode::SharedContinuousRefreshKhr,
+            "Shared Continuous Refresh KHR"
+        }
     };
 
-    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(PresentMode);
-
-    PresentMode PresentMode_from_vk(VkPresentModeKHR vk_mode);
-    VkPresentModeKHR PresentMode_to_vk(PresentMode mode);
-
+    // provided by VK_KHR_surface
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceCapabilitiesKHR.html
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceFormatsKHR.html
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfacePresentModesKHR.html
@@ -1683,6 +2107,7 @@ namespace bv
         std::vector<std::string> extensions;
     };
 
+    // provided by VK_EXT_debug_utils
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsLabelEXT.html
     struct DebugLabel
     {
@@ -1692,6 +2117,7 @@ namespace bv
 
     DebugLabel DebugLabel_from_vk(const VkDebugUtilsLabelEXT& vk_label);
 
+    // provided by VK_EXT_debug_utils
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsObjectNameInfoEXT.html
     struct DebugObjectInfo
     {
@@ -1704,6 +2130,7 @@ namespace bv
         const VkDebugUtilsObjectNameInfoEXT& vk_info
     );
 
+    // provided by VK_EXT_debug_utils
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessengerCallbackDataEXT.html
     struct DebugMessageData
     {
@@ -1719,6 +2146,7 @@ namespace bv
         const VkDebugUtilsMessengerCallbackDataEXT& vk_data
     );
 
+    // provided by VK_EXT_debug_utils
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/PFN_vkDebugUtilsMessengerCallbackEXT.html
     using DebugCallback = std::function<void(
         DebugMessageSeverity,
@@ -1736,7 +2164,8 @@ namespace bv
     };
 
     VkDeviceQueueCreateInfo QueueRequest_to_vk(
-        const QueueRequest& request
+        const QueueRequest& request,
+        std::vector<float>& waste_priorities
     );
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceCreateInfo.html
@@ -1747,6 +2176,7 @@ namespace bv
         PhysicalDeviceFeatures enabled_features;
     };
 
+    // provided by VK_KHR_swapchain
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSwapchainCreateFlagBitsKHR.html
     struct SwapchainFlags
     {
@@ -1756,25 +2186,19 @@ namespace bv
         bool deferred_memory_allocation : 1 = false;
     };
 
-    VkSwapchainCreateFlagsKHR SwapchainFlags_to_vk(const SwapchainFlags& flags);
-
-    enum class SharingMode : uint8_t
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSharingMode.html
+    enum class SharingMode : int32_t
     {
-        Exclusive,
-        Concurrent,
-        _
+        Exclusive = 0,
+        Concurrent = 1
     };
 
-    static constexpr const char* SharingMode_string[]
-    {
-        "Exclusive",
-        "Concurrent"
+    static EnumStrMap<SharingMode> SharingMode_strmap{
+        { SharingMode::Exclusive, "Exclusive" },
+        { SharingMode::Concurrent, "Concurrent" }
     };
 
-    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(SharingMode);
-
-    VkSharingMode SharingMode_to_vk(SharingMode mode);
-
+    // provided by VK_KHR_swapchain
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSwapchainCreateInfoKHR.html
     struct SwapchainConfig
     {
@@ -1801,63 +2225,49 @@ namespace bv
         bool fragment_density_map_deferred : 1 = false;
     };
 
-    VkImageViewCreateFlags ImageViewFlags_to_vk(const ImageViewFlags& flags);
-
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageViewType.html
-    enum class ImageViewType : uint8_t
+    enum class ImageViewType : int32_t
     {
-        _1d,
-        _2d,
-        _3d,
-        Cube,
-        _1dArray,
-        _2dArray,
-        CubeArray,
-        _
+        _1d = 0,
+        _2d = 1,
+        _3d = 2,
+        Cube = 3,
+        _1dArray = 4,
+        _2dArray = 5,
+        CubeArray = 6
     };
 
-    static constexpr const char* ImageViewType_string[]
-    {
-        "1D",
-        "2D",
-        "3D",
-        "Cube",
-        "1D Array",
-        "2D Array",
-        "Cube Array"
+    static EnumStrMap<ImageViewType> ImageViewType_strmap{
+        { ImageViewType::_1d, "1D" },
+        { ImageViewType::_2d, "2D" },
+        { ImageViewType::_3d, "3D" },
+        { ImageViewType::Cube, "Cube" },
+        { ImageViewType::_1dArray, "1D Array" },
+        { ImageViewType::_2dArray, "2D Array" },
+        { ImageViewType::CubeArray, "Cube Array" }
     };
-
-    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(ImageViewType);
-
-    VkImageViewType ImageViewType_to_vk(ImageViewType type);
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkComponentSwizzle.html
-    enum class ComponentSwizzle : uint8_t
+    enum class ComponentSwizzle : int32_t
     {
-        Identity,
-        Zero,
-        One,
-        R,
-        G,
-        B,
-        A,
-        _
+        Identity = 0,
+        Zero = 1,
+        One = 2,
+        R = 3,
+        G = 4,
+        B = 5,
+        A = 6
     };
 
-    static constexpr const char* ComponentSwizzle_string[]
-    {
-        "Identity",
-        "Zero",
-        "One",
-        "R",
-        "G",
-        "B",
-        "A"
+    static EnumStrMap<ComponentSwizzle> ComponentSwizzle_strmap{
+        { ComponentSwizzle::Identity, "Identity" },
+        { ComponentSwizzle::Zero, "Zero" },
+        { ComponentSwizzle::One, "One" },
+        { ComponentSwizzle::R, "R" },
+        { ComponentSwizzle::G, "G" },
+        { ComponentSwizzle::B, "B" },
+        { ComponentSwizzle::A, "A" }
     };
-
-    BEVA_DEFINE_ENUM_TO_STRING_FUNCTION(ComponentSwizzle);
-
-    VkComponentSwizzle ComponentSwizzle_to_vk(ComponentSwizzle swizzle);
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkComponentMapping.html
     struct ComponentMapping
@@ -1887,8 +2297,6 @@ namespace bv
         bool memory_plane_3 : 1 = false;
     };
 
-    VkImageAspectFlags ImageAspectFlags_to_vk(const ImageAspectFlags& flags);
-
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageSubresourceRange.html
     struct ImageSubresourceRange
     {
@@ -1911,6 +2319,625 @@ namespace bv
         Format format;
         ComponentMapping components;
         ImageSubresourceRange subresource_range;
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineShaderStageCreateFlagBits.html
+    struct FakeShaderStageFlagsCREATEFLAGS
+    {
+        bool allow_varying_subgroup_size : 1 = false;
+        bool require_full_subgroups : 1 = false;
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkShaderStageFlagBits.html
+    using ActualShaderStageFlags = TODO();
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSpecializationMapEntry.html
+    struct SpecializationMapEntry
+    {
+        uint32_t constant_id;
+        uint32_t offset;
+        size_t size;
+    };
+
+    VkSpecializationMapEntry SpecializationMapEntry_to_vk(
+        const SpecializationMapEntry& entry
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSpecializationInfo.html
+    struct SpecializationInfo
+    {
+        std::vector<SpecializationMapEntry> map_entries;
+
+        // std::copy your data here (and use reinterpret_cast)
+        std::vector<uint8_t> data;
+    };
+
+    VkSpecializationInfo SpecializationInfo_to_vk(
+        const SpecializationInfo& info,
+        std::vector<VkSpecializationMapEntry>& waste_vk_map_entries,
+        std::vector<uint8_t>& waste_data
+    );
+
+    class ShaderModule;
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineShaderStageCreateInfo.html
+    struct ShaderStage
+    {
+        ShaderStageFlags flags;
+        ShaderStageType type;
+        std::shared_ptr<ShaderModule> module;
+        std::string entry_point;
+        std::optional<SpecializationInfo> specialization_info;
+    };
+
+    VkPipelineShaderStageCreateInfo ShaderStage_to_vk(
+        const ShaderStage& stage,
+        VkSpecializationInfo& waste_vk_specialization_info,
+        std::vector<VkSpecializationMapEntry>& waste_vk_map_entries,
+        std::vector<uint8_t>& waste_data
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDynamicState.html
+    enum class DynamicState : int32_t
+    {
+        Viewport = 0,
+        Scissor = 1,
+        LineWidth = 2,
+        DepthBias = 3,
+        BlendConstants = 4,
+        DepthBounds = 5,
+        StencilCompareMask = 6,
+        StencilWriteMask = 7,
+        StencilReference = 8,
+
+        // provided by VK_VERSION_1_3
+        CullMode = 1000267000,
+
+        // provided by VK_VERSION_1_3
+        FrontFace = 1000267001,
+
+        // provided by VK_VERSION_1_3
+        PrimitiveTopology = 1000267002,
+
+        // provided by VK_VERSION_1_3
+        ViewportWithCount = 1000267003,
+
+        // provided by VK_VERSION_1_3
+        ScissorWithCount = 1000267004,
+
+        // provided by VK_VERSION_1_3
+        VertexInputBindingStride = 1000267005,
+
+        // provided by VK_VERSION_1_3
+        DepthTestEnable = 1000267006,
+
+        // provided by VK_VERSION_1_3
+        DepthWriteEnable = 1000267007,
+
+        // provided by VK_VERSION_1_3
+        DepthCompareOp = 1000267008,
+
+        // provided by VK_VERSION_1_3
+        DepthBoundsTestEnable = 1000267009,
+
+        // provided by VK_VERSION_1_3
+        StencilTestEnable = 1000267010,
+
+        // provided by VK_VERSION_1_3
+        StencilOp = 1000267011,
+
+        // provided by VK_VERSION_1_3
+        RasterizerDiscardEnable = 1000377001,
+
+        // provided by VK_VERSION_1_3
+        DepthBiasEnable = 1000377002,
+
+        // provided by VK_VERSION_1_3
+        PrimitiveRestartEnable = 1000377004,
+
+        // provided by VK_NV_clip_space_w_scaling
+        ViewportWScalingNv = 1000087000,
+
+        // provided by VK_EXT_discard_rectangles
+        DiscardRectangleExt = 1000099000,
+
+        // provided by VK_EXT_discard_rectangles
+        DiscardRectangleEnableExt = 1000099001,
+
+        // provided by VK_EXT_discard_rectangles
+        DiscardRectangleModeExt = 1000099002,
+
+        // provided by VK_EXT_sample_locations
+        SampleLocationsExt = 1000143000,
+
+        // provided by VK_KHR_ray_tracing_pipeline
+        RayTracingPipelineStackSizeKhr = 1000347000,
+
+        // provided by VK_NV_shading_rate_image
+        ViewportShadingRatePaletteNv = 1000164004,
+
+        // provided by VK_NV_shading_rate_image
+        ViewportCoarseSampleOrderNv = 1000164006,
+
+        // provided by VK_NV_scissor_exclusive
+        ExclusiveScissorEnableNv = 1000205000,
+
+        // provided by VK_NV_scissor_exclusive
+        ExclusiveScissorNv = 1000205001,
+
+        // provided by VK_KHR_fragment_shading_rate
+        FragmentShadingRateKhr = 1000226000,
+
+        // provided by VK_EXT_vertex_input_dynamic_state
+        VertexInputExt = 1000352000,
+
+        // provided by VK_EXT_extended_dynamic_state2
+        PatchControlPointsExt = 1000377000,
+
+        // provided by VK_EXT_extended_dynamic_state2
+        LogicOpExt = 1000377003,
+
+        // provided by VK_EXT_color_write_enable
+        ColorWriteEnableExt = 1000381000,
+
+        // provided by VK_EXT_extended_dynamic_state3
+        DepthClampEnableExt = 1000455003,
+
+        // provided by VK_EXT_extended_dynamic_state3
+        PolygonModeExt = 1000455004,
+
+        // provided by VK_EXT_extended_dynamic_state3
+        RasterizationSamplesExt = 1000455005,
+
+        // provided by VK_EXT_extended_dynamic_state3
+        SampleMaskExt = 1000455006,
+
+        // provided by VK_EXT_extended_dynamic_state3
+        AlphaToCoverageEnableExt = 1000455007,
+
+        // provided by VK_EXT_extended_dynamic_state3
+        AlphaToOneEnableExt = 1000455008,
+
+        // provided by VK_EXT_extended_dynamic_state3
+        LogicOpEnableExt = 1000455009,
+
+        // provided by VK_EXT_extended_dynamic_state3
+        ColorBlendEnableExt = 1000455010,
+
+        // provided by VK_EXT_extended_dynamic_state3
+        ColorBlendEquationExt = 1000455011,
+
+        // provided by VK_EXT_extended_dynamic_state3
+        ColorWriteMaskExt = 1000455012,
+
+        // provided by VK_EXT_extended_dynamic_state3 with VK_KHR_maintenance2
+        // or VK_VERSION_1_1
+        TessellationDomainOriginExt = 1000455002,
+
+        // provided by VK_EXT_extended_dynamic_state3 with
+        // VK_EXT_transform_feedback
+        RasterizationStreamExt = 1000455013,
+
+        // provided by VK_EXT_conservative_rasterization with
+        // VK_EXT_extended_dynamic_state3
+        ConservativeRasterizationModeExt = 1000455014,
+
+        // provided by VK_EXT_conservative_rasterization with
+        // VK_EXT_extended_dynamic_state3
+        ExtraPrimitiveOverestimationSizeExt = 1000455015,
+
+        // provided by VK_EXT_depth_clip_enable with
+        // VK_EXT_extended_dynamic_state3
+        DepthClipEnableExt = 1000455016,
+
+        // provided by VK_EXT_extended_dynamic_state3 with
+        // VK_EXT_sample_locations
+        SampleLocationsEnableExt = 1000455017,
+
+        // provided by VK_EXT_blend_operation_advanced with
+        // VK_EXT_extended_dynamic_state3
+        ColorBlendAdvancedExt = 1000455018,
+
+        // provided by VK_EXT_extended_dynamic_state3 with
+        // VK_EXT_provoking_vertex
+        ProvokingVertexModeExt = 1000455019,
+
+        // provided by VK_EXT_extended_dynamic_state3 with
+        // VK_EXT_line_rasterization
+        LineRasterizationModeExt = 1000455020,
+
+        // provided by VK_EXT_extended_dynamic_state3 with
+        // VK_EXT_line_rasterization
+        LineStippleEnableExt = 1000455021,
+
+        // provided by VK_EXT_depth_clip_control with
+        // VK_EXT_extended_dynamic_state3
+        DepthClipNegativeOneToOneExt = 1000455022,
+
+        // provided by VK_EXT_extended_dynamic_state3 with
+        // VK_NV_clip_space_w_scaling
+        ViewportWScalingEnableNv = 1000455023,
+
+        // provided by VK_EXT_extended_dynamic_state3 with
+        // VK_NV_viewport_swizzle
+        ViewportSwizzleNv = 1000455024,
+
+        // provided by VK_EXT_extended_dynamic_state3 with
+        // VK_NV_fragment_coverage_to_color
+        CoverageToColorEnableNv = 1000455025,
+
+        // provided by VK_EXT_extended_dynamic_state3 with
+        // VK_NV_fragment_coverage_to_color
+        CoverageToColorLocationNv = 1000455026,
+
+        // provided by VK_EXT_extended_dynamic_state3 with
+        // VK_NV_framebuffer_mixed_samples
+        CoverageModulationModeNv = 1000455027,
+
+        // provided by VK_EXT_extended_dynamic_state3 with
+        // VK_NV_framebuffer_mixed_samples
+        CoverageModulationTableEnableNv = 1000455028,
+
+        // provided by VK_EXT_extended_dynamic_state3 with
+        // VK_NV_framebuffer_mixed_samples
+        CoverageModulationTableNv = 1000455029,
+
+        // provided by VK_EXT_extended_dynamic_state3 with
+        // VK_NV_shading_rate_image
+        ShadingRateImageEnableNv = 1000455030,
+
+        // provided by VK_EXT_extended_dynamic_state3 with
+        // VK_NV_representative_fragment_test
+        RepresentativeFragmentTestEnableNv = 1000455031,
+
+        // provided by VK_EXT_extended_dynamic_state3 with
+        // VK_NV_coverage_reduction_mode
+        CoverageReductionModeNv = 1000455032,
+
+        // provided by VK_EXT_attachment_feedback_loop_dynamic_state
+        AttachmentFeedbackLoopEnableExt = 1000524000,
+
+        // provided by VK_KHR_line_rasterization
+        LineStippleKhr = 1000259000,
+
+        // provided by VK_EXT_line_rasterization
+        LineStippleExt = LineStippleKhr,
+
+        // provided by VK_EXT_extended_dynamic_state
+        CullModeExt = CullMode,
+
+        // provided by VK_EXT_extended_dynamic_state
+        FrontFaceExt = FrontFace,
+
+        // provided by VK_EXT_extended_dynamic_state
+        PrimitiveTopologyExt = PrimitiveTopology,
+
+        // provided by VK_EXT_extended_dynamic_state
+        ViewportWithCountExt = ViewportWithCount,
+
+        // provided by VK_EXT_extended_dynamic_state
+        ScissorWithCountExt = ScissorWithCount,
+
+        // provided by VK_EXT_extended_dynamic_state
+        VertexInputBindingStrideExt = VertexInputBindingStride,
+
+        // provided by VK_EXT_extended_dynamic_state
+        DepthTestEnableExt = DepthTestEnable,
+
+        // provided by VK_EXT_extended_dynamic_state
+        DepthWriteEnableExt = DepthWriteEnable,
+
+        // provided by VK_EXT_extended_dynamic_state
+        DepthCompareOpExt = DepthCompareOp,
+
+        // provided by VK_EXT_extended_dynamic_state
+        DepthBoundsTestEnableExt = DepthBoundsTestEnable,
+
+        // provided by VK_EXT_extended_dynamic_state
+        StencilTestEnableExt = StencilTestEnable,
+
+        // provided by VK_EXT_extended_dynamic_state
+        StencilOpExt = StencilOp,
+
+        // provided by VK_EXT_extended_dynamic_state2
+        RasterizerDiscardEnableExt = RasterizerDiscardEnable,
+
+        // provided by VK_EXT_extended_dynamic_state2
+        DepthBiasEnableExt = DepthBiasEnable,
+
+        // provided by VK_EXT_extended_dynamic_state2
+        PrimitiveRestartEnableExt = PrimitiveRestartEnable
+    };
+
+    static EnumStrMap<DynamicState> DynamicState_strmap{
+        {
+            DynamicState::Viewport,
+            "Viewport"
+        },
+    {
+        DynamicState::Scissor,
+        "Scissor"
+    },
+    {
+        DynamicState::LineWidth,
+        "LineWidth"
+    },
+    {
+        DynamicState::DepthBias,
+        "DepthBias"
+    },
+    {
+        DynamicState::BlendConstants,
+        "BlendConstants"
+    },
+    {
+        DynamicState::DepthBounds,
+        "DepthBounds"
+    },
+    {
+        DynamicState::StencilCompareMask,
+        "StencilCompareMask"
+    },
+    {
+        DynamicState::StencilWriteMask,
+        "StencilWriteMask"
+    },
+    {
+        DynamicState::StencilReference,
+        "StencilReference"
+    },
+    {
+        DynamicState::CullMode,
+        "CullMode"
+    },
+    {
+        DynamicState::FrontFace,
+        "FrontFace"
+    },
+    {
+        DynamicState::PrimitiveTopology,
+        "PrimitiveTopology"
+    },
+    {
+        DynamicState::ViewportWithCount,
+        "ViewportWithCount"
+    },
+    {
+        DynamicState::ScissorWithCount,
+        "ScissorWithCount"
+    },
+    {
+        DynamicState::VertexInputBindingStride,
+        "VertexInputBindingStride"
+    },
+    {
+        DynamicState::DepthTestEnable,
+        "DepthTestEnable"
+    },
+    {
+        DynamicState::DepthWriteEnable,
+        "DepthWriteEnable"
+    },
+    {
+        DynamicState::DepthCompareOp,
+        "DepthCompareOp"
+    },
+    {
+        DynamicState::DepthBoundsTestEnable,
+        "DepthBoundsTestEnable"
+    },
+    {
+        DynamicState::StencilTestEnable,
+        "StencilTestEnable"
+    },
+    {
+        DynamicState::StencilOp,
+        "StencilOp"
+    },
+    {
+        DynamicState::RasterizerDiscardEnable,
+        "RasterizerDiscardEnable"
+    },
+    {
+        DynamicState::DepthBiasEnable,
+        "DepthBiasEnable"
+    },
+    {
+        DynamicState::PrimitiveRestartEnable,
+        "PrimitiveRestartEnable"
+    },
+    {
+        DynamicState::ViewportWScalingNv,
+        "ViewportWScalingNv"
+    },
+    {
+        DynamicState::DiscardRectangleExt,
+        "DiscardRectangleExt"
+    },
+    {
+        DynamicState::DiscardRectangleEnableExt,
+        "DiscardRectangleEnableExt"
+    },
+    {
+        DynamicState::DiscardRectangleModeExt,
+        "DiscardRectangleModeExt"
+    },
+    {
+        DynamicState::SampleLocationsExt,
+        "SampleLocationsExt"
+    },
+    {
+        DynamicState::RayTracingPipelineStackSizeKhr,
+        "RayTracingPipelineStackSizeKhr"
+    },
+    {
+        DynamicState::ViewportShadingRatePaletteNv,
+        "ViewportShadingRatePaletteNv"
+    },
+    {
+        DynamicState::ViewportCoarseSampleOrderNv,
+        "ViewportCoarseSampleOrderNv"
+    },
+    {
+        DynamicState::ExclusiveScissorEnableNv,
+        "ExclusiveScissorEnableNv"
+    },
+    {
+        DynamicState::ExclusiveScissorNv,
+        "ExclusiveScissorNv"
+    },
+    {
+        DynamicState::FragmentShadingRateKhr,
+        "FragmentShadingRateKhr"
+    },
+    {
+        DynamicState::VertexInputExt,
+        "VertexInputExt"
+    },
+    {
+        DynamicState::PatchControlPointsExt,
+        "PatchControlPointsExt"
+    },
+    {
+        DynamicState::LogicOpExt,
+        "LogicOpExt"
+    },
+    {
+        DynamicState::ColorWriteEnableExt,
+        "ColorWriteEnableExt"
+    },
+    {
+        DynamicState::DepthClampEnableExt,
+        "DepthClampEnableExt"
+    },
+    {
+        DynamicState::PolygonModeExt,
+        "PolygonModeExt"
+    },
+    {
+        DynamicState::RasterizationSamplesExt,
+        "RasterizationSamplesExt"
+    },
+    {
+        DynamicState::SampleMaskExt,
+        "SampleMaskExt"
+    },
+    {
+        DynamicState::AlphaToCoverageEnableExt,
+        "AlphaToCoverageEnableExt"
+    },
+    {
+        DynamicState::AlphaToOneEnableExt,
+        "AlphaToOneEnableExt"
+    },
+    {
+        DynamicState::LogicOpEnableExt,
+        "LogicOpEnableExt"
+    },
+    {
+        DynamicState::ColorBlendEnableExt,
+        "ColorBlendEnableExt"
+    },
+    {
+        DynamicState::ColorBlendEquationExt,
+        "ColorBlendEquationExt"
+    },
+    {
+        DynamicState::ColorWriteMaskExt,
+        "ColorWriteMaskExt"
+    },
+    {
+        DynamicState::TessellationDomainOriginExt,
+        "TessellationDomainOriginExt"
+    },
+    {
+        DynamicState::RasterizationStreamExt,
+        "RasterizationStreamExt"
+    },
+    {
+        DynamicState::ConservativeRasterizationModeExt,
+        "ConservativeRasterizationModeExt"
+    },
+    {
+        DynamicState::ExtraPrimitiveOverestimationSizeExt,
+        "ExtraPrimitiveOverestimationSizeExt"
+    },
+    {
+        DynamicState::DepthClipEnableExt,
+        "DepthClipEnableExt"
+    },
+    {
+        DynamicState::SampleLocationsEnableExt,
+        "SampleLocationsEnableExt"
+    },
+    {
+        DynamicState::ColorBlendAdvancedExt,
+        "ColorBlendAdvancedExt"
+    },
+    {
+        DynamicState::ProvokingVertexModeExt,
+        "ProvokingVertexModeExt"
+    },
+    {
+        DynamicState::LineRasterizationModeExt,
+        "LineRasterizationModeExt"
+    },
+    {
+        DynamicState::LineStippleEnableExt,
+        "LineStippleEnableExt"
+    },
+    {
+        DynamicState::DepthClipNegativeOneToOneExt,
+        "DepthClipNegativeOneToOneExt"
+    },
+    {
+        DynamicState::ViewportWScalingEnableNv,
+        "ViewportWScalingEnableNv"
+    },
+    {
+        DynamicState::ViewportSwizzleNv,
+        "ViewportSwizzleNv"
+    },
+    {
+        DynamicState::CoverageToColorEnableNv,
+        "CoverageToColorEnableNv"
+    },
+    {
+        DynamicState::CoverageToColorLocationNv,
+        "CoverageToColorLocationNv"
+    },
+    {
+        DynamicState::CoverageModulationModeNv,
+        "CoverageModulationModeNv"
+    },
+    {
+        DynamicState::CoverageModulationTableEnableNv,
+        "CoverageModulationTableEnableNv"
+    },
+    {
+        DynamicState::CoverageModulationTableNv,
+        "CoverageModulationTableNv"
+    },
+    {
+        DynamicState::ShadingRateImageEnableNv,
+        "ShadingRateImageEnableNv"
+    },
+    {
+        DynamicState::RepresentativeFragmentTestEnableNv,
+        "RepresentativeFragmentTestEnableNv"
+    },
+    {
+        DynamicState::CoverageReductionModeNv,
+        "CoverageReductionModeNv"
+    },
+    {
+        DynamicState::AttachmentFeedbackLoopEnableExt,
+        "AttachmentFeedbackLoopEnableExt"
+    },
+    {
+        DynamicState::LineStippleKhr,
+        "LineStippleKhr"
+    }
     };
 
 #pragma endregion
@@ -2145,7 +3172,7 @@ namespace bv
 
         Context() = delete;
         Context(const Context& other) = delete;
-        Context(Context&& other);
+        Context(Context&& other) noexcept;
 
         // * it's best to keep at least one external reference to the allocator
         //   so that it doesn't die with the Context because the driver might
@@ -2219,7 +3246,7 @@ namespace bv
 
     };
 
-    // * requires extension VK_EXT_DEBUG_UTILS_EXTENSION_NAME
+    // provided by VK_EXT_debug_utils
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDebugUtilsMessengerEXT.html
     class DebugMessenger
     {
@@ -2227,7 +3254,7 @@ namespace bv
         using ptr = std::shared_ptr<DebugMessenger>;
 
         DebugMessenger(const DebugMessenger& other) = delete;
-        DebugMessenger(DebugMessenger&& other);
+        DebugMessenger(DebugMessenger&& other) = default;
 
         static Result<DebugMessenger::ptr> create(
             const Context::ptr& context,
@@ -2276,6 +3303,7 @@ namespace bv
 
     };
 
+    // provided by VK_KHR_surface
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceKHR.html
     class Surface
     {
@@ -2284,7 +3312,7 @@ namespace bv
 
         Surface() = delete;
         Surface(const Surface& other) = delete;
-        Surface(Surface&& other);
+        Surface(Surface&& other) = default;
 
         // create a surface based on a user-provided handle. this lets the user
         // write their own little surface creation implementation based on the
@@ -2327,7 +3355,7 @@ namespace bv
 
         Queue() = delete;
         Queue(const Queue& other) = delete;
-        Queue(Queue&& other);
+        Queue(Queue&& other) = default;
 
     protected:
         VkQueue vk_queue;
@@ -2344,7 +3372,7 @@ namespace bv
 
         Device() = delete;
         Device(const Device& other) = delete;
-        Device(Device&& other);
+        Device(Device&& other) = default;
 
         static Result<Device::ptr> create(
             const Context::ptr& context,
@@ -2389,6 +3417,7 @@ namespace bv
 
         friend class Swapchain;
         friend class ImageView;
+        friend class ShaderModule;
 
     };
 
@@ -2400,7 +3429,7 @@ namespace bv
 
         Image() = delete;
         Image(const Image& other) = delete;
-        Image(Image&& other);
+        Image(Image&& other) = default;
 
     protected:
         VkImage vk_image;
@@ -2411,6 +3440,7 @@ namespace bv
 
     };
 
+    // provided by VK_KHR_swapchain
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSwapchainKHR.html
     class Swapchain
     {
@@ -2419,7 +3449,7 @@ namespace bv
 
         Swapchain() = delete;
         Swapchain(const Swapchain& other) = delete;
-        Swapchain(Swapchain&& other);
+        Swapchain(Swapchain&& other) = default;
 
         static Result<Swapchain::ptr> create(
             const Device::ptr& device,
@@ -2482,7 +3512,7 @@ namespace bv
 
         ImageView() = delete;
         ImageView(const ImageView& other) = delete;
-        ImageView(ImageView&& other);
+        ImageView(ImageView&& other) = default;
 
         static Result<ImageView::ptr> create(
             const Device::ptr& device,
@@ -2518,6 +3548,45 @@ namespace bv
             const Device::ptr& device,
             const Image::ptr& image,
             const ImageViewConfig& config
+        );
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkShaderModule.html
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkShaderModuleCreateInfo.html
+    class ShaderModule
+    {
+    public:
+        using ptr = std::shared_ptr<ShaderModule>;
+
+        ShaderModule() = delete;
+        ShaderModule(const ShaderModule& other) = delete;
+        ShaderModule(ShaderModule&& other) = default;
+
+        static Result<ShaderModule::ptr> create(
+            const Device::ptr& device,
+            const std::vector<uint8_t>& code
+        );
+
+        constexpr const Device::ptr& device() const
+        {
+            return _device;
+        }
+
+        ~ShaderModule();
+
+    protected:
+        Device::ptr _device;
+
+        VkShaderModule vk_shader_module = nullptr;
+
+        ShaderModule(const Device::ptr& device);
+
+        friend VkPipelineShaderStageCreateInfo ShaderStage_to_vk(
+            const ShaderStage& stage,
+            VkSpecializationInfo& waste_vk_specialization_info,
+            std::vector<VkSpecializationMapEntry>& waste_vk_map_entries,
+            std::vector<uint8_t>& waste_data
         );
 
     };

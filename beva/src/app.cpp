@@ -1,6 +1,7 @@
 #include "app.h"
 
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <string>
 #include <format>
@@ -19,6 +20,7 @@
 namespace beva_demo
 {
 
+    static std::vector<uint8_t> read_file(const std::string& filename);
     static void glfw_error_callback(int error, const char* description);
 
     void App::run()
@@ -30,6 +32,7 @@ namespace beva_demo
         pick_physical_device();
         create_logical_device();
         create_swapchain();
+        create_graphics_pipeline();
 
         main_loop();
 
@@ -90,22 +93,22 @@ namespace beva_demo
 
         bv::ContextConfig config{
             .will_enumerate_portability = false,
-                .app_name = "beva demo",
-                .app_version = bv::Version(1, 1, 0, 0),
-                .engine_name = "no engine",
-                .engine_version = bv::Version(1, 1, 0, 0),
-                .vulkan_api_version = bv::VulkanApiVersion::Vulkan1_0,
-                .layers = layers,
-                .extensions = extensions
+            .app_name = "beva demo",
+            .app_version = bv::Version(1, 1, 0, 0),
+            .engine_name = "no engine",
+            .engine_version = bv::Version(1, 1, 0, 0),
+            .vulkan_api_version = bv::VulkanApiVersion::Vulkan1_0,
+            .layers = layers,
+            .extensions = extensions
         };
 
         auto context_result = bv::Context::create(config);
         if (!context_result.ok())
         {
-            std::string s =
-                "failed to create context: "
-                + context_result.error().to_string();
-            throw std::runtime_error(s.c_str());
+            throw std::runtime_error(std::format(
+                "failed to create context: {}",
+                context_result.error().to_string()
+            ).c_str());
         }
         context = context_result.value();
     }
@@ -119,16 +122,16 @@ namespace beva_demo
 
         bv::DebugMessageSeverityFlags severity_filter{
             .verbose = false,
-                .info = false,
-                .warning = true,
-                .error = true
+            .info = false,
+            .warning = true,
+            .error = true
         };
 
         bv::DebugMessageTypeFlags type_filter{
             .general = true,
-                .validation = true,
-                .performance = true,
-                .device_address_binding = true
+            .validation = true,
+            .performance = true,
+            .device_address_binding = true
         };
 
         auto debug_messenger_result = bv::DebugMessenger::create(
@@ -146,10 +149,10 @@ namespace beva_demo
         );
         if (!debug_messenger_result.ok())
         {
-            std::string s =
-                "failed to create debug messenger: "
-                + debug_messenger_result.error().to_string();
-            throw std::runtime_error(s.c_str());
+            throw std::runtime_error(std::format(
+                "failed to create debug messenger: {}",
+                debug_messenger_result.error().to_string()
+            ).c_str());
         }
         debug_messenger = debug_messenger_result.value();
     }
@@ -180,10 +183,10 @@ namespace beva_demo
         auto physical_devices_result = context->fetch_physical_devices(surface);
         if (!physical_devices_result.ok())
         {
-            std::string s =
-                "failed to fetch physical devices: "
-                + physical_devices_result.error().to_string();
-            throw std::runtime_error(s.c_str());
+            throw std::runtime_error(std::format(
+                "failed to fetch physical devices: {}",
+                physical_devices_result.error().to_string()
+            ).c_str());
         }
         auto all_physical_devices = physical_devices_result.value();
 
@@ -271,16 +274,16 @@ namespace beva_demo
         {
             queue_requests.push_back(bv::QueueRequest{
                 .flags = bv::QueueRequestFlags{},
-                    .queue_family_index = family_idx,
-                    .num_queues_to_create = 1,
-                    .priorities = { 1.f }
-            });
+                .queue_family_index = family_idx,
+                .num_queues_to_create = 1,
+                .priorities = { 1.f }
+                });
         }
 
         bv::DeviceConfig config{
             .queue_requests = queue_requests,
-                .extensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME },
-                .enabled_features = bv::PhysicalDeviceFeatures{}
+            .extensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME },
+            .enabled_features = bv::PhysicalDeviceFeatures{}
         };
 
         auto device_result = bv::Device::create(
@@ -290,10 +293,10 @@ namespace beva_demo
         );
         if (!device_result.ok())
         {
-            std::string s =
-                "failed to create device: "
-                + device_result.error().to_string();
-            throw std::runtime_error(s.c_str());
+            throw std::runtime_error(std::format(
+                "failed to create device: {}",
+                device_result.error().to_string()
+            ).c_str());
         }
         device = device_result.value();
 
@@ -375,27 +378,27 @@ namespace beva_demo
 
         bv::SwapchainConfig config{
             .flags = {},
-                .min_image_count = image_count,
-                .image_format = surface_format.format,
-                .image_color_space = surface_format.color_space,
-                .image_extent = extent,
-                .image_array_layers = 1,
-                .image_usage = { .color_attachment = true },
-                .image_sharing_mode = image_sharing_mode,
-                .queue_family_indices = queue_family_indices,
-                .pre_transform = pre_transform,
-                .composite_alpha = bv::CompositeAlpha::Opaque,
-                .present_mode = bv::PresentMode::Fifo,
-                .clipped = true
+            .min_image_count = image_count,
+            .image_format = surface_format.format,
+            .image_color_space = surface_format.color_space,
+            .image_extent = extent,
+            .image_array_layers = 1,
+            .image_usage = { .color_attachment = true },
+            .image_sharing_mode = image_sharing_mode,
+            .queue_family_indices = queue_family_indices,
+            .pre_transform = pre_transform,
+            .composite_alpha = bv::CompositeAlpha::Opaque,
+            .present_mode = bv::PresentMode::Fifo,
+            .clipped = true
         };
 
         auto swapchain_result = bv::Swapchain::create(device, surface, config);
         if (!swapchain_result.ok())
         {
-            std::string s =
-                "failed to create swapchain: "
-                + swapchain_result.error().to_string();
-            throw std::runtime_error(s.c_str());
+            throw std::runtime_error(std::format(
+                "failed to create swapchain: {}",
+                swapchain_result.error().to_string()
+            ).c_str());
         }
         swapchain = swapchain_result.value();
 
@@ -403,16 +406,16 @@ namespace beva_demo
         {
             bv::ImageViewConfig config{
                 .flags = {},
-                    .view_type = bv::ImageViewType::_2d,
-                    .format = surface_format.format,
-                    .components = {},
-                    .subresource_range = bv::ImageSubresourceRange{
+                .view_type = bv::ImageViewType::_2d,
+                .format = surface_format.format,
+                .components = {},
+                .subresource_range = bv::ImageSubresourceRange{
                     .aspect_mask = { .color = true },
                     .base_mip_level = 0,
                     .level_count = 1,
                     .base_array_layer = 0,
                     .layer_count = 1
-                }
+            }
             };
 
             auto image_view_result = bv::ImageView::create(
@@ -431,6 +434,59 @@ namespace beva_demo
             }
             swapchain_imgviews.push_back(image_view_result.value());
         }
+    }
+
+    void App::create_graphics_pipeline()
+    {
+        // shader modules
+        // they are local variables because they're only needed until pipeline
+        // creation.
+
+        auto vert_shader_code = read_file("./shaders/vert.spv");
+        auto frag_shader_code = read_file("./shaders/frag.spv");
+
+        auto vert_shader_module_result = bv::ShaderModule::create(
+            device,
+            std::move(vert_shader_code)
+        );
+        if (!vert_shader_module_result.ok())
+        {
+            throw std::runtime_error(std::format(
+                "failed to create vertex shader module: {}",
+                vert_shader_module_result.error().to_string()
+            ).c_str());
+        }
+        auto vert_shader_module = vert_shader_module_result.value();
+
+        auto frag_shader_module_result = bv::ShaderModule::create(
+            device,
+            std::move(frag_shader_code)
+        );
+        if (!frag_shader_module_result.ok())
+        {
+            throw std::runtime_error(std::format(
+                "failed to create fragment shader module: {}",
+                frag_shader_module_result.error().to_string()
+            ).c_str());
+        }
+        auto frag_shader_module = frag_shader_module_result.value();
+
+        // shader stages
+        std::vector<bv::ShaderStage> shader_stages;
+        shader_stages.push_back(bv::ShaderStage{
+            .flags = {},
+            .type = bv::ShaderStageType::Vertex,
+            .module = vert_shader_module,
+            .entry_point = "main",
+            .specialization_info = std::nullopt
+            });
+        shader_stages.push_back(bv::ShaderStage{
+            .flags = {},
+            .type = bv::ShaderStageType::Fragment,
+            .module = frag_shader_module,
+            .entry_point = "main",
+            .specialization_info = std::nullopt
+            });
     }
 
     void App::main_loop()
@@ -460,6 +516,28 @@ namespace beva_demo
 
         glfwDestroyWindow(window);
         glfwTerminate();
+    }
+
+    static std::vector<uint8_t> read_file(const std::string& filename)
+    {
+        std::ifstream f(filename, std::ios::ate | std::ios::binary);
+        if (!f.is_open())
+        {
+            throw std::runtime_error(std::format(
+                "failed to read file \"{}\"",
+                filename
+            ).c_str());
+        }
+
+        size_t size_in_chars = (size_t)f.tellg();
+        size_t size_in_bytes = size_in_chars * sizeof(char);
+
+        std::vector<uint8_t> buf(size_in_bytes);
+        f.seekg(0);
+        f.read(reinterpret_cast<char*>(buf.data()), size_in_chars);
+        f.close();
+
+        return buf;
     }
 
     static void glfw_error_callback(int error, const char* description)

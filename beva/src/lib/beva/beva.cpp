@@ -38,6 +38,7 @@ namespace bv
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Image);
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Swapchain);
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(ImageView);
+    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(ShaderModule);
 
 #pragma region forward declarations
 
@@ -124,205 +125,19 @@ namespace bv
         return std::format("{}.{}.{}.{}", variant, major, minor, patch);
     }
 
-    ApiResult::ApiResult(VkResult vk_result)
-        : _undocumented_vk_result(vk_result)
+    std::string ApiResult_to_string(ApiResult result)
     {
-        switch (vk_result)
+        if (ApiResult_strmap.contains(result))
         {
-        case VK_NOT_READY:
-            _type = ApiResultType::NotReady;
-            break;
-        case VK_TIMEOUT:
-            _type = ApiResultType::Timeout;
-            break;
-        case VK_EVENT_SET:
-            _type = ApiResultType::EventSet;
-            break;
-        case VK_EVENT_RESET:
-            _type = ApiResultType::EventReset;
-            break;
-        case VK_INCOMPLETE:
-            _type = ApiResultType::Incomplete;
-            break;
-        case VK_ERROR_OUT_OF_HOST_MEMORY:
-            _type = ApiResultType::ErrorOutOfHostMemory;
-            break;
-        case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-            _type = ApiResultType::ErrorOutOfDeviceMemory;
-            break;
-        case VK_ERROR_INITIALIZATION_FAILED:
-            _type = ApiResultType::ErrorInitializationFailed;
-            break;
-        case VK_ERROR_DEVICE_LOST:
-            _type = ApiResultType::ErrorDeviceLost;
-            break;
-        case VK_ERROR_MEMORY_MAP_FAILED:
-            _type = ApiResultType::ErrorMemoryMapFailed;
-            break;
-        case VK_ERROR_LAYER_NOT_PRESENT:
-            _type = ApiResultType::ErrorLayerNotPresent;
-            break;
-        case VK_ERROR_EXTENSION_NOT_PRESENT:
-            _type = ApiResultType::ErrorExtensionNotPresent;
-            break;
-        case VK_ERROR_FEATURE_NOT_PRESENT:
-            _type = ApiResultType::ErrorFeatureNotPresent;
-            break;
-        case VK_ERROR_INCOMPATIBLE_DRIVER:
-            _type = ApiResultType::ErrorIncompatibleDriver;
-            break;
-        case VK_ERROR_TOO_MANY_OBJECTS:
-            _type = ApiResultType::ErrorTooManyObjects;
-            break;
-        case VK_ERROR_FORMAT_NOT_SUPPORTED:
-            _type = ApiResultType::ErrorFormatNotSupported;
-            break;
-        case VK_ERROR_FRAGMENTED_POOL:
-            _type = ApiResultType::ErrorFragmentedPool;
-            break;
-        case VK_ERROR_UNKNOWN:
-            _type = ApiResultType::ErrorUnknown;
-            break;
-        case VK_ERROR_OUT_OF_POOL_MEMORY:
-            _type = ApiResultType::ErrorOutOfPoolMemory;
-            break;
-        case VK_ERROR_INVALID_EXTERNAL_HANDLE:
-            _type = ApiResultType::ErrorInvalidExternalHandle;
-            break;
-        case VK_ERROR_FRAGMENTATION:
-            _type = ApiResultType::ErrorFragmentation;
-            break;
-        case VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS:
-            _type = ApiResultType::ErrorInvalidOpaqueCaptureAddress;
-            break;
-        case VK_PIPELINE_COMPILE_REQUIRED:
-            _type = ApiResultType::PipelineCompileRequired;
-            break;
-        case VK_ERROR_SURFACE_LOST_KHR:
-            _type = ApiResultType::ErrorSurfaceLostKhr;
-            break;
-        case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR:
-            _type = ApiResultType::ErrorNativeWindowInUseKhr;
-            break;
-        case VK_SUBOPTIMAL_KHR:
-            _type = ApiResultType::SuboptimalKhr;
-            break;
-        case VK_ERROR_OUT_OF_DATE_KHR:
-            _type = ApiResultType::ErrorOutOfDateKhr;
-            break;
-        case VK_ERROR_INCOMPATIBLE_DISPLAY_KHR:
-            _type = ApiResultType::ErrorIncompatibleDisplayKhr;
-            break;
-        case VK_ERROR_VALIDATION_FAILED_EXT:
-            _type = ApiResultType::ErrorValidationFailedExt;
-            break;
-        case VK_ERROR_INVALID_SHADER_NV:
-            _type = ApiResultType::ErrorInvalidShaderNv;
-            break;
-        case VK_ERROR_IMAGE_USAGE_NOT_SUPPORTED_KHR:
-            _type = ApiResultType::ErrorImageUsageNotSupportedKhr;
-            break;
-        case VK_ERROR_VIDEO_PICTURE_LAYOUT_NOT_SUPPORTED_KHR:
-            _type =
-                ApiResultType::ErrorVideoPictureLayoutNotSupportedKhr;
-            break;
-        case VK_ERROR_VIDEO_PROFILE_OPERATION_NOT_SUPPORTED_KHR:
-            _type =
-                ApiResultType::ErrorVideoProfileOperationNotSupportedKhr;
-            break;
-        case VK_ERROR_VIDEO_PROFILE_FORMAT_NOT_SUPPORTED_KHR:
-            _type =
-                ApiResultType::ErrorVideoProfileFormatNotSupportedKhr;
-            break;
-        case VK_ERROR_VIDEO_PROFILE_CODEC_NOT_SUPPORTED_KHR:
-            _type = ApiResultType::ErrorVideoProfileCodecNotSupportedKhr;
-            break;
-        case VK_ERROR_VIDEO_STD_VERSION_NOT_SUPPORTED_KHR:
-            _type = ApiResultType::ErrorVideoStdVersionNotSupportedKhr;
-            break;
-        case VK_ERROR_NOT_PERMITTED_KHR:
-            _type = ApiResultType::ErrorNotPermittedKhr;
-            break;
-        case VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT:
-            _type = ApiResultType::ErrorFullScreenExclusiveModeLostExt;
-            break;
-        case VK_THREAD_IDLE_KHR:
-            _type = ApiResultType::ThreadIdleKhr;
-            break;
-        case VK_THREAD_DONE_KHR:
-            _type = ApiResultType::ThreadDoneKhr;
-            break;
-        case VK_OPERATION_DEFERRED_KHR:
-            _type = ApiResultType::OperationDeferredKhr;
-            break;
-        case VK_OPERATION_NOT_DEFERRED_KHR:
-            _type = ApiResultType::OperationNotDeferredKhr;
-            break;
-        case VK_ERROR_COMPRESSION_EXHAUSTED_EXT:
-            _type = ApiResultType::ErrorCompressionExhaustedExt;
-            break;
-        case VK_ERROR_INCOMPATIBLE_SHADER_BINARY_EXT:
-            _type = ApiResultType::ErrorIncompatibleShaderBinaryExt;
-            break;
-        default:
-            _type = ApiResultType::UndocumentedVkResult;
-            break;
+            return ApiResult_strmap[result];
         }
+        return std::format(
+            "undocumented VkResult: {}",
+            string_VkResult((VkResult)result)
+        );
     }
 
-    std::string ApiResult::to_string() const
-    {
-        if (_type >= ApiResultType::_)
-        {
-            throw std::exception(
-                "invalid enum value, this should never happen"
-            );
-        }
-        if (_type == ApiResultType::UndocumentedVkResult)
-        {
-            return std::format(
-                "undocumented VkResult \"{}\"",
-                string_VkResult(_undocumented_vk_result)
-            );
-        }
-        return ApiResultType_string[(uint8_t)_type];
-    }
-
-    AllocationScope AllocationScope_from_vk(
-        VkSystemAllocationScope vk_scope
-    )
-    {
-        switch (vk_scope)
-        {
-        case VK_SYSTEM_ALLOCATION_SCOPE_COMMAND:
-            return AllocationScope::Command;
-        case VK_SYSTEM_ALLOCATION_SCOPE_OBJECT:
-            return AllocationScope::Object;
-        case VK_SYSTEM_ALLOCATION_SCOPE_CACHE:
-            return AllocationScope::Cache;
-        case VK_SYSTEM_ALLOCATION_SCOPE_DEVICE:
-            return AllocationScope::Device;
-        case VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE:
-            return AllocationScope::Instance;
-        default:
-            return AllocationScope::Unknown;
-        }
-    }
-
-    InternalAllocationType InternalAllocationType_from_vk(
-        VkInternalAllocationType vk_type
-    )
-    {
-        switch (vk_type)
-        {
-        case VK_INTERNAL_ALLOCATION_TYPE_EXECUTABLE:
-            return InternalAllocationType::Executable;
-        default:
-            return InternalAllocationType::Unknown;
-        }
-    }
-
-    uint32_t VulkanApiVersion_to_vk(VulkanApiVersion version)
+    uint32_t VulkanApiVersion_encode(VulkanApiVersion version)
     {
         switch (version)
         {
@@ -337,330 +152,6 @@ namespace bv
         default:
             return VK_API_VERSION_1_0;
         }
-    }
-
-    PhysicalDeviceType PhysicalDeviceType_from_vk(
-        VkPhysicalDeviceType vk_type
-    )
-    {
-        switch (vk_type)
-        {
-        case VK_PHYSICAL_DEVICE_TYPE_OTHER:
-            return PhysicalDeviceType::Other;
-        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
-            return PhysicalDeviceType::IntegratedGpu;
-        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
-            return PhysicalDeviceType::DiscreteGpu;
-        case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
-            return PhysicalDeviceType::VirtualGpu;
-        case VK_PHYSICAL_DEVICE_TYPE_CPU:
-            return PhysicalDeviceType::Cpu;
-        default:
-            return PhysicalDeviceType::Other;
-        }
-    }
-
-    SampleCountFlags SampleCountFlags_from_vk(
-        VkSampleCountFlags vk_flags
-    )
-    {
-        return SampleCountFlags{
-            ._1 = (bool)(vk_flags & VK_SAMPLE_COUNT_1_BIT),
-            ._2 = (bool)(vk_flags & VK_SAMPLE_COUNT_2_BIT),
-            ._4 = (bool)(vk_flags & VK_SAMPLE_COUNT_4_BIT),
-            ._8 = (bool)(vk_flags & VK_SAMPLE_COUNT_8_BIT),
-            ._16 = (bool)(vk_flags & VK_SAMPLE_COUNT_16_BIT),
-            ._32 = (bool)(vk_flags & VK_SAMPLE_COUNT_32_BIT),
-            ._64 = (bool)(vk_flags & VK_SAMPLE_COUNT_64_BIT)
-        };
-    }
-
-    SampleCount SampleCount_from_vk(VkSampleCountFlagBits vk_sample_count)
-    {
-        switch (vk_sample_count)
-        {
-        case VK_SAMPLE_COUNT_1_BIT:
-            return SampleCount::_1;
-        case VK_SAMPLE_COUNT_2_BIT:
-            return SampleCount::_2;
-        case VK_SAMPLE_COUNT_4_BIT:
-            return SampleCount::_4;
-        case VK_SAMPLE_COUNT_8_BIT:
-            return SampleCount::_8;
-        case VK_SAMPLE_COUNT_16_BIT:
-            return SampleCount::_16;
-        case VK_SAMPLE_COUNT_32_BIT:
-            return SampleCount::_32;
-        case VK_SAMPLE_COUNT_64_BIT:
-            return SampleCount::_64;
-        default:
-            return SampleCount::_1;
-        }
-    }
-
-    VkSampleCountFlagBits SampleCount_to_vk(SampleCount sample_count)
-    {
-        switch (sample_count)
-        {
-        case bv::SampleCount::_1:
-            return VK_SAMPLE_COUNT_1_BIT;
-        case bv::SampleCount::_2:
-            return VK_SAMPLE_COUNT_2_BIT;
-        case bv::SampleCount::_4:
-            return VK_SAMPLE_COUNT_4_BIT;
-        case bv::SampleCount::_8:
-            return VK_SAMPLE_COUNT_8_BIT;
-        case bv::SampleCount::_16:
-            return VK_SAMPLE_COUNT_16_BIT;
-        case bv::SampleCount::_32:
-            return VK_SAMPLE_COUNT_32_BIT;
-        case bv::SampleCount::_64:
-            return VK_SAMPLE_COUNT_64_BIT;
-        default:
-            return VK_SAMPLE_COUNT_1_BIT;
-        }
-    }
-
-    QueueFlags QueueFlags_from_vk(
-        const VkQueueFlags& vk_queue_flags,
-        VkBool32 vk_presentation_support
-    )
-    {
-        return QueueFlags{
-            .graphics = (bool)(vk_queue_flags & VK_QUEUE_GRAPHICS_BIT),
-
-            .presentation = (bool)vk_presentation_support,
-
-            .compute = (bool)(vk_queue_flags & VK_QUEUE_COMPUTE_BIT),
-
-            .transfer = (bool)(vk_queue_flags & VK_QUEUE_TRANSFER_BIT),
-
-            .sparse_binding =
-            (bool)(vk_queue_flags & VK_QUEUE_SPARSE_BINDING_BIT),
-
-            .protected_ = (bool)(vk_queue_flags & VK_QUEUE_PROTECTED_BIT),
-
-            .video_decode =
-            (bool)(vk_queue_flags & VK_QUEUE_VIDEO_DECODE_BIT_KHR),
-
-            .optical_flow_nv =
-            (bool)(vk_queue_flags & VK_QUEUE_OPTICAL_FLOW_BIT_NV)
-        };
-    }
-
-    ObjectType ObjectType_from_vk(VkObjectType vk_type)
-    {
-        switch (vk_type)
-        {
-        case VK_OBJECT_TYPE_UNKNOWN:
-            return ObjectType::Unknown;
-        case VK_OBJECT_TYPE_INSTANCE:
-            return ObjectType::Instance;
-        case VK_OBJECT_TYPE_PHYSICAL_DEVICE:
-            return ObjectType::PhysicalDevice;
-        case VK_OBJECT_TYPE_DEVICE:
-            return ObjectType::Device;
-        case VK_OBJECT_TYPE_QUEUE:
-            return ObjectType::Queue;
-        case VK_OBJECT_TYPE_SEMAPHORE:
-            return ObjectType::Semaphore;
-        case VK_OBJECT_TYPE_COMMAND_BUFFER:
-            return ObjectType::CommandBuffer;
-        case VK_OBJECT_TYPE_FENCE:
-            return ObjectType::Fence;
-        case VK_OBJECT_TYPE_DEVICE_MEMORY:
-            return ObjectType::DeviceMemory;
-        case VK_OBJECT_TYPE_BUFFER:
-            return ObjectType::Buffer;
-        case VK_OBJECT_TYPE_IMAGE:
-            return ObjectType::Image;
-        case VK_OBJECT_TYPE_EVENT:
-            return ObjectType::Event;
-        case VK_OBJECT_TYPE_QUERY_POOL:
-            return ObjectType::QueryPool;
-        case VK_OBJECT_TYPE_BUFFER_VIEW:
-            return ObjectType::BufferView;
-        case VK_OBJECT_TYPE_IMAGE_VIEW:
-            return ObjectType::ImageView;
-        case VK_OBJECT_TYPE_SHADER_MODULE:
-            return ObjectType::ShaderModule;
-        case VK_OBJECT_TYPE_PIPELINE_CACHE:
-            return ObjectType::PipelineCache;
-        case VK_OBJECT_TYPE_PIPELINE_LAYOUT:
-            return ObjectType::PipelineLayout;
-        case VK_OBJECT_TYPE_RENDER_PASS:
-            return ObjectType::RenderPass;
-        case VK_OBJECT_TYPE_PIPELINE:
-            return ObjectType::Pipeline;
-        case VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT:
-            return ObjectType::DescriptorSetLayout;
-        case VK_OBJECT_TYPE_SAMPLER:
-            return ObjectType::Sampler;
-        case VK_OBJECT_TYPE_DESCRIPTOR_POOL:
-            return ObjectType::DescriptorPool;
-        case VK_OBJECT_TYPE_DESCRIPTOR_SET:
-            return ObjectType::DescriptorSet;
-        case VK_OBJECT_TYPE_FRAMEBUFFER:
-            return ObjectType::Framebuffer;
-        case VK_OBJECT_TYPE_COMMAND_POOL:
-            return ObjectType::CommandPool;
-        case VK_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION:
-            return ObjectType::SamplerYcbcrConversion;
-        case VK_OBJECT_TYPE_DESCRIPTOR_UPDATE_TEMPLATE:
-            return ObjectType::DescriptorUpdateTemplate;
-        case VK_OBJECT_TYPE_PRIVATE_DATA_SLOT:
-            return ObjectType::PrivateDataSlot;
-        case VK_OBJECT_TYPE_SURFACE_KHR:
-            return ObjectType::Surface;
-        case VK_OBJECT_TYPE_SWAPCHAIN_KHR:
-            return ObjectType::Swapchain;
-        case VK_OBJECT_TYPE_DISPLAY_KHR:
-            return ObjectType::Display;
-        case VK_OBJECT_TYPE_DISPLAY_MODE_KHR:
-            return ObjectType::DisplayMode;
-        case VK_OBJECT_TYPE_DEBUG_REPORT_CALLBACK_EXT:
-            return ObjectType::DebugReportCallback;
-        case VK_OBJECT_TYPE_VIDEO_SESSION_KHR:
-            return ObjectType::VideoSession;
-        case VK_OBJECT_TYPE_VIDEO_SESSION_PARAMETERS_KHR:
-            return ObjectType::VideoSessionParameters;
-        case VK_OBJECT_TYPE_CU_MODULE_NVX:
-            return ObjectType::CuModuleNvx;
-        case VK_OBJECT_TYPE_CU_FUNCTION_NVX:
-            return ObjectType::CuFunctionNvx;
-        case VK_OBJECT_TYPE_DEBUG_UTILS_MESSENGER_EXT:
-            return ObjectType::DebugMessenger;
-        case VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR:
-            return ObjectType::AccelerationStructure;
-        case VK_OBJECT_TYPE_VALIDATION_CACHE_EXT:
-            return ObjectType::ValidationCache;
-        case VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_NV:
-            return ObjectType::AccelerationStructureNv;
-        case VK_OBJECT_TYPE_PERFORMANCE_CONFIGURATION_INTEL:
-            return ObjectType::PerformanceConfigurationIntel;
-        case VK_OBJECT_TYPE_DEFERRED_OPERATION_KHR:
-            return ObjectType::DeferredOperation;
-        case VK_OBJECT_TYPE_INDIRECT_COMMANDS_LAYOUT_NV:
-            return ObjectType::IndirectCommandsLayoutNv;
-        case VK_OBJECT_TYPE_BUFFER_COLLECTION_FUCHSIA:
-            return ObjectType::BufferCollectionFuchsia;
-        case VK_OBJECT_TYPE_MICROMAP_EXT:
-            return ObjectType::Micromap;
-        case VK_OBJECT_TYPE_OPTICAL_FLOW_SESSION_NV:
-            return ObjectType::OpticalFlowSessionNv;
-        case VK_OBJECT_TYPE_SHADER_EXT:
-            return ObjectType::Shader;
-        default:
-            return ObjectType::Unknown;
-        }
-    }
-
-    VkDebugUtilsMessageSeverityFlagsEXT DebugMessageSeverityFlags_to_vk(
-        const DebugMessageSeverityFlags& flags
-    )
-    {
-        VkDebugUtilsMessageSeverityFlagsEXT vk_flags = 0;
-        if (flags.verbose)
-        {
-            vk_flags |=
-                VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT;
-        }
-        if (flags.info)
-        {
-            vk_flags |=
-                VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT;
-        }
-        if (flags.warning)
-        {
-            vk_flags |=
-                VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
-        }
-        if (flags.error)
-        {
-            vk_flags |=
-                VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-        }
-        return vk_flags;
-    }
-
-    DebugMessageTypeFlags DebugMessageTypeFlags_from_vk(
-        VkDebugUtilsMessageTypeFlagsEXT vk_flags
-    )
-    {
-        return DebugMessageTypeFlags{
-            .general =
-            (bool)(vk_flags & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT),
-
-            .validation =
-            (bool)(vk_flags & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT),
-
-            .performance =
-            (bool)(vk_flags & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT),
-
-            .device_address_binding =
-            (bool)(vk_flags
-                & VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT)
-        };
-    }
-
-    VkDebugUtilsMessageTypeFlagsEXT DebugMessageTypeFlags_to_vk(
-        const DebugMessageTypeFlags& flags
-    )
-    {
-        VkDebugUtilsMessageTypeFlagsEXT vk_flags = 0;
-        if (flags.general)
-        {
-            vk_flags |=
-                VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT;
-        }
-        if (flags.validation)
-        {
-            vk_flags |=
-                VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
-        }
-        if (flags.performance)
-        {
-            vk_flags |=
-                VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-        }
-        if (flags.device_address_binding)
-        {
-            vk_flags |=
-                VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT;
-        }
-        return vk_flags;
-    }
-
-    DebugMessageSeverity DebugMessageSeverity_from_vk(
-        VkDebugUtilsMessageSeverityFlagBitsEXT vk_severity
-    )
-    {
-        if (vk_severity
-            & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
-            return DebugMessageSeverity::Error;
-        else if (vk_severity
-            & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-            return DebugMessageSeverity::Warning;
-        else if (vk_severity
-            & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
-            return DebugMessageSeverity::Info;
-        else if (vk_severity
-            & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT)
-            return DebugMessageSeverity::Verbose;
-        else
-            return DebugMessageSeverity::Verbose;
-    }
-
-    VkDeviceQueueCreateFlags QueueRequestFlags_to_vk(
-        const QueueRequestFlags& flags
-    )
-    {
-        VkDeviceQueueCreateFlags vk_flags = 0;
-        if (flags.protected_)
-        {
-            vk_flags |= VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT;
-        }
-        return vk_flags;
     }
 
     ExtensionProperties ExtensionProperties_from_vk(
@@ -1463,270 +954,12 @@ namespace bv
                 vk_family.queueFlags,
                 vk_presentation_support
             ),
-            .queue_count = vk_family.queueCount,
-            .timestamp_valid_bits = vk_family.timestampValidBits,
-            .min_image_transfer_granularity = Extent3d_from_vk(
-                vk_family.minImageTransferGranularity
-            )
+                .queue_count = vk_family.queueCount,
+                .timestamp_valid_bits = vk_family.timestampValidBits,
+                .min_image_transfer_granularity = Extent3d_from_vk(
+                    vk_family.minImageTransferGranularity
+                )
         };
-    }
-
-    SurfaceTransformFlags SurfaceTransformFlags_from_vk(const VkSurfaceTransformFlagsKHR& vk_flags)
-    {
-        return SurfaceTransformFlags{
-            .identity =
-            (bool)(vk_flags & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR),
-
-            .rotate90 =
-            (bool)(vk_flags & VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR),
-
-            .rotate180 =
-            (bool)(vk_flags & VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR),
-
-            .rotate270 =
-            (bool)(vk_flags & VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR),
-
-            .horizontal_mirror =
-            (bool)(vk_flags & VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_BIT_KHR),
-
-            .horizontal_mirror_rotate90 =
-            (bool)(vk_flags
-                & VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_90_BIT_KHR),
-
-            .horizontal_mirror_rotate180 =
-            (bool)(vk_flags
-                & VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_180_BIT_KHR),
-
-            .horizontal_mirror_rotate270 =
-            (bool)(vk_flags
-                & VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_270_BIT_KHR),
-
-            .inherit =
-            (bool)(vk_flags & VK_SURFACE_TRANSFORM_INHERIT_BIT_KHR),
-        };
-    }
-
-    SurfaceTransform SurfaceTransform_from_vk(
-        VkSurfaceTransformFlagBitsKHR vk_transform
-    )
-    {
-        switch (vk_transform)
-        {
-        case VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR:
-            return SurfaceTransform::Identity;
-        case VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR:
-            return SurfaceTransform::Rotate90;
-        case VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR:
-            return SurfaceTransform::Rotate180;
-        case VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR:
-            return SurfaceTransform::Rotate270;
-        case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_BIT_KHR:
-            return SurfaceTransform::HorizontalMirror;
-        case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_90_BIT_KHR:
-            return SurfaceTransform::HorizontalMirrorRotate90;
-        case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_180_BIT_KHR:
-            return SurfaceTransform::HorizontalMirrorRotate180;
-        case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_270_BIT_KHR:
-            return SurfaceTransform::HorizontalMirrorRotate270;
-        case VK_SURFACE_TRANSFORM_INHERIT_BIT_KHR:
-            return SurfaceTransform::Inherit;
-        default:
-            return SurfaceTransform::Identity;
-        }
-    }
-
-    VkSurfaceTransformFlagBitsKHR SurfaceTransform_to_vk(
-        SurfaceTransform transform
-    )
-    {
-        switch (transform)
-        {
-        case SurfaceTransform::Identity:
-            return VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-        case SurfaceTransform::Rotate90:
-            return VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR;
-        case SurfaceTransform::Rotate180:
-            return VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR;
-        case SurfaceTransform::Rotate270:
-            return VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR;
-        case SurfaceTransform::HorizontalMirror:
-            return VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_BIT_KHR;
-        case SurfaceTransform::HorizontalMirrorRotate90:
-            return VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_90_BIT_KHR;
-        case SurfaceTransform::HorizontalMirrorRotate180:
-            return VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_180_BIT_KHR;
-        case SurfaceTransform::HorizontalMirrorRotate270:
-            return VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_270_BIT_KHR;
-        case SurfaceTransform::Inherit:
-            return VK_SURFACE_TRANSFORM_INHERIT_BIT_KHR;
-        default:
-            return VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-        }
-    }
-
-    CompositeAlphaFlags CompositeAlphaFlags_from_vk(
-        VkCompositeAlphaFlagsKHR vk_flags
-    )
-    {
-        return CompositeAlphaFlags{
-            .opaque = (bool)(vk_flags & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR),
-
-            .pre_multiplied =
-            (bool)(vk_flags & VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR),
-
-            .post_multiplied =
-            (bool)(vk_flags & VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR),
-
-            .inherit = (bool)(vk_flags & VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR)
-        };
-    }
-
-    VkCompositeAlphaFlagBitsKHR CompositeAlpha_to_vk(CompositeAlpha alpha)
-    {
-        switch (alpha)
-        {
-        case CompositeAlpha::Opaque:
-            return VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-        case CompositeAlpha::PreMultiplied:
-            return VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR;
-        case CompositeAlpha::PostMultiplied:
-            return VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR;
-        case CompositeAlpha::Inherit:
-            return VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
-        default:
-            return VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-        }
-    }
-
-    ImageUsageFlags ImageUsageFlags_from_vk(VkImageUsageFlags vk_flags)
-    {
-        return ImageUsageFlags{
-            .transfer_src =
-            (bool)(vk_flags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT),
-
-            .transfer_dst =
-            (bool)(vk_flags & VK_IMAGE_USAGE_TRANSFER_DST_BIT),
-
-            .sampled =
-            (bool)(vk_flags & VK_IMAGE_USAGE_SAMPLED_BIT),
-
-            .storage =
-            (bool)(vk_flags & VK_IMAGE_USAGE_STORAGE_BIT),
-
-            .color_attachment =
-            (bool)(vk_flags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT),
-
-            .depth_stencil_attachment =
-            (bool)(vk_flags & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT),
-
-            .transient_attachment =
-            (bool)(vk_flags & VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT),
-
-            .input_attachment =
-            (bool)(vk_flags & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT),
-
-            .video_decode_dst =
-            (bool)(vk_flags & VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR),
-
-            .video_decode_src =
-            (bool)(vk_flags & VK_IMAGE_USAGE_VIDEO_DECODE_SRC_BIT_KHR),
-
-            .video_decode_dpb =
-            (bool)(vk_flags & VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR),
-
-            .fragment_density_map =
-            (bool)(vk_flags & VK_IMAGE_USAGE_FRAGMENT_DENSITY_MAP_BIT_EXT),
-
-            .fragment_shading_rate_attachment =
-            (bool)(vk_flags
-                & VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR),
-
-            .attachment_feedback_loop =
-            (bool)(vk_flags & VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT),
-
-            .invocation_mask_huawei =
-            (bool)(vk_flags & VK_IMAGE_USAGE_INVOCATION_MASK_BIT_HUAWEI),
-
-            .sample_weight_qcom =
-            (bool)(vk_flags & VK_IMAGE_USAGE_SAMPLE_WEIGHT_BIT_QCOM),
-
-            .sample_block_match_qcom =
-            (bool)(vk_flags & VK_IMAGE_USAGE_SAMPLE_BLOCK_MATCH_BIT_QCOM)
-        };
-    }
-
-    VkImageUsageFlags ImageUsageFlags_to_vk(const ImageUsageFlags& flags)
-    {
-        VkImageUsageFlags vk_flags = 0;
-        if (flags.transfer_src)
-        {
-            vk_flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-        }
-        if (flags.transfer_dst)
-        {
-            vk_flags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-        }
-        if (flags.sampled)
-        {
-            vk_flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
-        }
-        if (flags.storage)
-        {
-            vk_flags |= VK_IMAGE_USAGE_STORAGE_BIT;
-        }
-        if (flags.color_attachment)
-        {
-            vk_flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-        }
-        if (flags.depth_stencil_attachment)
-        {
-            vk_flags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-        }
-        if (flags.transient_attachment)
-        {
-            vk_flags |= VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
-        }
-        if (flags.input_attachment)
-        {
-            vk_flags |= VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
-        }
-        if (flags.video_decode_dst)
-        {
-            vk_flags |= VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR;
-        }
-        if (flags.video_decode_src)
-        {
-            vk_flags |= VK_IMAGE_USAGE_VIDEO_DECODE_SRC_BIT_KHR;
-        }
-        if (flags.video_decode_dpb)
-        {
-            vk_flags |= VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR;
-        }
-        if (flags.fragment_density_map)
-        {
-            vk_flags |= VK_IMAGE_USAGE_FRAGMENT_DENSITY_MAP_BIT_EXT;
-        }
-        if (flags.fragment_shading_rate_attachment)
-        {
-            vk_flags |= VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR;
-        }
-        if (flags.attachment_feedback_loop)
-        {
-            vk_flags |= VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
-        }
-        if (flags.invocation_mask_huawei)
-        {
-            vk_flags |= VK_IMAGE_USAGE_INVOCATION_MASK_BIT_HUAWEI;
-        }
-        if (flags.sample_weight_qcom)
-        {
-            vk_flags |= VK_IMAGE_USAGE_SAMPLE_WEIGHT_BIT_QCOM;
-        }
-        if (flags.sample_block_match_qcom)
-        {
-            vk_flags |= VK_IMAGE_USAGE_SAMPLE_BLOCK_MATCH_BIT_QCOM;
-        }
-        return vk_flags;
     }
 
     SurfaceCapabilities SurfaceCapabilities_from_vk(
@@ -1759,1098 +992,6 @@ namespace bv
         };
     }
 
-    Format Format_from_vk(VkFormat vk_format)
-    {
-        switch (vk_format)
-        {
-        case VK_FORMAT_UNDEFINED:
-            return Format::Undefined;
-        case VK_FORMAT_R4G4_UNORM_PACK8:
-            return Format::R4G4_UNORM_PACK8;
-        case VK_FORMAT_R4G4B4A4_UNORM_PACK16:
-            return Format::R4G4B4A4_UNORM_PACK16;
-        case VK_FORMAT_B4G4R4A4_UNORM_PACK16:
-            return Format::B4G4R4A4_UNORM_PACK16;
-        case VK_FORMAT_R5G6B5_UNORM_PACK16:
-            return Format::R5G6B5_UNORM_PACK16;
-        case VK_FORMAT_B5G6R5_UNORM_PACK16:
-            return Format::B5G6R5_UNORM_PACK16;
-        case VK_FORMAT_R5G5B5A1_UNORM_PACK16:
-            return Format::R5G5B5A1_UNORM_PACK16;
-        case VK_FORMAT_B5G5R5A1_UNORM_PACK16:
-            return Format::B5G5R5A1_UNORM_PACK16;
-        case VK_FORMAT_A1R5G5B5_UNORM_PACK16:
-            return Format::A1R5G5B5_UNORM_PACK16;
-        case VK_FORMAT_R8_UNORM:
-            return Format::R8_UNORM;
-        case VK_FORMAT_R8_SNORM:
-            return Format::R8_SNORM;
-        case VK_FORMAT_R8_USCALED:
-            return Format::R8_USCALED;
-        case VK_FORMAT_R8_SSCALED:
-            return Format::R8_SSCALED;
-        case VK_FORMAT_R8_UINT:
-            return Format::R8_UINT;
-        case VK_FORMAT_R8_SINT:
-            return Format::R8_SINT;
-        case VK_FORMAT_R8_SRGB:
-            return Format::R8_SRGB;
-        case VK_FORMAT_R8G8_UNORM:
-            return Format::R8G8_UNORM;
-        case VK_FORMAT_R8G8_SNORM:
-            return Format::R8G8_SNORM;
-        case VK_FORMAT_R8G8_USCALED:
-            return Format::R8G8_USCALED;
-        case VK_FORMAT_R8G8_SSCALED:
-            return Format::R8G8_SSCALED;
-        case VK_FORMAT_R8G8_UINT:
-            return Format::R8G8_UINT;
-        case VK_FORMAT_R8G8_SINT:
-            return Format::R8G8_SINT;
-        case VK_FORMAT_R8G8_SRGB:
-            return Format::R8G8_SRGB;
-        case VK_FORMAT_R8G8B8_UNORM:
-            return Format::R8G8B8_UNORM;
-        case VK_FORMAT_R8G8B8_SNORM:
-            return Format::R8G8B8_SNORM;
-        case VK_FORMAT_R8G8B8_USCALED:
-            return Format::R8G8B8_USCALED;
-        case VK_FORMAT_R8G8B8_SSCALED:
-            return Format::R8G8B8_SSCALED;
-        case VK_FORMAT_R8G8B8_UINT:
-            return Format::R8G8B8_UINT;
-        case VK_FORMAT_R8G8B8_SINT:
-            return Format::R8G8B8_SINT;
-        case VK_FORMAT_R8G8B8_SRGB:
-            return Format::R8G8B8_SRGB;
-        case VK_FORMAT_B8G8R8_UNORM:
-            return Format::B8G8R8_UNORM;
-        case VK_FORMAT_B8G8R8_SNORM:
-            return Format::B8G8R8_SNORM;
-        case VK_FORMAT_B8G8R8_USCALED:
-            return Format::B8G8R8_USCALED;
-        case VK_FORMAT_B8G8R8_SSCALED:
-            return Format::B8G8R8_SSCALED;
-        case VK_FORMAT_B8G8R8_UINT:
-            return Format::B8G8R8_UINT;
-        case VK_FORMAT_B8G8R8_SINT:
-            return Format::B8G8R8_SINT;
-        case VK_FORMAT_B8G8R8_SRGB:
-            return Format::B8G8R8_SRGB;
-        case VK_FORMAT_R8G8B8A8_UNORM:
-            return Format::R8G8B8A8_UNORM;
-        case VK_FORMAT_R8G8B8A8_SNORM:
-            return Format::R8G8B8A8_SNORM;
-        case VK_FORMAT_R8G8B8A8_USCALED:
-            return Format::R8G8B8A8_USCALED;
-        case VK_FORMAT_R8G8B8A8_SSCALED:
-            return Format::R8G8B8A8_SSCALED;
-        case VK_FORMAT_R8G8B8A8_UINT:
-            return Format::R8G8B8A8_UINT;
-        case VK_FORMAT_R8G8B8A8_SINT:
-            return Format::R8G8B8A8_SINT;
-        case VK_FORMAT_R8G8B8A8_SRGB:
-            return Format::R8G8B8A8_SRGB;
-        case VK_FORMAT_B8G8R8A8_UNORM:
-            return Format::B8G8R8A8_UNORM;
-        case VK_FORMAT_B8G8R8A8_SNORM:
-            return Format::B8G8R8A8_SNORM;
-        case VK_FORMAT_B8G8R8A8_USCALED:
-            return Format::B8G8R8A8_USCALED;
-        case VK_FORMAT_B8G8R8A8_SSCALED:
-            return Format::B8G8R8A8_SSCALED;
-        case VK_FORMAT_B8G8R8A8_UINT:
-            return Format::B8G8R8A8_UINT;
-        case VK_FORMAT_B8G8R8A8_SINT:
-            return Format::B8G8R8A8_SINT;
-        case VK_FORMAT_B8G8R8A8_SRGB:
-            return Format::B8G8R8A8_SRGB;
-        case VK_FORMAT_A8B8G8R8_UNORM_PACK32:
-            return Format::A8B8G8R8_UNORM_PACK32;
-        case VK_FORMAT_A8B8G8R8_SNORM_PACK32:
-            return Format::A8B8G8R8_SNORM_PACK32;
-        case VK_FORMAT_A8B8G8R8_USCALED_PACK32:
-            return Format::A8B8G8R8_USCALED_PACK32;
-        case VK_FORMAT_A8B8G8R8_SSCALED_PACK32:
-            return Format::A8B8G8R8_SSCALED_PACK32;
-        case VK_FORMAT_A8B8G8R8_UINT_PACK32:
-            return Format::A8B8G8R8_UINT_PACK32;
-        case VK_FORMAT_A8B8G8R8_SINT_PACK32:
-            return Format::A8B8G8R8_SINT_PACK32;
-        case VK_FORMAT_A8B8G8R8_SRGB_PACK32:
-            return Format::A8B8G8R8_SRGB_PACK32;
-        case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
-            return Format::A2R10G10B10_UNORM_PACK32;
-        case VK_FORMAT_A2R10G10B10_SNORM_PACK32:
-            return Format::A2R10G10B10_SNORM_PACK32;
-        case VK_FORMAT_A2R10G10B10_USCALED_PACK32:
-            return Format::A2R10G10B10_USCALED_PACK32;
-        case VK_FORMAT_A2R10G10B10_SSCALED_PACK32:
-            return Format::A2R10G10B10_SSCALED_PACK32;
-        case VK_FORMAT_A2R10G10B10_UINT_PACK32:
-            return Format::A2R10G10B10_UINT_PACK32;
-        case VK_FORMAT_A2R10G10B10_SINT_PACK32:
-            return Format::A2R10G10B10_SINT_PACK32;
-        case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
-            return Format::A2B10G10R10_UNORM_PACK32;
-        case VK_FORMAT_A2B10G10R10_SNORM_PACK32:
-            return Format::A2B10G10R10_SNORM_PACK32;
-        case VK_FORMAT_A2B10G10R10_USCALED_PACK32:
-            return Format::A2B10G10R10_USCALED_PACK32;
-        case VK_FORMAT_A2B10G10R10_SSCALED_PACK32:
-            return Format::A2B10G10R10_SSCALED_PACK32;
-        case VK_FORMAT_A2B10G10R10_UINT_PACK32:
-            return Format::A2B10G10R10_UINT_PACK32;
-        case VK_FORMAT_A2B10G10R10_SINT_PACK32:
-            return Format::A2B10G10R10_SINT_PACK32;
-        case VK_FORMAT_R16_UNORM:
-            return Format::R16_UNORM;
-        case VK_FORMAT_R16_SNORM:
-            return Format::R16_SNORM;
-        case VK_FORMAT_R16_USCALED:
-            return Format::R16_USCALED;
-        case VK_FORMAT_R16_SSCALED:
-            return Format::R16_SSCALED;
-        case VK_FORMAT_R16_UINT:
-            return Format::R16_UINT;
-        case VK_FORMAT_R16_SINT:
-            return Format::R16_SINT;
-        case VK_FORMAT_R16_SFLOAT:
-            return Format::R16_SFLOAT;
-        case VK_FORMAT_R16G16_UNORM:
-            return Format::R16G16_UNORM;
-        case VK_FORMAT_R16G16_SNORM:
-            return Format::R16G16_SNORM;
-        case VK_FORMAT_R16G16_USCALED:
-            return Format::R16G16_USCALED;
-        case VK_FORMAT_R16G16_SSCALED:
-            return Format::R16G16_SSCALED;
-        case VK_FORMAT_R16G16_UINT:
-            return Format::R16G16_UINT;
-        case VK_FORMAT_R16G16_SINT:
-            return Format::R16G16_SINT;
-        case VK_FORMAT_R16G16_SFLOAT:
-            return Format::R16G16_SFLOAT;
-        case VK_FORMAT_R16G16B16_UNORM:
-            return Format::R16G16B16_UNORM;
-        case VK_FORMAT_R16G16B16_SNORM:
-            return Format::R16G16B16_SNORM;
-        case VK_FORMAT_R16G16B16_USCALED:
-            return Format::R16G16B16_USCALED;
-        case VK_FORMAT_R16G16B16_SSCALED:
-            return Format::R16G16B16_SSCALED;
-        case VK_FORMAT_R16G16B16_UINT:
-            return Format::R16G16B16_UINT;
-        case VK_FORMAT_R16G16B16_SINT:
-            return Format::R16G16B16_SINT;
-        case VK_FORMAT_R16G16B16_SFLOAT:
-            return Format::R16G16B16_SFLOAT;
-        case VK_FORMAT_R16G16B16A16_UNORM:
-            return Format::R16G16B16A16_UNORM;
-        case VK_FORMAT_R16G16B16A16_SNORM:
-            return Format::R16G16B16A16_SNORM;
-        case VK_FORMAT_R16G16B16A16_USCALED:
-            return Format::R16G16B16A16_USCALED;
-        case VK_FORMAT_R16G16B16A16_SSCALED:
-            return Format::R16G16B16A16_SSCALED;
-        case VK_FORMAT_R16G16B16A16_UINT:
-            return Format::R16G16B16A16_UINT;
-        case VK_FORMAT_R16G16B16A16_SINT:
-            return Format::R16G16B16A16_SINT;
-        case VK_FORMAT_R16G16B16A16_SFLOAT:
-            return Format::R16G16B16A16_SFLOAT;
-        case VK_FORMAT_R32_UINT:
-            return Format::R32_UINT;
-        case VK_FORMAT_R32_SINT:
-            return Format::R32_SINT;
-        case VK_FORMAT_R32_SFLOAT:
-            return Format::R32_SFLOAT;
-        case VK_FORMAT_R32G32_UINT:
-            return Format::R32G32_UINT;
-        case VK_FORMAT_R32G32_SINT:
-            return Format::R32G32_SINT;
-        case VK_FORMAT_R32G32_SFLOAT:
-            return Format::R32G32_SFLOAT;
-        case VK_FORMAT_R32G32B32_UINT:
-            return Format::R32G32B32_UINT;
-        case VK_FORMAT_R32G32B32_SINT:
-            return Format::R32G32B32_SINT;
-        case VK_FORMAT_R32G32B32_SFLOAT:
-            return Format::R32G32B32_SFLOAT;
-        case VK_FORMAT_R32G32B32A32_UINT:
-            return Format::R32G32B32A32_UINT;
-        case VK_FORMAT_R32G32B32A32_SINT:
-            return Format::R32G32B32A32_SINT;
-        case VK_FORMAT_R32G32B32A32_SFLOAT:
-            return Format::R32G32B32A32_SFLOAT;
-        case VK_FORMAT_R64_UINT:
-            return Format::R64_UINT;
-        case VK_FORMAT_R64_SINT:
-            return Format::R64_SINT;
-        case VK_FORMAT_R64_SFLOAT:
-            return Format::R64_SFLOAT;
-        case VK_FORMAT_R64G64_UINT:
-            return Format::R64G64_UINT;
-        case VK_FORMAT_R64G64_SINT:
-            return Format::R64G64_SINT;
-        case VK_FORMAT_R64G64_SFLOAT:
-            return Format::R64G64_SFLOAT;
-        case VK_FORMAT_R64G64B64_UINT:
-            return Format::R64G64B64_UINT;
-        case VK_FORMAT_R64G64B64_SINT:
-            return Format::R64G64B64_SINT;
-        case VK_FORMAT_R64G64B64_SFLOAT:
-            return Format::R64G64B64_SFLOAT;
-        case VK_FORMAT_R64G64B64A64_UINT:
-            return Format::R64G64B64A64_UINT;
-        case VK_FORMAT_R64G64B64A64_SINT:
-            return Format::R64G64B64A64_SINT;
-        case VK_FORMAT_R64G64B64A64_SFLOAT:
-            return Format::R64G64B64A64_SFLOAT;
-        case VK_FORMAT_B10G11R11_UFLOAT_PACK32:
-            return Format::B10G11R11_UFLOAT_PACK32;
-        case VK_FORMAT_E5B9G9R9_UFLOAT_PACK32:
-            return Format::E5B9G9R9_UFLOAT_PACK32;
-        case VK_FORMAT_D16_UNORM:
-            return Format::D16_UNORM;
-        case VK_FORMAT_X8_D24_UNORM_PACK32:
-            return Format::X8_D24_UNORM_PACK32;
-        case VK_FORMAT_D32_SFLOAT:
-            return Format::D32_SFLOAT;
-        case VK_FORMAT_S8_UINT:
-            return Format::S8_UINT;
-        case VK_FORMAT_D16_UNORM_S8_UINT:
-            return Format::D16_UNORM_S8_UINT;
-        case VK_FORMAT_D24_UNORM_S8_UINT:
-            return Format::D24_UNORM_S8_UINT;
-        case VK_FORMAT_D32_SFLOAT_S8_UINT:
-            return Format::D32_SFLOAT_S8_UINT;
-        case VK_FORMAT_BC1_RGB_UNORM_BLOCK:
-            return Format::BC1_RGB_UNORM_BLOCK;
-        case VK_FORMAT_BC1_RGB_SRGB_BLOCK:
-            return Format::BC1_RGB_SRGB_BLOCK;
-        case VK_FORMAT_BC1_RGBA_UNORM_BLOCK:
-            return Format::BC1_RGBA_UNORM_BLOCK;
-        case VK_FORMAT_BC1_RGBA_SRGB_BLOCK:
-            return Format::BC1_RGBA_SRGB_BLOCK;
-        case VK_FORMAT_BC2_UNORM_BLOCK:
-            return Format::BC2_UNORM_BLOCK;
-        case VK_FORMAT_BC2_SRGB_BLOCK:
-            return Format::BC2_SRGB_BLOCK;
-        case VK_FORMAT_BC3_UNORM_BLOCK:
-            return Format::BC3_UNORM_BLOCK;
-        case VK_FORMAT_BC3_SRGB_BLOCK:
-            return Format::BC3_SRGB_BLOCK;
-        case VK_FORMAT_BC4_UNORM_BLOCK:
-            return Format::BC4_UNORM_BLOCK;
-        case VK_FORMAT_BC4_SNORM_BLOCK:
-            return Format::BC4_SNORM_BLOCK;
-        case VK_FORMAT_BC5_UNORM_BLOCK:
-            return Format::BC5_UNORM_BLOCK;
-        case VK_FORMAT_BC5_SNORM_BLOCK:
-            return Format::BC5_SNORM_BLOCK;
-        case VK_FORMAT_BC6H_UFLOAT_BLOCK:
-            return Format::BC6H_UFLOAT_BLOCK;
-        case VK_FORMAT_BC6H_SFLOAT_BLOCK:
-            return Format::BC6H_SFLOAT_BLOCK;
-        case VK_FORMAT_BC7_UNORM_BLOCK:
-            return Format::BC7_UNORM_BLOCK;
-        case VK_FORMAT_BC7_SRGB_BLOCK:
-            return Format::BC7_SRGB_BLOCK;
-        case VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK:
-            return Format::ETC2_R8G8B8_UNORM_BLOCK;
-        case VK_FORMAT_ETC2_R8G8B8_SRGB_BLOCK:
-            return Format::ETC2_R8G8B8_SRGB_BLOCK;
-        case VK_FORMAT_ETC2_R8G8B8A1_UNORM_BLOCK:
-            return Format::ETC2_R8G8B8A1_UNORM_BLOCK;
-        case VK_FORMAT_ETC2_R8G8B8A1_SRGB_BLOCK:
-            return Format::ETC2_R8G8B8A1_SRGB_BLOCK;
-        case VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK:
-            return Format::ETC2_R8G8B8A8_UNORM_BLOCK;
-        case VK_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK:
-            return Format::ETC2_R8G8B8A8_SRGB_BLOCK;
-        case VK_FORMAT_EAC_R11_UNORM_BLOCK:
-            return Format::EAC_R11_UNORM_BLOCK;
-        case VK_FORMAT_EAC_R11_SNORM_BLOCK:
-            return Format::EAC_R11_SNORM_BLOCK;
-        case VK_FORMAT_EAC_R11G11_UNORM_BLOCK:
-            return Format::EAC_R11G11_UNORM_BLOCK;
-        case VK_FORMAT_EAC_R11G11_SNORM_BLOCK:
-            return Format::EAC_R11G11_SNORM_BLOCK;
-        case VK_FORMAT_ASTC_4x4_UNORM_BLOCK:
-            return Format::ASTC_4x4_UNORM_BLOCK;
-        case VK_FORMAT_ASTC_4x4_SRGB_BLOCK:
-            return Format::ASTC_4x4_SRGB_BLOCK;
-        case VK_FORMAT_ASTC_5x4_UNORM_BLOCK:
-            return Format::ASTC_5x4_UNORM_BLOCK;
-        case VK_FORMAT_ASTC_5x4_SRGB_BLOCK:
-            return Format::ASTC_5x4_SRGB_BLOCK;
-        case VK_FORMAT_ASTC_5x5_UNORM_BLOCK:
-            return Format::ASTC_5x5_UNORM_BLOCK;
-        case VK_FORMAT_ASTC_5x5_SRGB_BLOCK:
-            return Format::ASTC_5x5_SRGB_BLOCK;
-        case VK_FORMAT_ASTC_6x5_UNORM_BLOCK:
-            return Format::ASTC_6x5_UNORM_BLOCK;
-        case VK_FORMAT_ASTC_6x5_SRGB_BLOCK:
-            return Format::ASTC_6x5_SRGB_BLOCK;
-        case VK_FORMAT_ASTC_6x6_UNORM_BLOCK:
-            return Format::ASTC_6x6_UNORM_BLOCK;
-        case VK_FORMAT_ASTC_6x6_SRGB_BLOCK:
-            return Format::ASTC_6x6_SRGB_BLOCK;
-        case VK_FORMAT_ASTC_8x5_UNORM_BLOCK:
-            return Format::ASTC_8x5_UNORM_BLOCK;
-        case VK_FORMAT_ASTC_8x5_SRGB_BLOCK:
-            return Format::ASTC_8x5_SRGB_BLOCK;
-        case VK_FORMAT_ASTC_8x6_UNORM_BLOCK:
-            return Format::ASTC_8x6_UNORM_BLOCK;
-        case VK_FORMAT_ASTC_8x6_SRGB_BLOCK:
-            return Format::ASTC_8x6_SRGB_BLOCK;
-        case VK_FORMAT_ASTC_8x8_UNORM_BLOCK:
-            return Format::ASTC_8x8_UNORM_BLOCK;
-        case VK_FORMAT_ASTC_8x8_SRGB_BLOCK:
-            return Format::ASTC_8x8_SRGB_BLOCK;
-        case VK_FORMAT_ASTC_10x5_UNORM_BLOCK:
-            return Format::ASTC_10x5_UNORM_BLOCK;
-        case VK_FORMAT_ASTC_10x5_SRGB_BLOCK:
-            return Format::ASTC_10x5_SRGB_BLOCK;
-        case VK_FORMAT_ASTC_10x6_UNORM_BLOCK:
-            return Format::ASTC_10x6_UNORM_BLOCK;
-        case VK_FORMAT_ASTC_10x6_SRGB_BLOCK:
-            return Format::ASTC_10x6_SRGB_BLOCK;
-        case VK_FORMAT_ASTC_10x8_UNORM_BLOCK:
-            return Format::ASTC_10x8_UNORM_BLOCK;
-        case VK_FORMAT_ASTC_10x8_SRGB_BLOCK:
-            return Format::ASTC_10x8_SRGB_BLOCK;
-        case VK_FORMAT_ASTC_10x10_UNORM_BLOCK:
-            return Format::ASTC_10x10_UNORM_BLOCK;
-        case VK_FORMAT_ASTC_10x10_SRGB_BLOCK:
-            return Format::ASTC_10x10_SRGB_BLOCK;
-        case VK_FORMAT_ASTC_12x10_UNORM_BLOCK:
-            return Format::ASTC_12x10_UNORM_BLOCK;
-        case VK_FORMAT_ASTC_12x10_SRGB_BLOCK:
-            return Format::ASTC_12x10_SRGB_BLOCK;
-        case VK_FORMAT_ASTC_12x12_UNORM_BLOCK:
-            return Format::ASTC_12x12_UNORM_BLOCK;
-        case VK_FORMAT_ASTC_12x12_SRGB_BLOCK:
-            return Format::ASTC_12x12_SRGB_BLOCK;
-        case VK_FORMAT_G8B8G8R8_422_UNORM:
-            return Format::G8B8G8R8_422_UNORM;
-        case VK_FORMAT_B8G8R8G8_422_UNORM:
-            return Format::B8G8R8G8_422_UNORM;
-        case VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM:
-            return Format::G8_B8_R8_3PLANE_420_UNORM;
-        case VK_FORMAT_G8_B8R8_2PLANE_420_UNORM:
-            return Format::G8_B8R8_2PLANE_420_UNORM;
-        case VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM:
-            return Format::G8_B8_R8_3PLANE_422_UNORM;
-        case VK_FORMAT_G8_B8R8_2PLANE_422_UNORM:
-            return Format::G8_B8R8_2PLANE_422_UNORM;
-        case VK_FORMAT_G8_B8_R8_3PLANE_444_UNORM:
-            return Format::G8_B8_R8_3PLANE_444_UNORM;
-        case VK_FORMAT_R10X6_UNORM_PACK16:
-            return Format::R10X6_UNORM_PACK16;
-        case VK_FORMAT_R10X6G10X6_UNORM_2PACK16:
-            return Format::R10X6G10X6_UNORM_2PACK16;
-        case VK_FORMAT_R10X6G10X6B10X6A10X6_UNORM_4PACK16:
-            return Format::R10X6G10X6B10X6A10X6_UNORM_4PACK16;
-        case VK_FORMAT_G10X6B10X6G10X6R10X6_422_UNORM_4PACK16:
-            return Format::G10X6B10X6G10X6R10X6_422_UNORM_4PACK16;
-        case VK_FORMAT_B10X6G10X6R10X6G10X6_422_UNORM_4PACK16:
-            return Format::B10X6G10X6R10X6G10X6_422_UNORM_4PACK16;
-        case VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16:
-            return Format::G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16;
-        case VK_FORMAT_G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16:
-            return Format::G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16;
-        case VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16:
-            return Format::G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16;
-        case VK_FORMAT_G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16:
-            return Format::G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16;
-        case VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16:
-            return Format::G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16;
-        case VK_FORMAT_R12X4_UNORM_PACK16:
-            return Format::R12X4_UNORM_PACK16;
-        case VK_FORMAT_R12X4G12X4_UNORM_2PACK16:
-            return Format::R12X4G12X4_UNORM_2PACK16;
-        case VK_FORMAT_R12X4G12X4B12X4A12X4_UNORM_4PACK16:
-            return Format::R12X4G12X4B12X4A12X4_UNORM_4PACK16;
-        case VK_FORMAT_G12X4B12X4G12X4R12X4_422_UNORM_4PACK16:
-            return Format::G12X4B12X4G12X4R12X4_422_UNORM_4PACK16;
-        case VK_FORMAT_B12X4G12X4R12X4G12X4_422_UNORM_4PACK16:
-            return Format::B12X4G12X4R12X4G12X4_422_UNORM_4PACK16;
-        case VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16:
-            return Format::G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16;
-        case VK_FORMAT_G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16:
-            return Format::G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16;
-        case VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16:
-            return Format::G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16;
-        case VK_FORMAT_G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16:
-            return Format::G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16;
-        case VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16:
-            return Format::G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16;
-        case VK_FORMAT_G16B16G16R16_422_UNORM:
-            return Format::G16B16G16R16_422_UNORM;
-        case VK_FORMAT_B16G16R16G16_422_UNORM:
-            return Format::B16G16R16G16_422_UNORM;
-        case VK_FORMAT_G16_B16_R16_3PLANE_420_UNORM:
-            return Format::G16_B16_R16_3PLANE_420_UNORM;
-        case VK_FORMAT_G16_B16R16_2PLANE_420_UNORM:
-            return Format::G16_B16R16_2PLANE_420_UNORM;
-        case VK_FORMAT_G16_B16_R16_3PLANE_422_UNORM:
-            return Format::G16_B16_R16_3PLANE_422_UNORM;
-        case VK_FORMAT_G16_B16R16_2PLANE_422_UNORM:
-            return Format::G16_B16R16_2PLANE_422_UNORM;
-        case VK_FORMAT_G16_B16_R16_3PLANE_444_UNORM:
-            return Format::G16_B16_R16_3PLANE_444_UNORM;
-        case VK_FORMAT_G8_B8R8_2PLANE_444_UNORM:
-            return Format::G8_B8R8_2PLANE_444_UNORM;
-        case VK_FORMAT_G10X6_B10X6R10X6_2PLANE_444_UNORM_3PACK16:
-            return Format::G10X6_B10X6R10X6_2PLANE_444_UNORM_3PACK16;
-        case VK_FORMAT_G12X4_B12X4R12X4_2PLANE_444_UNORM_3PACK16:
-            return Format::G12X4_B12X4R12X4_2PLANE_444_UNORM_3PACK16;
-        case VK_FORMAT_G16_B16R16_2PLANE_444_UNORM:
-            return Format::G16_B16R16_2PLANE_444_UNORM;
-        case VK_FORMAT_A4R4G4B4_UNORM_PACK16:
-            return Format::A4R4G4B4_UNORM_PACK16;
-        case VK_FORMAT_A4B4G4R4_UNORM_PACK16:
-            return Format::A4B4G4R4_UNORM_PACK16;
-        case VK_FORMAT_ASTC_4x4_SFLOAT_BLOCK:
-            return Format::ASTC_4x4_SFLOAT_BLOCK;
-        case VK_FORMAT_ASTC_5x4_SFLOAT_BLOCK:
-            return Format::ASTC_5x4_SFLOAT_BLOCK;
-        case VK_FORMAT_ASTC_5x5_SFLOAT_BLOCK:
-            return Format::ASTC_5x5_SFLOAT_BLOCK;
-        case VK_FORMAT_ASTC_6x5_SFLOAT_BLOCK:
-            return Format::ASTC_6x5_SFLOAT_BLOCK;
-        case VK_FORMAT_ASTC_6x6_SFLOAT_BLOCK:
-            return Format::ASTC_6x6_SFLOAT_BLOCK;
-        case VK_FORMAT_ASTC_8x5_SFLOAT_BLOCK:
-            return Format::ASTC_8x5_SFLOAT_BLOCK;
-        case VK_FORMAT_ASTC_8x6_SFLOAT_BLOCK:
-            return Format::ASTC_8x6_SFLOAT_BLOCK;
-        case VK_FORMAT_ASTC_8x8_SFLOAT_BLOCK:
-            return Format::ASTC_8x8_SFLOAT_BLOCK;
-        case VK_FORMAT_ASTC_10x5_SFLOAT_BLOCK:
-            return Format::ASTC_10x5_SFLOAT_BLOCK;
-        case VK_FORMAT_ASTC_10x6_SFLOAT_BLOCK:
-            return Format::ASTC_10x6_SFLOAT_BLOCK;
-        case VK_FORMAT_ASTC_10x8_SFLOAT_BLOCK:
-            return Format::ASTC_10x8_SFLOAT_BLOCK;
-        case VK_FORMAT_ASTC_10x10_SFLOAT_BLOCK:
-            return Format::ASTC_10x10_SFLOAT_BLOCK;
-        case VK_FORMAT_ASTC_12x10_SFLOAT_BLOCK:
-            return Format::ASTC_12x10_SFLOAT_BLOCK;
-        case VK_FORMAT_ASTC_12x12_SFLOAT_BLOCK:
-            return Format::ASTC_12x12_SFLOAT_BLOCK;
-        case VK_FORMAT_PVRTC1_2BPP_UNORM_BLOCK_IMG:
-            return Format::PVRTC1_2BPP_UNORM_BLOCK_IMG;
-        case VK_FORMAT_PVRTC1_4BPP_UNORM_BLOCK_IMG:
-            return Format::PVRTC1_4BPP_UNORM_BLOCK_IMG;
-        case VK_FORMAT_PVRTC2_2BPP_UNORM_BLOCK_IMG:
-            return Format::PVRTC2_2BPP_UNORM_BLOCK_IMG;
-        case VK_FORMAT_PVRTC2_4BPP_UNORM_BLOCK_IMG:
-            return Format::PVRTC2_4BPP_UNORM_BLOCK_IMG;
-        case VK_FORMAT_PVRTC1_2BPP_SRGB_BLOCK_IMG:
-            return Format::PVRTC1_2BPP_SRGB_BLOCK_IMG;
-        case VK_FORMAT_PVRTC1_4BPP_SRGB_BLOCK_IMG:
-            return Format::PVRTC1_4BPP_SRGB_BLOCK_IMG;
-        case VK_FORMAT_PVRTC2_2BPP_SRGB_BLOCK_IMG:
-            return Format::PVRTC2_2BPP_SRGB_BLOCK_IMG;
-        case VK_FORMAT_PVRTC2_4BPP_SRGB_BLOCK_IMG:
-            return Format::PVRTC2_4BPP_SRGB_BLOCK_IMG;
-        case VK_FORMAT_R16G16_S10_5_NV:
-            return Format::R16G16_S10_5_NV;
-        default:
-            return Format::Undefined;
-        }
-    }
-
-    VkFormat Format_to_vk(Format format)
-    {
-        switch (format)
-        {
-        case Format::Undefined:
-            return VK_FORMAT_UNDEFINED;
-        case Format::R4G4_UNORM_PACK8:
-            return VK_FORMAT_R4G4_UNORM_PACK8;
-        case Format::R4G4B4A4_UNORM_PACK16:
-            return VK_FORMAT_R4G4B4A4_UNORM_PACK16;
-        case Format::B4G4R4A4_UNORM_PACK16:
-            return VK_FORMAT_B4G4R4A4_UNORM_PACK16;
-        case Format::R5G6B5_UNORM_PACK16:
-            return VK_FORMAT_R5G6B5_UNORM_PACK16;
-        case Format::B5G6R5_UNORM_PACK16:
-            return VK_FORMAT_B5G6R5_UNORM_PACK16;
-        case Format::R5G5B5A1_UNORM_PACK16:
-            return VK_FORMAT_R5G5B5A1_UNORM_PACK16;
-        case Format::B5G5R5A1_UNORM_PACK16:
-            return VK_FORMAT_B5G5R5A1_UNORM_PACK16;
-        case Format::A1R5G5B5_UNORM_PACK16:
-            return VK_FORMAT_A1R5G5B5_UNORM_PACK16;
-        case Format::R8_UNORM:
-            return VK_FORMAT_R8_UNORM;
-        case Format::R8_SNORM:
-            return VK_FORMAT_R8_SNORM;
-        case Format::R8_USCALED:
-            return VK_FORMAT_R8_USCALED;
-        case Format::R8_SSCALED:
-            return VK_FORMAT_R8_SSCALED;
-        case Format::R8_UINT:
-            return VK_FORMAT_R8_UINT;
-        case Format::R8_SINT:
-            return VK_FORMAT_R8_SINT;
-        case Format::R8_SRGB:
-            return VK_FORMAT_R8_SRGB;
-        case Format::R8G8_UNORM:
-            return VK_FORMAT_R8G8_UNORM;
-        case Format::R8G8_SNORM:
-            return VK_FORMAT_R8G8_SNORM;
-        case Format::R8G8_USCALED:
-            return VK_FORMAT_R8G8_USCALED;
-        case Format::R8G8_SSCALED:
-            return VK_FORMAT_R8G8_SSCALED;
-        case Format::R8G8_UINT:
-            return VK_FORMAT_R8G8_UINT;
-        case Format::R8G8_SINT:
-            return VK_FORMAT_R8G8_SINT;
-        case Format::R8G8_SRGB:
-            return VK_FORMAT_R8G8_SRGB;
-        case Format::R8G8B8_UNORM:
-            return VK_FORMAT_R8G8B8_UNORM;
-        case Format::R8G8B8_SNORM:
-            return VK_FORMAT_R8G8B8_SNORM;
-        case Format::R8G8B8_USCALED:
-            return VK_FORMAT_R8G8B8_USCALED;
-        case Format::R8G8B8_SSCALED:
-            return VK_FORMAT_R8G8B8_SSCALED;
-        case Format::R8G8B8_UINT:
-            return VK_FORMAT_R8G8B8_UINT;
-        case Format::R8G8B8_SINT:
-            return VK_FORMAT_R8G8B8_SINT;
-        case Format::R8G8B8_SRGB:
-            return VK_FORMAT_R8G8B8_SRGB;
-        case Format::B8G8R8_UNORM:
-            return VK_FORMAT_B8G8R8_UNORM;
-        case Format::B8G8R8_SNORM:
-            return VK_FORMAT_B8G8R8_SNORM;
-        case Format::B8G8R8_USCALED:
-            return VK_FORMAT_B8G8R8_USCALED;
-        case Format::B8G8R8_SSCALED:
-            return VK_FORMAT_B8G8R8_SSCALED;
-        case Format::B8G8R8_UINT:
-            return VK_FORMAT_B8G8R8_UINT;
-        case Format::B8G8R8_SINT:
-            return VK_FORMAT_B8G8R8_SINT;
-        case Format::B8G8R8_SRGB:
-            return VK_FORMAT_B8G8R8_SRGB;
-        case Format::R8G8B8A8_UNORM:
-            return VK_FORMAT_R8G8B8A8_UNORM;
-        case Format::R8G8B8A8_SNORM:
-            return VK_FORMAT_R8G8B8A8_SNORM;
-        case Format::R8G8B8A8_USCALED:
-            return VK_FORMAT_R8G8B8A8_USCALED;
-        case Format::R8G8B8A8_SSCALED:
-            return VK_FORMAT_R8G8B8A8_SSCALED;
-        case Format::R8G8B8A8_UINT:
-            return VK_FORMAT_R8G8B8A8_UINT;
-        case Format::R8G8B8A8_SINT:
-            return VK_FORMAT_R8G8B8A8_SINT;
-        case Format::R8G8B8A8_SRGB:
-            return VK_FORMAT_R8G8B8A8_SRGB;
-        case Format::B8G8R8A8_UNORM:
-            return VK_FORMAT_B8G8R8A8_UNORM;
-        case Format::B8G8R8A8_SNORM:
-            return VK_FORMAT_B8G8R8A8_SNORM;
-        case Format::B8G8R8A8_USCALED:
-            return VK_FORMAT_B8G8R8A8_USCALED;
-        case Format::B8G8R8A8_SSCALED:
-            return VK_FORMAT_B8G8R8A8_SSCALED;
-        case Format::B8G8R8A8_UINT:
-            return VK_FORMAT_B8G8R8A8_UINT;
-        case Format::B8G8R8A8_SINT:
-            return VK_FORMAT_B8G8R8A8_SINT;
-        case Format::B8G8R8A8_SRGB:
-            return VK_FORMAT_B8G8R8A8_SRGB;
-        case Format::A8B8G8R8_UNORM_PACK32:
-            return VK_FORMAT_A8B8G8R8_UNORM_PACK32;
-        case Format::A8B8G8R8_SNORM_PACK32:
-            return VK_FORMAT_A8B8G8R8_SNORM_PACK32;
-        case Format::A8B8G8R8_USCALED_PACK32:
-            return VK_FORMAT_A8B8G8R8_USCALED_PACK32;
-        case Format::A8B8G8R8_SSCALED_PACK32:
-            return VK_FORMAT_A8B8G8R8_SSCALED_PACK32;
-        case Format::A8B8G8R8_UINT_PACK32:
-            return VK_FORMAT_A8B8G8R8_UINT_PACK32;
-        case Format::A8B8G8R8_SINT_PACK32:
-            return VK_FORMAT_A8B8G8R8_SINT_PACK32;
-        case Format::A8B8G8R8_SRGB_PACK32:
-            return VK_FORMAT_A8B8G8R8_SRGB_PACK32;
-        case Format::A2R10G10B10_UNORM_PACK32:
-            return VK_FORMAT_A2R10G10B10_UNORM_PACK32;
-        case Format::A2R10G10B10_SNORM_PACK32:
-            return VK_FORMAT_A2R10G10B10_SNORM_PACK32;
-        case Format::A2R10G10B10_USCALED_PACK32:
-            return VK_FORMAT_A2R10G10B10_USCALED_PACK32;
-        case Format::A2R10G10B10_SSCALED_PACK32:
-            return VK_FORMAT_A2R10G10B10_SSCALED_PACK32;
-        case Format::A2R10G10B10_UINT_PACK32:
-            return VK_FORMAT_A2R10G10B10_UINT_PACK32;
-        case Format::A2R10G10B10_SINT_PACK32:
-            return VK_FORMAT_A2R10G10B10_SINT_PACK32;
-        case Format::A2B10G10R10_UNORM_PACK32:
-            return VK_FORMAT_A2B10G10R10_UNORM_PACK32;
-        case Format::A2B10G10R10_SNORM_PACK32:
-            return VK_FORMAT_A2B10G10R10_SNORM_PACK32;
-        case Format::A2B10G10R10_USCALED_PACK32:
-            return VK_FORMAT_A2B10G10R10_USCALED_PACK32;
-        case Format::A2B10G10R10_SSCALED_PACK32:
-            return VK_FORMAT_A2B10G10R10_SSCALED_PACK32;
-        case Format::A2B10G10R10_UINT_PACK32:
-            return VK_FORMAT_A2B10G10R10_UINT_PACK32;
-        case Format::A2B10G10R10_SINT_PACK32:
-            return VK_FORMAT_A2B10G10R10_SINT_PACK32;
-        case Format::R16_UNORM:
-            return VK_FORMAT_R16_UNORM;
-        case Format::R16_SNORM:
-            return VK_FORMAT_R16_SNORM;
-        case Format::R16_USCALED:
-            return VK_FORMAT_R16_USCALED;
-        case Format::R16_SSCALED:
-            return VK_FORMAT_R16_SSCALED;
-        case Format::R16_UINT:
-            return VK_FORMAT_R16_UINT;
-        case Format::R16_SINT:
-            return VK_FORMAT_R16_SINT;
-        case Format::R16_SFLOAT:
-            return VK_FORMAT_R16_SFLOAT;
-        case Format::R16G16_UNORM:
-            return VK_FORMAT_R16G16_UNORM;
-        case Format::R16G16_SNORM:
-            return VK_FORMAT_R16G16_SNORM;
-        case Format::R16G16_USCALED:
-            return VK_FORMAT_R16G16_USCALED;
-        case Format::R16G16_SSCALED:
-            return VK_FORMAT_R16G16_SSCALED;
-        case Format::R16G16_UINT:
-            return VK_FORMAT_R16G16_UINT;
-        case Format::R16G16_SINT:
-            return VK_FORMAT_R16G16_SINT;
-        case Format::R16G16_SFLOAT:
-            return VK_FORMAT_R16G16_SFLOAT;
-        case Format::R16G16B16_UNORM:
-            return VK_FORMAT_R16G16B16_UNORM;
-        case Format::R16G16B16_SNORM:
-            return VK_FORMAT_R16G16B16_SNORM;
-        case Format::R16G16B16_USCALED:
-            return VK_FORMAT_R16G16B16_USCALED;
-        case Format::R16G16B16_SSCALED:
-            return VK_FORMAT_R16G16B16_SSCALED;
-        case Format::R16G16B16_UINT:
-            return VK_FORMAT_R16G16B16_UINT;
-        case Format::R16G16B16_SINT:
-            return VK_FORMAT_R16G16B16_SINT;
-        case Format::R16G16B16_SFLOAT:
-            return VK_FORMAT_R16G16B16_SFLOAT;
-        case Format::R16G16B16A16_UNORM:
-            return VK_FORMAT_R16G16B16A16_UNORM;
-        case Format::R16G16B16A16_SNORM:
-            return VK_FORMAT_R16G16B16A16_SNORM;
-        case Format::R16G16B16A16_USCALED:
-            return VK_FORMAT_R16G16B16A16_USCALED;
-        case Format::R16G16B16A16_SSCALED:
-            return VK_FORMAT_R16G16B16A16_SSCALED;
-        case Format::R16G16B16A16_UINT:
-            return VK_FORMAT_R16G16B16A16_UINT;
-        case Format::R16G16B16A16_SINT:
-            return VK_FORMAT_R16G16B16A16_SINT;
-        case Format::R16G16B16A16_SFLOAT:
-            return VK_FORMAT_R16G16B16A16_SFLOAT;
-        case Format::R32_UINT:
-            return VK_FORMAT_R32_UINT;
-        case Format::R32_SINT:
-            return VK_FORMAT_R32_SINT;
-        case Format::R32_SFLOAT:
-            return VK_FORMAT_R32_SFLOAT;
-        case Format::R32G32_UINT:
-            return VK_FORMAT_R32G32_UINT;
-        case Format::R32G32_SINT:
-            return VK_FORMAT_R32G32_SINT;
-        case Format::R32G32_SFLOAT:
-            return VK_FORMAT_R32G32_SFLOAT;
-        case Format::R32G32B32_UINT:
-            return VK_FORMAT_R32G32B32_UINT;
-        case Format::R32G32B32_SINT:
-            return VK_FORMAT_R32G32B32_SINT;
-        case Format::R32G32B32_SFLOAT:
-            return VK_FORMAT_R32G32B32_SFLOAT;
-        case Format::R32G32B32A32_UINT:
-            return VK_FORMAT_R32G32B32A32_UINT;
-        case Format::R32G32B32A32_SINT:
-            return VK_FORMAT_R32G32B32A32_SINT;
-        case Format::R32G32B32A32_SFLOAT:
-            return VK_FORMAT_R32G32B32A32_SFLOAT;
-        case Format::R64_UINT:
-            return VK_FORMAT_R64_UINT;
-        case Format::R64_SINT:
-            return VK_FORMAT_R64_SINT;
-        case Format::R64_SFLOAT:
-            return VK_FORMAT_R64_SFLOAT;
-        case Format::R64G64_UINT:
-            return VK_FORMAT_R64G64_UINT;
-        case Format::R64G64_SINT:
-            return VK_FORMAT_R64G64_SINT;
-        case Format::R64G64_SFLOAT:
-            return VK_FORMAT_R64G64_SFLOAT;
-        case Format::R64G64B64_UINT:
-            return VK_FORMAT_R64G64B64_UINT;
-        case Format::R64G64B64_SINT:
-            return VK_FORMAT_R64G64B64_SINT;
-        case Format::R64G64B64_SFLOAT:
-            return VK_FORMAT_R64G64B64_SFLOAT;
-        case Format::R64G64B64A64_UINT:
-            return VK_FORMAT_R64G64B64A64_UINT;
-        case Format::R64G64B64A64_SINT:
-            return VK_FORMAT_R64G64B64A64_SINT;
-        case Format::R64G64B64A64_SFLOAT:
-            return VK_FORMAT_R64G64B64A64_SFLOAT;
-        case Format::B10G11R11_UFLOAT_PACK32:
-            return VK_FORMAT_B10G11R11_UFLOAT_PACK32;
-        case Format::E5B9G9R9_UFLOAT_PACK32:
-            return VK_FORMAT_E5B9G9R9_UFLOAT_PACK32;
-        case Format::D16_UNORM:
-            return VK_FORMAT_D16_UNORM;
-        case Format::X8_D24_UNORM_PACK32:
-            return VK_FORMAT_X8_D24_UNORM_PACK32;
-        case Format::D32_SFLOAT:
-            return VK_FORMAT_D32_SFLOAT;
-        case Format::S8_UINT:
-            return VK_FORMAT_S8_UINT;
-        case Format::D16_UNORM_S8_UINT:
-            return VK_FORMAT_D16_UNORM_S8_UINT;
-        case Format::D24_UNORM_S8_UINT:
-            return VK_FORMAT_D24_UNORM_S8_UINT;
-        case Format::D32_SFLOAT_S8_UINT:
-            return VK_FORMAT_D32_SFLOAT_S8_UINT;
-        case Format::BC1_RGB_UNORM_BLOCK:
-            return VK_FORMAT_BC1_RGB_UNORM_BLOCK;
-        case Format::BC1_RGB_SRGB_BLOCK:
-            return VK_FORMAT_BC1_RGB_SRGB_BLOCK;
-        case Format::BC1_RGBA_UNORM_BLOCK:
-            return VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
-        case Format::BC1_RGBA_SRGB_BLOCK:
-            return VK_FORMAT_BC1_RGBA_SRGB_BLOCK;
-        case Format::BC2_UNORM_BLOCK:
-            return VK_FORMAT_BC2_UNORM_BLOCK;
-        case Format::BC2_SRGB_BLOCK:
-            return VK_FORMAT_BC2_SRGB_BLOCK;
-        case Format::BC3_UNORM_BLOCK:
-            return VK_FORMAT_BC3_UNORM_BLOCK;
-        case Format::BC3_SRGB_BLOCK:
-            return VK_FORMAT_BC3_SRGB_BLOCK;
-        case Format::BC4_UNORM_BLOCK:
-            return VK_FORMAT_BC4_UNORM_BLOCK;
-        case Format::BC4_SNORM_BLOCK:
-            return VK_FORMAT_BC4_SNORM_BLOCK;
-        case Format::BC5_UNORM_BLOCK:
-            return VK_FORMAT_BC5_UNORM_BLOCK;
-        case Format::BC5_SNORM_BLOCK:
-            return VK_FORMAT_BC5_SNORM_BLOCK;
-        case Format::BC6H_UFLOAT_BLOCK:
-            return VK_FORMAT_BC6H_UFLOAT_BLOCK;
-        case Format::BC6H_SFLOAT_BLOCK:
-            return VK_FORMAT_BC6H_SFLOAT_BLOCK;
-        case Format::BC7_UNORM_BLOCK:
-            return VK_FORMAT_BC7_UNORM_BLOCK;
-        case Format::BC7_SRGB_BLOCK:
-            return VK_FORMAT_BC7_SRGB_BLOCK;
-        case Format::ETC2_R8G8B8_UNORM_BLOCK:
-            return VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK;
-        case Format::ETC2_R8G8B8_SRGB_BLOCK:
-            return VK_FORMAT_ETC2_R8G8B8_SRGB_BLOCK;
-        case Format::ETC2_R8G8B8A1_UNORM_BLOCK:
-            return VK_FORMAT_ETC2_R8G8B8A1_UNORM_BLOCK;
-        case Format::ETC2_R8G8B8A1_SRGB_BLOCK:
-            return VK_FORMAT_ETC2_R8G8B8A1_SRGB_BLOCK;
-        case Format::ETC2_R8G8B8A8_UNORM_BLOCK:
-            return VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK;
-        case Format::ETC2_R8G8B8A8_SRGB_BLOCK:
-            return VK_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK;
-        case Format::EAC_R11_UNORM_BLOCK:
-            return VK_FORMAT_EAC_R11_UNORM_BLOCK;
-        case Format::EAC_R11_SNORM_BLOCK:
-            return VK_FORMAT_EAC_R11_SNORM_BLOCK;
-        case Format::EAC_R11G11_UNORM_BLOCK:
-            return VK_FORMAT_EAC_R11G11_UNORM_BLOCK;
-        case Format::EAC_R11G11_SNORM_BLOCK:
-            return VK_FORMAT_EAC_R11G11_SNORM_BLOCK;
-        case Format::ASTC_4x4_UNORM_BLOCK:
-            return VK_FORMAT_ASTC_4x4_UNORM_BLOCK;
-        case Format::ASTC_4x4_SRGB_BLOCK:
-            return VK_FORMAT_ASTC_4x4_SRGB_BLOCK;
-        case Format::ASTC_5x4_UNORM_BLOCK:
-            return VK_FORMAT_ASTC_5x4_UNORM_BLOCK;
-        case Format::ASTC_5x4_SRGB_BLOCK:
-            return VK_FORMAT_ASTC_5x4_SRGB_BLOCK;
-        case Format::ASTC_5x5_UNORM_BLOCK:
-            return VK_FORMAT_ASTC_5x5_UNORM_BLOCK;
-        case Format::ASTC_5x5_SRGB_BLOCK:
-            return VK_FORMAT_ASTC_5x5_SRGB_BLOCK;
-        case Format::ASTC_6x5_UNORM_BLOCK:
-            return VK_FORMAT_ASTC_6x5_UNORM_BLOCK;
-        case Format::ASTC_6x5_SRGB_BLOCK:
-            return VK_FORMAT_ASTC_6x5_SRGB_BLOCK;
-        case Format::ASTC_6x6_UNORM_BLOCK:
-            return VK_FORMAT_ASTC_6x6_UNORM_BLOCK;
-        case Format::ASTC_6x6_SRGB_BLOCK:
-            return VK_FORMAT_ASTC_6x6_SRGB_BLOCK;
-        case Format::ASTC_8x5_UNORM_BLOCK:
-            return VK_FORMAT_ASTC_8x5_UNORM_BLOCK;
-        case Format::ASTC_8x5_SRGB_BLOCK:
-            return VK_FORMAT_ASTC_8x5_SRGB_BLOCK;
-        case Format::ASTC_8x6_UNORM_BLOCK:
-            return VK_FORMAT_ASTC_8x6_UNORM_BLOCK;
-        case Format::ASTC_8x6_SRGB_BLOCK:
-            return VK_FORMAT_ASTC_8x6_SRGB_BLOCK;
-        case Format::ASTC_8x8_UNORM_BLOCK:
-            return VK_FORMAT_ASTC_8x8_UNORM_BLOCK;
-        case Format::ASTC_8x8_SRGB_BLOCK:
-            return VK_FORMAT_ASTC_8x8_SRGB_BLOCK;
-        case Format::ASTC_10x5_UNORM_BLOCK:
-            return VK_FORMAT_ASTC_10x5_UNORM_BLOCK;
-        case Format::ASTC_10x5_SRGB_BLOCK:
-            return VK_FORMAT_ASTC_10x5_SRGB_BLOCK;
-        case Format::ASTC_10x6_UNORM_BLOCK:
-            return VK_FORMAT_ASTC_10x6_UNORM_BLOCK;
-        case Format::ASTC_10x6_SRGB_BLOCK:
-            return VK_FORMAT_ASTC_10x6_SRGB_BLOCK;
-        case Format::ASTC_10x8_UNORM_BLOCK:
-            return VK_FORMAT_ASTC_10x8_UNORM_BLOCK;
-        case Format::ASTC_10x8_SRGB_BLOCK:
-            return VK_FORMAT_ASTC_10x8_SRGB_BLOCK;
-        case Format::ASTC_10x10_UNORM_BLOCK:
-            return VK_FORMAT_ASTC_10x10_UNORM_BLOCK;
-        case Format::ASTC_10x10_SRGB_BLOCK:
-            return VK_FORMAT_ASTC_10x10_SRGB_BLOCK;
-        case Format::ASTC_12x10_UNORM_BLOCK:
-            return VK_FORMAT_ASTC_12x10_UNORM_BLOCK;
-        case Format::ASTC_12x10_SRGB_BLOCK:
-            return VK_FORMAT_ASTC_12x10_SRGB_BLOCK;
-        case Format::ASTC_12x12_UNORM_BLOCK:
-            return VK_FORMAT_ASTC_12x12_UNORM_BLOCK;
-        case Format::ASTC_12x12_SRGB_BLOCK:
-            return VK_FORMAT_ASTC_12x12_SRGB_BLOCK;
-        case Format::G8B8G8R8_422_UNORM:
-            return VK_FORMAT_G8B8G8R8_422_UNORM;
-        case Format::B8G8R8G8_422_UNORM:
-            return VK_FORMAT_B8G8R8G8_422_UNORM;
-        case Format::G8_B8_R8_3PLANE_420_UNORM:
-            return VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM;
-        case Format::G8_B8R8_2PLANE_420_UNORM:
-            return VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
-        case Format::G8_B8_R8_3PLANE_422_UNORM:
-            return VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM;
-        case Format::G8_B8R8_2PLANE_422_UNORM:
-            return VK_FORMAT_G8_B8R8_2PLANE_422_UNORM;
-        case Format::G8_B8_R8_3PLANE_444_UNORM:
-            return VK_FORMAT_G8_B8_R8_3PLANE_444_UNORM;
-        case Format::R10X6_UNORM_PACK16:
-            return VK_FORMAT_R10X6_UNORM_PACK16;
-        case Format::R10X6G10X6_UNORM_2PACK16:
-            return VK_FORMAT_R10X6G10X6_UNORM_2PACK16;
-        case Format::R10X6G10X6B10X6A10X6_UNORM_4PACK16:
-            return VK_FORMAT_R10X6G10X6B10X6A10X6_UNORM_4PACK16;
-        case Format::G10X6B10X6G10X6R10X6_422_UNORM_4PACK16:
-            return VK_FORMAT_G10X6B10X6G10X6R10X6_422_UNORM_4PACK16;
-        case Format::B10X6G10X6R10X6G10X6_422_UNORM_4PACK16:
-            return VK_FORMAT_B10X6G10X6R10X6G10X6_422_UNORM_4PACK16;
-        case Format::G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16:
-            return VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16;
-        case Format::G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16:
-            return VK_FORMAT_G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16;
-        case Format::G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16:
-            return VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16;
-        case Format::G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16:
-            return VK_FORMAT_G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16;
-        case Format::G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16:
-            return VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16;
-        case Format::R12X4_UNORM_PACK16:
-            return VK_FORMAT_R12X4_UNORM_PACK16;
-        case Format::R12X4G12X4_UNORM_2PACK16:
-            return VK_FORMAT_R12X4G12X4_UNORM_2PACK16;
-        case Format::R12X4G12X4B12X4A12X4_UNORM_4PACK16:
-            return VK_FORMAT_R12X4G12X4B12X4A12X4_UNORM_4PACK16;
-        case Format::G12X4B12X4G12X4R12X4_422_UNORM_4PACK16:
-            return VK_FORMAT_G12X4B12X4G12X4R12X4_422_UNORM_4PACK16;
-        case Format::B12X4G12X4R12X4G12X4_422_UNORM_4PACK16:
-            return VK_FORMAT_B12X4G12X4R12X4G12X4_422_UNORM_4PACK16;
-        case Format::G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16:
-            return VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16;
-        case Format::G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16:
-            return VK_FORMAT_G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16;
-        case Format::G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16:
-            return VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16;
-        case Format::G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16:
-            return VK_FORMAT_G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16;
-        case Format::G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16:
-            return VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16;
-        case Format::G16B16G16R16_422_UNORM:
-            return VK_FORMAT_G16B16G16R16_422_UNORM;
-        case Format::B16G16R16G16_422_UNORM:
-            return VK_FORMAT_B16G16R16G16_422_UNORM;
-        case Format::G16_B16_R16_3PLANE_420_UNORM:
-            return VK_FORMAT_G16_B16_R16_3PLANE_420_UNORM;
-        case Format::G16_B16R16_2PLANE_420_UNORM:
-            return VK_FORMAT_G16_B16R16_2PLANE_420_UNORM;
-        case Format::G16_B16_R16_3PLANE_422_UNORM:
-            return VK_FORMAT_G16_B16_R16_3PLANE_422_UNORM;
-        case Format::G16_B16R16_2PLANE_422_UNORM:
-            return VK_FORMAT_G16_B16R16_2PLANE_422_UNORM;
-        case Format::G16_B16_R16_3PLANE_444_UNORM:
-            return VK_FORMAT_G16_B16_R16_3PLANE_444_UNORM;
-        case Format::G8_B8R8_2PLANE_444_UNORM:
-            return VK_FORMAT_G8_B8R8_2PLANE_444_UNORM;
-        case Format::G10X6_B10X6R10X6_2PLANE_444_UNORM_3PACK16:
-            return VK_FORMAT_G10X6_B10X6R10X6_2PLANE_444_UNORM_3PACK16;
-        case Format::G12X4_B12X4R12X4_2PLANE_444_UNORM_3PACK16:
-            return VK_FORMAT_G12X4_B12X4R12X4_2PLANE_444_UNORM_3PACK16;
-        case Format::G16_B16R16_2PLANE_444_UNORM:
-            return VK_FORMAT_G16_B16R16_2PLANE_444_UNORM;
-        case Format::A4R4G4B4_UNORM_PACK16:
-            return VK_FORMAT_A4R4G4B4_UNORM_PACK16;
-        case Format::A4B4G4R4_UNORM_PACK16:
-            return VK_FORMAT_A4B4G4R4_UNORM_PACK16;
-        case Format::ASTC_4x4_SFLOAT_BLOCK:
-            return VK_FORMAT_ASTC_4x4_SFLOAT_BLOCK;
-        case Format::ASTC_5x4_SFLOAT_BLOCK:
-            return VK_FORMAT_ASTC_5x4_SFLOAT_BLOCK;
-        case Format::ASTC_5x5_SFLOAT_BLOCK:
-            return VK_FORMAT_ASTC_5x5_SFLOAT_BLOCK;
-        case Format::ASTC_6x5_SFLOAT_BLOCK:
-            return VK_FORMAT_ASTC_6x5_SFLOAT_BLOCK;
-        case Format::ASTC_6x6_SFLOAT_BLOCK:
-            return VK_FORMAT_ASTC_6x6_SFLOAT_BLOCK;
-        case Format::ASTC_8x5_SFLOAT_BLOCK:
-            return VK_FORMAT_ASTC_8x5_SFLOAT_BLOCK;
-        case Format::ASTC_8x6_SFLOAT_BLOCK:
-            return VK_FORMAT_ASTC_8x6_SFLOAT_BLOCK;
-        case Format::ASTC_8x8_SFLOAT_BLOCK:
-            return VK_FORMAT_ASTC_8x8_SFLOAT_BLOCK;
-        case Format::ASTC_10x5_SFLOAT_BLOCK:
-            return VK_FORMAT_ASTC_10x5_SFLOAT_BLOCK;
-        case Format::ASTC_10x6_SFLOAT_BLOCK:
-            return VK_FORMAT_ASTC_10x6_SFLOAT_BLOCK;
-        case Format::ASTC_10x8_SFLOAT_BLOCK:
-            return VK_FORMAT_ASTC_10x8_SFLOAT_BLOCK;
-        case Format::ASTC_10x10_SFLOAT_BLOCK:
-            return VK_FORMAT_ASTC_10x10_SFLOAT_BLOCK;
-        case Format::ASTC_12x10_SFLOAT_BLOCK:
-            return VK_FORMAT_ASTC_12x10_SFLOAT_BLOCK;
-        case Format::ASTC_12x12_SFLOAT_BLOCK:
-            return VK_FORMAT_ASTC_12x12_SFLOAT_BLOCK;
-        case Format::PVRTC1_2BPP_UNORM_BLOCK_IMG:
-            return VK_FORMAT_PVRTC1_2BPP_UNORM_BLOCK_IMG;
-        case Format::PVRTC1_4BPP_UNORM_BLOCK_IMG:
-            return VK_FORMAT_PVRTC1_4BPP_UNORM_BLOCK_IMG;
-        case Format::PVRTC2_2BPP_UNORM_BLOCK_IMG:
-            return VK_FORMAT_PVRTC2_2BPP_UNORM_BLOCK_IMG;
-        case Format::PVRTC2_4BPP_UNORM_BLOCK_IMG:
-            return VK_FORMAT_PVRTC2_4BPP_UNORM_BLOCK_IMG;
-        case Format::PVRTC1_2BPP_SRGB_BLOCK_IMG:
-            return VK_FORMAT_PVRTC1_2BPP_SRGB_BLOCK_IMG;
-        case Format::PVRTC1_4BPP_SRGB_BLOCK_IMG:
-            return VK_FORMAT_PVRTC1_4BPP_SRGB_BLOCK_IMG;
-        case Format::PVRTC2_2BPP_SRGB_BLOCK_IMG:
-            return VK_FORMAT_PVRTC2_2BPP_SRGB_BLOCK_IMG;
-        case Format::PVRTC2_4BPP_SRGB_BLOCK_IMG:
-            return VK_FORMAT_PVRTC2_4BPP_SRGB_BLOCK_IMG;
-        case Format::R16G16_S10_5_NV:
-            return VK_FORMAT_R16G16_S10_5_NV;
-        default:
-            return VK_FORMAT_UNDEFINED;
-        }
-    }
-
-    ColorSpace ColorSpace_from_vk(VkColorSpaceKHR vk_space)
-    {
-        switch (vk_space)
-        {
-        case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
-            return ColorSpace::SrgbNonlinear;
-        case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
-            return ColorSpace::DisplayP3Nonlinear;
-        case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
-            return ColorSpace::ExtendedSrgbLinear;
-        case VK_COLOR_SPACE_DISPLAY_P3_LINEAR_EXT:
-            return ColorSpace::DisplayP3Linear;
-        case VK_COLOR_SPACE_DCI_P3_NONLINEAR_EXT:
-            return ColorSpace::DciP3Nonlinear;
-        case VK_COLOR_SPACE_BT709_LINEAR_EXT:
-            return ColorSpace::Bt709Linear;
-        case VK_COLOR_SPACE_BT709_NONLINEAR_EXT:
-            return ColorSpace::Bt709Nonlinear;
-        case VK_COLOR_SPACE_BT2020_LINEAR_EXT:
-            return ColorSpace::Bt2020Linear;
-        case VK_COLOR_SPACE_HDR10_ST2084_EXT:
-            return ColorSpace::Hdr10St2084;
-        case VK_COLOR_SPACE_DOLBYVISION_EXT:
-            return ColorSpace::DolbyVision;
-        case VK_COLOR_SPACE_HDR10_HLG_EXT:
-            return ColorSpace::Hdr10Hlg;
-        case VK_COLOR_SPACE_ADOBERGB_LINEAR_EXT:
-            return ColorSpace::AdobeRgbLinear;
-        case VK_COLOR_SPACE_ADOBERGB_NONLINEAR_EXT:
-            return ColorSpace::AdobeRgbNonlinear;
-        case VK_COLOR_SPACE_PASS_THROUGH_EXT:
-            return ColorSpace::PassThrough;
-        case VK_COLOR_SPACE_EXTENDED_SRGB_NONLINEAR_EXT:
-            return ColorSpace::ExtendedSrgbNonlinear;
-        case VK_COLOR_SPACE_DISPLAY_NATIVE_AMD:
-            return ColorSpace::DisplayNativeAmd;
-        default:
-            return ColorSpace::SrgbNonlinear;
-        }
-    }
-
-    VkColorSpaceKHR ColorSpace_to_vk(ColorSpace space)
-    {
-        switch (space)
-        {
-        case ColorSpace::SrgbNonlinear:
-            return VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-        case ColorSpace::DisplayP3Nonlinear:
-            return VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT;
-        case ColorSpace::ExtendedSrgbLinear:
-            return VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT;
-        case ColorSpace::DisplayP3Linear:
-            return VK_COLOR_SPACE_DISPLAY_P3_LINEAR_EXT;
-        case ColorSpace::DciP3Nonlinear:
-            return VK_COLOR_SPACE_DCI_P3_NONLINEAR_EXT;
-        case ColorSpace::Bt709Linear:
-            return VK_COLOR_SPACE_BT709_LINEAR_EXT;
-        case ColorSpace::Bt709Nonlinear:
-            return VK_COLOR_SPACE_BT709_NONLINEAR_EXT;
-        case ColorSpace::Bt2020Linear:
-            return VK_COLOR_SPACE_BT2020_LINEAR_EXT;
-        case ColorSpace::Hdr10St2084:
-            return VK_COLOR_SPACE_HDR10_ST2084_EXT;
-        case ColorSpace::DolbyVision:
-            return VK_COLOR_SPACE_DOLBYVISION_EXT;
-        case ColorSpace::Hdr10Hlg:
-            return VK_COLOR_SPACE_HDR10_HLG_EXT;
-        case ColorSpace::AdobeRgbLinear:
-            return VK_COLOR_SPACE_ADOBERGB_LINEAR_EXT;
-        case ColorSpace::AdobeRgbNonlinear:
-            return VK_COLOR_SPACE_ADOBERGB_NONLINEAR_EXT;
-        case ColorSpace::PassThrough:
-            return VK_COLOR_SPACE_PASS_THROUGH_EXT;
-        case ColorSpace::ExtendedSrgbNonlinear:
-            return VK_COLOR_SPACE_EXTENDED_SRGB_NONLINEAR_EXT;
-        case ColorSpace::DisplayNativeAmd:
-            return VK_COLOR_SPACE_DISPLAY_NATIVE_AMD;
-        default:
-            return VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-        }
-    }
-
     SurfaceFormat SurfaceFormat_from_vk(
         const VkSurfaceFormatKHR& vk_surface_format
     )
@@ -2859,48 +1000,6 @@ namespace bv
             .format = Format_from_vk(vk_surface_format.format),
             .color_space = ColorSpace_from_vk(vk_surface_format.colorSpace)
         };
-    }
-
-    PresentMode PresentMode_from_vk(VkPresentModeKHR vk_mode)
-    {
-        switch (vk_mode)
-        {
-        case VK_PRESENT_MODE_IMMEDIATE_KHR:
-            return PresentMode::Immediate;
-        case VK_PRESENT_MODE_MAILBOX_KHR:
-            return PresentMode::Mailbox;
-        case VK_PRESENT_MODE_FIFO_KHR:
-            return PresentMode::Fifo;
-        case VK_PRESENT_MODE_FIFO_RELAXED_KHR:
-            return PresentMode::FifoRelaxed;
-        case VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR:
-            return PresentMode::SharedDemandRefresh;
-        case VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR:
-            return PresentMode::SharedContinuousRefresh;
-        default:
-            return PresentMode::Immediate;
-        }
-    }
-
-    VkPresentModeKHR PresentMode_to_vk(PresentMode mode)
-    {
-        switch (mode)
-        {
-        case bv::PresentMode::Immediate:
-            return VK_PRESENT_MODE_IMMEDIATE_KHR;
-        case bv::PresentMode::Mailbox:
-            return VK_PRESENT_MODE_MAILBOX_KHR;
-        case bv::PresentMode::Fifo:
-            return VK_PRESENT_MODE_FIFO_KHR;
-        case bv::PresentMode::FifoRelaxed:
-            return VK_PRESENT_MODE_FIFO_RELAXED_KHR;
-        case bv::PresentMode::SharedDemandRefresh:
-            return VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR;
-        case bv::PresentMode::SharedContinuousRefresh:
-            return VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR;
-        default:
-            return VK_PRESENT_MODE_IMMEDIATE_KHR;
-        }
     }
 
     DebugLabel DebugLabel_from_vk(const VkDebugUtilsLabelEXT& vk_label)
@@ -2961,119 +1060,19 @@ namespace bv
     }
 
     VkDeviceQueueCreateInfo QueueRequest_to_vk(
-        const QueueRequest& request
+        const QueueRequest& request,
+        std::vector<float>& waste_priorities
     )
     {
+        waste_priorities = request.priorities;
         return VkDeviceQueueCreateInfo{
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
             .pNext = nullptr,
             .flags = QueueRequestFlags_to_vk(request.flags),
             .queueFamilyIndex = request.queue_family_index,
             .queueCount = request.num_queues_to_create,
-            .pQueuePriorities = request.priorities.data()
+            .pQueuePriorities = waste_priorities.data()
         };
-    }
-
-    VkSwapchainCreateFlagsKHR SwapchainFlags_to_vk(const SwapchainFlags& flags)
-    {
-        VkSwapchainCreateFlagsKHR vk_flags = 0;
-        if (flags.split_instance_bind_regions)
-        {
-            vk_flags |= VK_SWAPCHAIN_CREATE_SPLIT_INSTANCE_BIND_REGIONS_BIT_KHR;
-        }
-        if (flags.protected_)
-        {
-            vk_flags |= VK_SWAPCHAIN_CREATE_PROTECTED_BIT_KHR;
-        }
-        if (flags.mutable_format)
-        {
-            vk_flags |= VK_SWAPCHAIN_CREATE_MUTABLE_FORMAT_BIT_KHR;
-        }
-        if (flags.deferred_memory_allocation)
-        {
-            vk_flags |= VK_SWAPCHAIN_CREATE_DEFERRED_MEMORY_ALLOCATION_BIT_EXT;
-        }
-        return vk_flags;
-    }
-
-    VkSharingMode SharingMode_to_vk(SharingMode mode)
-    {
-        switch (mode)
-        {
-        case SharingMode::Exclusive:
-            return VK_SHARING_MODE_EXCLUSIVE;
-        case SharingMode::Concurrent:
-            return VK_SHARING_MODE_CONCURRENT;
-        default:
-            return VK_SHARING_MODE_EXCLUSIVE;
-        }
-    }
-
-    VkImageViewCreateFlags ImageViewFlags_to_vk(const ImageViewFlags& flags)
-    {
-        VkImageViewCreateFlags vk_flags = 0;
-        if (flags.fragment_density_map_dynamic)
-        {
-            vk_flags |=
-                VK_IMAGE_VIEW_CREATE_FRAGMENT_DENSITY_MAP_DYNAMIC_BIT_EXT;
-        }
-        if (flags.descriptor_buffer_capture_replay)
-        {
-            vk_flags |=
-                VK_IMAGE_VIEW_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT;
-        }
-        if (flags.fragment_density_map_deferred)
-        {
-            vk_flags |=
-                VK_IMAGE_VIEW_CREATE_FRAGMENT_DENSITY_MAP_DEFERRED_BIT_EXT;
-        }
-        return vk_flags;
-    }
-
-    VkImageViewType ImageViewType_to_vk(ImageViewType type)
-    {
-        switch (type)
-        {
-        case bv::ImageViewType::_1d:
-            return VK_IMAGE_VIEW_TYPE_1D;
-        case bv::ImageViewType::_2d:
-            return VK_IMAGE_VIEW_TYPE_2D;
-        case bv::ImageViewType::_3d:
-            return VK_IMAGE_VIEW_TYPE_3D;
-        case bv::ImageViewType::Cube:
-            return VK_IMAGE_VIEW_TYPE_CUBE;
-        case bv::ImageViewType::_1dArray:
-            return VK_IMAGE_VIEW_TYPE_1D_ARRAY;
-        case bv::ImageViewType::_2dArray:
-            return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-        case bv::ImageViewType::CubeArray:
-            return VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
-        default:
-            return VK_IMAGE_VIEW_TYPE_1D;
-        }
-    }
-
-    VkComponentSwizzle ComponentSwizzle_to_vk(ComponentSwizzle swizzle)
-    {
-        switch (swizzle)
-        {
-        case bv::ComponentSwizzle::Identity:
-            return VK_COMPONENT_SWIZZLE_IDENTITY;
-        case bv::ComponentSwizzle::Zero:
-            return VK_COMPONENT_SWIZZLE_ZERO;
-        case bv::ComponentSwizzle::One:
-            return VK_COMPONENT_SWIZZLE_ONE;
-        case bv::ComponentSwizzle::R:
-            return VK_COMPONENT_SWIZZLE_R;
-        case bv::ComponentSwizzle::G:
-            return VK_COMPONENT_SWIZZLE_G;
-        case bv::ComponentSwizzle::B:
-            return VK_COMPONENT_SWIZZLE_B;
-        case bv::ComponentSwizzle::A:
-            return VK_COMPONENT_SWIZZLE_A;
-        default:
-            return VK_COMPONENT_SWIZZLE_IDENTITY;
-        }
     }
 
     VkComponentMapping ComponentMapping_to_vk(const ComponentMapping& mapping)
@@ -3086,60 +1085,6 @@ namespace bv
         };
     }
 
-    VkImageAspectFlags ImageAspectFlags_to_vk(const ImageAspectFlags& flags)
-    {
-        VkImageAspectFlags vk_flags = 0;
-        if (flags.color)
-        {
-            vk_flags |= VK_IMAGE_ASPECT_COLOR_BIT;
-        }
-        if (flags.depth)
-        {
-            vk_flags |= VK_IMAGE_ASPECT_DEPTH_BIT;
-        }
-        if (flags.stencil)
-        {
-            vk_flags |= VK_IMAGE_ASPECT_STENCIL_BIT;
-        }
-        if (flags.metadata)
-        {
-            vk_flags |= VK_IMAGE_ASPECT_METADATA_BIT;
-        }
-        if (flags.plane_0)
-        {
-            vk_flags |= VK_IMAGE_ASPECT_PLANE_0_BIT;
-        }
-        if (flags.plane_1)
-        {
-            vk_flags |= VK_IMAGE_ASPECT_PLANE_1_BIT;
-        }
-        if (flags.plane_2)
-        {
-            vk_flags |= VK_IMAGE_ASPECT_PLANE_2_BIT;
-        }
-        if (flags.none)
-        {
-            vk_flags |= VK_IMAGE_ASPECT_NONE;
-        }
-        if (flags.memory_plane_0)
-        {
-            vk_flags |= VK_IMAGE_ASPECT_MEMORY_PLANE_0_BIT_EXT;
-        }
-        if (flags.memory_plane_1)
-        {
-            vk_flags |= VK_IMAGE_ASPECT_MEMORY_PLANE_1_BIT_EXT;
-        }
-        if (flags.memory_plane_2)
-        {
-            vk_flags |= VK_IMAGE_ASPECT_MEMORY_PLANE_2_BIT_EXT;
-        }
-        if (flags.memory_plane_3)
-        {
-            vk_flags |= VK_IMAGE_ASPECT_MEMORY_PLANE_3_BIT_EXT;
-        }
-        return vk_flags;
-    }
-
     VkImageSubresourceRange ImageSubresourceRange_to_vk(
         const ImageSubresourceRange& range
     )
@@ -3150,6 +1095,72 @@ namespace bv
             .levelCount = range.level_count,
             .baseArrayLayer = range.base_array_layer,
             .layerCount = range.layer_count
+        };
+    }
+
+    VkSpecializationMapEntry SpecializationMapEntry_to_vk(
+        const SpecializationMapEntry& entry
+    )
+    {
+        return VkSpecializationMapEntry{
+            .constantID = entry.constant_id,
+            .offset = entry.offset,
+            .size = entry.size
+        };
+    }
+
+    VkSpecializationInfo SpecializationInfo_to_vk(
+        const SpecializationInfo& info,
+        std::vector<VkSpecializationMapEntry>& waste_vk_map_entries,
+        std::vector<uint8_t>& waste_data
+    )
+    {
+        waste_vk_map_entries.clear();
+        for (const auto& map_entry : info.map_entries)
+        {
+            waste_vk_map_entries.push_back(
+                SpecializationMapEntry_to_vk(map_entry)
+            );
+        }
+
+        waste_data = info.data;
+
+        return VkSpecializationInfo{
+            .mapEntryCount = (uint32_t)waste_vk_map_entries.size(),
+            .pMapEntries = waste_vk_map_entries.data(),
+            .dataSize = waste_data.size(),
+            .pData = reinterpret_cast<const void*>(waste_data.data())
+        };
+    }
+
+    VkPipelineShaderStageCreateInfo ShaderStage_to_vk(
+        const ShaderStage& stage,
+        VkSpecializationInfo& waste_vk_specialization_info,
+        std::vector<VkSpecializationMapEntry>& waste_vk_map_entries,
+        std::vector<uint8_t>& waste_data
+    )
+    {
+        if (stage.specialization_info.has_value())
+        {
+            waste_vk_specialization_info = SpecializationInfo_to_vk(
+                stage.specialization_info.value(),
+                waste_vk_map_entries,
+                waste_data
+            );
+        }
+
+        return VkPipelineShaderStageCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = ShaderStageFlags_to_vk(stage.flags),
+            .stage = ShaderStageType_to_vk(stage.type),
+            .module = stage.module->vk_shader_module,
+            .pName = stage.entry_point.c_str(),
+
+            .pSpecializationInfo =
+            stage.specialization_info.has_value()
+            ? &waste_vk_specialization_info
+            : nullptr
         };
     }
 
@@ -3182,7 +1193,7 @@ namespace bv
             {
                 s += ": ";
             }
-            s += api_result.value().to_string();
+            s += ApiResult_to_string(api_result.value());
         }
         return s;
     }
@@ -3358,7 +1369,7 @@ namespace bv
         return Result();
     }
 
-    Context::Context(Context&& other)
+    Context::Context(Context&& other) noexcept
         : _config(std::move(other._config))
     {
         _config = other._config;
@@ -3611,7 +1622,7 @@ namespace bv
                 {
                     vk_result = vkGetPhysicalDeviceSurfaceSupportKHR(
                         vk_physical_device,
-                        i,
+                        (uint32_t)i,
                         surface->vk_surface,
                         &vk_present_support
                     );
@@ -3730,24 +1741,6 @@ namespace bv
         : _config(config), _allocator(allocator)
     {}
 
-    DebugMessenger::DebugMessenger(DebugMessenger&& other)
-    {
-        _context = other._context;
-        other._context = nullptr;
-
-        vk_debug_messenger = other.vk_debug_messenger;
-        other.vk_debug_messenger = nullptr;
-
-        _message_severity_filter = other._message_severity_filter;
-        other._message_severity_filter = DebugMessageSeverityFlags{};
-
-        _message_type_filter = other._message_type_filter;
-        other._message_type_filter = DebugMessageTypeFlags{};
-
-        _callback = other._callback;
-        other._callback = nullptr;
-    }
-
     Result<DebugMessenger::ptr> DebugMessenger::create(
         const Context::ptr& context,
         DebugMessageSeverityFlags message_severity_filter,
@@ -3811,12 +1804,6 @@ namespace bv
         _callback(callback)
     {}
 
-    Surface::Surface(Surface&& other)
-    {
-        vk_surface = other.vk_surface;
-        other.vk_surface = nullptr;
-    }
-
     Surface::ptr Surface::create(
         const Context::ptr& context,
         VkSurfaceKHR vk_surface
@@ -3841,30 +1828,9 @@ namespace bv
         : _context(context), vk_surface(vk_surface)
     {}
 
-    Queue::Queue(Queue&& other)
-    {
-        vk_queue = other.vk_queue;
-        other.vk_queue = nullptr;
-    }
-
     Queue::Queue(VkQueue vk_queue)
         : vk_queue(vk_queue)
     {}
-
-    Device::Device(Device&& other)
-    {
-        _context = other._context;
-        other._context = nullptr;
-
-        _physical_device = other._physical_device;
-        other._physical_device = nullptr;
-
-        _config = other._config;
-        other._config = DeviceConfig{};
-
-        vk_device = other.vk_device;
-        other.vk_device = nullptr;
-    }
 
     Result<Device::ptr>Device::create(
         const Context::ptr& context,
@@ -3879,6 +1845,7 @@ namespace bv
         );
 
         std::vector<VkDeviceQueueCreateInfo> vk_queue_requests;
+        std::vector<std::vector<float>> wastes_priorities;
         for (const auto& queue_request : device->config().queue_requests)
         {
             if (queue_request.priorities.size()
@@ -3890,7 +1857,13 @@ namespace bv
                 );
             }
 
-            vk_queue_requests.push_back(QueueRequest_to_vk(queue_request));
+            wastes_priorities.push_back(std::vector<float>());
+            vk_queue_requests.push_back(
+                QueueRequest_to_vk(
+                    queue_request,
+                    wastes_priorities.back()
+                )
+            );
         }
 
         std::vector<const char*> layers_cstr;
@@ -3976,33 +1949,9 @@ namespace bv
         _config(config)
     {}
 
-    Image::Image(Image&& other)
-    {
-        vk_image = other.vk_image;
-        other.vk_image = nullptr;
-    }
-
     Image::Image(VkImage vk_image)
         : vk_image(vk_image)
     {}
-
-    Swapchain::Swapchain(Swapchain&& other)
-    {
-        _device = other._device;
-        other._device = nullptr;
-
-        _surface = other._surface;
-        other._surface = nullptr;
-
-        _config = other._config;
-        other._config = SwapchainConfig{};
-
-        _old_swapchain = other._old_swapchain;
-        other._old_swapchain = nullptr;
-
-        vk_swapchain = other.vk_swapchain;
-        other.vk_swapchain = nullptr;
-    }
 
     Result<Swapchain::ptr> Swapchain::create(
         const Device::ptr& device,
@@ -4115,21 +2064,6 @@ namespace bv
         _old_swapchain(old_swapchain)
     {}
 
-    ImageView::ImageView(ImageView&& other)
-    {
-        _device = other._device;
-        other._device = nullptr;
-
-        _image = other._image;
-        other._image = nullptr;
-
-        _config = other._config;
-        other._config = ImageViewConfig{};
-
-        vk_image_view = other.vk_image_view;
-        other.vk_image_view = nullptr;
-    }
-
     Result<ImageView::ptr> ImageView::create(
         const Device::ptr& device,
         const Image::ptr& image,
@@ -4185,6 +2119,58 @@ namespace bv
         : _device(device),
         _image(image),
         _config(config)
+    {}
+
+    Result<ShaderModule::ptr> ShaderModule::create(
+        const Device::ptr& device,
+        const std::vector<uint8_t>& code
+    )
+    {
+        ShaderModule::ptr module = std::make_shared<ShaderModule_public_ctor>(
+            device
+        );
+
+        std::vector<uint8_t> code_aligned = code;
+        if (code_aligned.size() % 8 != 0)
+        {
+            for (size_t i = 0; i < 8 - (code_aligned.size() % 8); i++)
+            {
+                code_aligned.push_back(0);
+            }
+        }
+
+        VkShaderModuleCreateInfo create_info{
+            .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .codeSize = code.size(),
+            .pCode = reinterpret_cast<const uint32_t*>(code_aligned.data())
+        };
+
+        VkResult vk_result = vkCreateShaderModule(
+            module->device()->vk_device,
+            &create_info,
+            module->device()->context()->vk_allocator_ptr(),
+            &module->vk_shader_module
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return module;
+    }
+
+    ShaderModule::~ShaderModule()
+    {
+        vkDestroyShaderModule(
+            device()->vk_device,
+            vk_shader_module,
+            device()->context()->vk_allocator_ptr()
+        );
+    }
+
+    ShaderModule::ShaderModule(const Device::ptr& device)
+        : _device(device)
     {}
 
 #pragma region Vulkan callbacks

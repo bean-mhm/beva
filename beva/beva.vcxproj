@@ -69,7 +69,12 @@
       <AdditionalDependencies>vulkan-1.lib;glfw3.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>XCOPY "$(ProjectDir)licenses\" "$(OutDir)licenses\" /S /Y</Command>
+      <Command>XCOPY "$(ProjectDir)licenses/" "$(OutDir)licenses/" /S /Y
+
+set VS_PROJ_DIR=$(ProjectDir)
+set VS_OUT_DIR=$(OutDir)
+$(ProjectDir)shaders/compile.bat
+</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -94,7 +99,12 @@
       <AdditionalDependencies>vulkan-1.lib;glfw3.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>XCOPY "$(ProjectDir)licenses\" "$(OutDir)licenses\" /S /Y</Command>
+      <Command>XCOPY "$(ProjectDir)licenses/" "$(OutDir)licenses/" /S /Y
+
+set VS_PROJ_DIR=$(ProjectDir)
+set VS_OUT_DIR=$(OutDir)
+$(ProjectDir)shaders/compile.bat
+</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
