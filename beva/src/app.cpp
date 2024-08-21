@@ -120,27 +120,23 @@ namespace beva_demo
             return;
         }
 
-        bv::DebugMessageSeverityFlags severity_filter{
-            .verbose = false,
-            .info = false,
-            .warning = true,
-            .error = true
-        };
+        VkDebugUtilsMessageSeverityFlagsEXT severity_filter =
+            VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
+            | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
 
-        bv::DebugMessageTypeFlags type_filter{
-            .general = true,
-            .validation = true,
-            .performance = true,
-            .device_address_binding = true
-        };
+        VkDebugUtilsMessageTypeFlagsEXT tpye_filter =
+            VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
+            | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
+            | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT
+            | VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT;
 
         auto debug_messenger_result = bv::DebugMessenger::create(
             context,
             severity_filter,
-            type_filter,
+            tpye_filter,
             [](
-                bv::DebugMessageSeverity message_severity,
-                bv::DebugMessageTypeFlags message_type_flags,
+                VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+                VkDebugUtilsMessageTypeFlagsEXT message_types,
                 const bv::DebugMessageData& message_data
                 )
             {
@@ -225,11 +221,31 @@ namespace beva_demo
         for (size_t i = 0; i < supported_physical_devices.size(); i++)
         {
             const auto& pdev = supported_physical_devices[i];
+
+            std::string s_device_type = "unknown device type";
+            switch (pdev->properties().device_type)
+            {
+            case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+                s_device_type = "integrated GPU";
+                break;
+            case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+                s_device_type = "discrete GPU";
+                break;
+            case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+                s_device_type = "virtual GPU";
+                break;
+            case VK_PHYSICAL_DEVICE_TYPE_CPU:
+                s_device_type = "CPU";
+                break;
+            default:
+                break;
+            }
+
             std::cout << std::format(
                 "{}: {} ({})\n",
                 i,
                 pdev->properties().device_name,
-                bv::PhysicalDeviceType_to_string(pdev->properties().device_type)
+                s_device_type
             );
         }
 
@@ -273,7 +289,7 @@ namespace beva_demo
         for (auto family_idx : unique_queue_family_indices)
         {
             queue_requests.push_back(bv::QueueRequest{
-                .flags = bv::QueueRequestFlags{},
+                .flags = 0,
                 .queue_family_index = family_idx,
                 .num_queues_to_create = 1,
                 .priorities = { 1.f }
@@ -313,7 +329,7 @@ namespace beva_demo
         bool found_surface_format = false;
         for (const auto& sfmt : swapchain_support.surface_formats)
         {
-            if (sfmt.color_space == bv::ColorSpace::SrgbNonlinear)
+            if (sfmt.color_space == VK_COLORSPACE_SRGB_NONLINEAR_KHR)
             {
                 surface_format = sfmt;
                 found_surface_format = true;
@@ -359,11 +375,11 @@ namespace beva_demo
             image_count = swapchain_support.capabilities.max_image_count;
         }
 
-        bv::SharingMode image_sharing_mode;
+        VkSharingMode image_sharing_mode;
         std::vector<uint32_t> queue_family_indices;
         if (graphics_family_idx != presentation_family_idx)
         {
-            image_sharing_mode = bv::SharingMode::Concurrent;
+            image_sharing_mode = VK_SHARING_MODE_CONCURRENT;
             queue_family_indices = {
                 graphics_family_idx,
                 presentation_family_idx
@@ -371,7 +387,7 @@ namespace beva_demo
         }
         else
         {
-            image_sharing_mode = bv::SharingMode::Exclusive;
+            image_sharing_mode = VK_SHARING_MODE_EXCLUSIVE;
         }
 
         auto pre_transform = swapchain_support.capabilities.current_transform;
@@ -383,12 +399,12 @@ namespace beva_demo
             .image_color_space = surface_format.color_space,
             .image_extent = extent,
             .image_array_layers = 1,
-            .image_usage = { .color_attachment = true },
+            .image_usage = { VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT },
             .image_sharing_mode = image_sharing_mode,
             .queue_family_indices = queue_family_indices,
             .pre_transform = pre_transform,
-            .composite_alpha = bv::CompositeAlpha::Opaque,
-            .present_mode = bv::PresentMode::Fifo,
+            .composite_alpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+            .present_mode = VK_PRESENT_MODE_FIFO_KHR,
             .clipped = true
         };
 
@@ -406,11 +422,11 @@ namespace beva_demo
         {
             bv::ImageViewConfig config{
                 .flags = {},
-                .view_type = bv::ImageViewType::_2d,
+                .view_type = VK_IMAGE_VIEW_TYPE_2D,
                 .format = surface_format.format,
                 .components = {},
                 .subresource_range = bv::ImageSubresourceRange{
-                    .aspect_mask = { .color = true },
+                    .aspect_mask = { VK_IMAGE_ASPECT_COLOR_BIT },
                     .base_mip_level = 0,
                     .level_count = 1,
                     .base_array_layer = 0,
@@ -475,14 +491,14 @@ namespace beva_demo
         std::vector<bv::ShaderStage> shader_stages;
         shader_stages.push_back(bv::ShaderStage{
             .flags = {},
-            .type = bv::ShaderStageType::Vertex,
+            .stage = VK_SHADER_STAGE_VERTEX_BIT,
             .module = vert_shader_module,
             .entry_point = "main",
             .specialization_info = std::nullopt
             });
         shader_stages.push_back(bv::ShaderStage{
             .flags = {},
-            .type = bv::ShaderStageType::Fragment,
+            .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
             .module = frag_shader_module,
             .entry_point = "main",
             .specialization_info = std::nullopt

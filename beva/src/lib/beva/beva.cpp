@@ -46,14 +46,14 @@ namespace bv
         void* p_user_data,
         size_t size,
         size_t alignment,
-        VkSystemAllocationScope vk_allocation_scope
+        VkSystemAllocationScope allocation_scope
     );
     static void* vk_reallocation_callback(
         void* p_user_data,
         void* p_original,
         size_t size,
         size_t alignment,
-        VkSystemAllocationScope vk_allocation_scope
+        VkSystemAllocationScope allocation_scope
     );
     static void vk_free_callback(
         void* p_user_data,
@@ -62,18 +62,18 @@ namespace bv
     static void vk_internal_allocation_notification(
         void* p_user_data,
         size_t size,
-        VkInternalAllocationType vk_allocation_type,
-        VkSystemAllocationScope vk_allocation_scope
+        VkInternalAllocationType allocation_type,
+        VkSystemAllocationScope allocation_scope
     );
     static void vk_internal_free_notification(
         void* p_user_data,
         size_t size,
-        VkInternalAllocationType vk_allocation_type,
-        VkSystemAllocationScope vk_allocation_scope
+        VkInternalAllocationType allocation_type,
+        VkSystemAllocationScope allocation_scope
     );
     static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
-        VkDebugUtilsMessageSeverityFlagBitsEXT vk_message_severity,
-        VkDebugUtilsMessageTypeFlagsEXT vk_message_type_flags,
+        VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+        VkDebugUtilsMessageTypeFlagsEXT message_types,
         const VkDebugUtilsMessengerCallbackDataEXT* p_callback_data,
         void* p_user_data
     );
@@ -425,45 +425,35 @@ namespace bv
             .max_framebuffer_layers =
             vk_limits.maxFramebufferLayers,
 
-            .framebuffer_color_sample_counts = SampleCountFlags_from_vk(
-                vk_limits.framebufferColorSampleCounts
-            ),
+            .framebuffer_color_sample_counts =
+            vk_limits.framebufferColorSampleCounts,
 
-            .framebuffer_depth_sample_counts = SampleCountFlags_from_vk(
-                vk_limits.framebufferDepthSampleCounts
-            ),
+            .framebuffer_depth_sample_counts =
+            vk_limits.framebufferDepthSampleCounts,
 
-            .framebuffer_stencil_sample_counts = SampleCountFlags_from_vk(
-                vk_limits.framebufferStencilSampleCounts
-            ),
+            .framebuffer_stencil_sample_counts =
+            vk_limits.framebufferStencilSampleCounts,
 
             .framebuffer_no_attachments_sample_counts =
-            SampleCountFlags_from_vk(
-                vk_limits.framebufferNoAttachmentsSampleCounts
-            ),
+            vk_limits.framebufferNoAttachmentsSampleCounts,
 
             .max_color_attachments =
             vk_limits.maxColorAttachments,
 
-            .sampled_image_color_sample_counts = SampleCountFlags_from_vk(
-                vk_limits.sampledImageColorSampleCounts
-            ),
+            .sampled_image_color_sample_counts =
+            vk_limits.sampledImageColorSampleCounts,
 
-            .sampled_image_integer_sample_counts = SampleCountFlags_from_vk(
-                vk_limits.sampledImageIntegerSampleCounts
-            ),
+            .sampled_image_integer_sample_counts =
+            vk_limits.sampledImageIntegerSampleCounts,
 
-            .sampled_image_depth_sample_counts = SampleCountFlags_from_vk(
-                vk_limits.sampledImageDepthSampleCounts
-            ),
+            .sampled_image_depth_sample_counts =
+            vk_limits.sampledImageDepthSampleCounts,
 
-            .sampled_image_stencil_sample_counts = SampleCountFlags_from_vk(
-                vk_limits.sampledImageStencilSampleCounts
-            ),
+            .sampled_image_stencil_sample_counts =
+            vk_limits.sampledImageStencilSampleCounts,
 
-            .storage_image_sample_counts = SampleCountFlags_from_vk(
-                vk_limits.storageImageSampleCounts
-            ),
+            .storage_image_sample_counts =
+            vk_limits.storageImageSampleCounts,
 
             .max_sample_mask_words =
             vk_limits.maxSampleMaskWords,
@@ -544,9 +534,7 @@ namespace bv
             .driver_version = vk_properties.driverVersion,
             .vendor_id = vk_properties.vendorID,
             .device_id = vk_properties.deviceID,
-            .device_type = PhysicalDeviceType_from_vk(
-                vk_properties.deviceType
-            ),
+            .device_type = vk_properties.deviceType,
             .device_name = cstr_to_std(vk_properties.deviceName),
             .pipeline_cache_uuid = raw_arr_to_std<VK_UUID_SIZE>(
                 vk_properties.pipelineCacheUUID
@@ -946,19 +934,17 @@ namespace bv
 
     QueueFamily QueueFamily_from_vk(
         const VkQueueFamilyProperties& vk_family,
-        VkBool32 vk_presentation_support
+        VkBool32 vk_surface_support
     )
     {
         return QueueFamily{
-            .queue_flags = QueueFlags_from_vk(
-                vk_family.queueFlags,
-                vk_presentation_support
+            .queue_flags = vk_family.queueFlags,
+            .queue_count = vk_family.queueCount,
+            .timestamp_valid_bits = vk_family.timestampValidBits,
+            .min_image_transfer_granularity = Extent3d_from_vk(
+                vk_family.minImageTransferGranularity
             ),
-                .queue_count = vk_family.queueCount,
-                .timestamp_valid_bits = vk_family.timestampValidBits,
-                .min_image_transfer_granularity = Extent3d_from_vk(
-                    vk_family.minImageTransferGranularity
-                )
+            .surface_support = (bool)vk_surface_support
         };
     }
 
@@ -977,18 +963,13 @@ namespace bv
                 vk_capabilities.maxImageExtent
             ),
             .max_image_array_layers = vk_capabilities.maxImageArrayLayers,
-            .supported_transforms = SurfaceTransformFlags_from_vk(
-                vk_capabilities.supportedTransforms
-            ),
-            .current_transform = SurfaceTransform_from_vk(
-                vk_capabilities.currentTransform
-            ),
-            .supported_composite_alpha = CompositeAlphaFlags_from_vk(
-                vk_capabilities.supportedCompositeAlpha
-            ),
-            .supported_usage_flags = ImageUsageFlags_from_vk(
-                vk_capabilities.supportedUsageFlags
-            )
+            .supported_transforms = vk_capabilities.supportedTransforms,
+            .current_transform = vk_capabilities.currentTransform,
+
+            .supported_composite_alpha =
+            vk_capabilities.supportedCompositeAlpha,
+
+            .supported_usage_flags = vk_capabilities.supportedUsageFlags
         };
     }
 
@@ -997,8 +978,8 @@ namespace bv
     )
     {
         return SurfaceFormat{
-            .format = Format_from_vk(vk_surface_format.format),
-            .color_space = ColorSpace_from_vk(vk_surface_format.colorSpace)
+            .format = vk_surface_format.format,
+            .color_space = vk_surface_format.colorSpace
         };
     }
 
@@ -1015,7 +996,7 @@ namespace bv
     )
     {
         return DebugObjectInfo{
-            .type = ObjectType_from_vk(vk_info.objectType),
+            .type = vk_info.objectType,
             .handle = vk_info.objectHandle,
             .name = cstr_to_std(vk_info.pObjectName)
         };
@@ -1068,7 +1049,7 @@ namespace bv
         return VkDeviceQueueCreateInfo{
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
             .pNext = nullptr,
-            .flags = QueueRequestFlags_to_vk(request.flags),
+            .flags = request.flags,
             .queueFamilyIndex = request.queue_family_index,
             .queueCount = request.num_queues_to_create,
             .pQueuePriorities = waste_priorities.data()
@@ -1078,10 +1059,10 @@ namespace bv
     VkComponentMapping ComponentMapping_to_vk(const ComponentMapping& mapping)
     {
         return VkComponentMapping{
-            .r = ComponentSwizzle_to_vk(mapping.r),
-            .g = ComponentSwizzle_to_vk(mapping.g),
-            .b = ComponentSwizzle_to_vk(mapping.b),
-            .a = ComponentSwizzle_to_vk(mapping.a)
+            .r = mapping.r,
+            .g = mapping.g,
+            .b = mapping.b,
+            .a = mapping.a
         };
     }
 
@@ -1090,7 +1071,7 @@ namespace bv
     )
     {
         return VkImageSubresourceRange{
-            .aspectMask = ImageAspectFlags_to_vk(range.aspect_mask),
+            .aspectMask = range.aspect_mask,
             .baseMipLevel = range.base_mip_level,
             .levelCount = range.level_count,
             .baseArrayLayer = range.base_array_layer,
@@ -1152,8 +1133,8 @@ namespace bv
         return VkPipelineShaderStageCreateInfo{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .pNext = nullptr,
-            .flags = ShaderStageFlags_to_vk(stage.flags),
-            .stage = ShaderStageType_to_vk(stage.type),
+            .flags = stage.flags,
+            .stage = stage.stage,
             .module = stage.module->vk_shader_module,
             .pName = stage.entry_point.c_str(),
 
@@ -1182,6 +1163,16 @@ namespace bv
     Error::Error(std::string message, ApiResult api_result)
         : message(std::move(message)),
         api_result(api_result)
+    {}
+
+    Error::Error(VkResult vk_result)
+        : message(),
+        api_result((ApiResult)vk_result)
+    {}
+
+    Error::Error(std::string message, VkResult vk_result)
+        : message(std::move(message)),
+        api_result((ApiResult)vk_result)
     {}
 
     std::string Error::to_string() const
@@ -1331,7 +1322,7 @@ namespace bv
             }
         }
 
-        std::vector<PresentMode> present_modes;
+        std::vector<VkPresentModeKHR> present_modes;
         {
             uint32_t present_mode_count;
             vkGetPhysicalDeviceSurfacePresentModesKHR(
@@ -1341,22 +1332,16 @@ namespace bv
                 nullptr
             );
 
-            std::vector<VkPresentModeKHR> vk_present_modes(present_mode_count);
+            present_modes.resize(present_mode_count);
             vk_result = vkGetPhysicalDeviceSurfacePresentModesKHR(
                 vk_physical_device,
                 surface->vk_surface,
                 &present_mode_count,
-                vk_present_modes.data()
+                present_modes.data()
             );
             if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
             {
                 return Error(vk_result);
-            }
-
-            present_modes.reserve(vk_present_modes.size());
-            for (const auto& vk_present_mode : vk_present_modes)
-            {
-                present_modes.push_back(PresentMode_from_vk(vk_present_mode));
             }
         }
 
@@ -1424,7 +1409,7 @@ namespace bv
             app_info.pEngineName = c->config().engine_name.c_str();
             app_info.engineVersion = c->config().engine_version.encode();
 
-            app_info.apiVersion = VulkanApiVersion_to_vk(
+            app_info.apiVersion = VulkanApiVersion_encode(
                 c->config().vulkan_api_version
             );
         }
@@ -1617,14 +1602,14 @@ namespace bv
                 const VkQueueFamilyProperties& vk_queue_family =
                     vk_queue_families[i];
 
-                VkBool32 vk_present_support = VK_FALSE;
+                VkBool32 vk_surface_support = VK_FALSE;
                 if (surface != nullptr)
                 {
                     vk_result = vkGetPhysicalDeviceSurfaceSupportKHR(
                         vk_physical_device,
                         (uint32_t)i,
                         surface->vk_surface,
-                        &vk_present_support
+                        &vk_surface_support
                     );
                     if (vk_result != VK_SUCCESS)
                     {
@@ -1637,53 +1622,53 @@ namespace bv
 
                 auto queue_family = QueueFamily_from_vk(
                     vk_queue_family,
-                    vk_present_support
+                    vk_surface_support
                 );
 
-                if (queue_family.queue_flags.graphics &&
-                    !queue_family_indices.graphics.has_value())
+                if ((queue_family.queue_flags & VK_QUEUE_GRAPHICS_BIT)
+                    && !queue_family_indices.graphics.has_value())
                 {
                     queue_family_indices.graphics = i;
                 }
-                if (queue_family.queue_flags.presentation &&
-                    !queue_family_indices.presentation.has_value())
+                if (queue_family.surface_support
+                    && !queue_family_indices.presentation.has_value())
                 {
                     queue_family_indices.presentation = i;
                 }
-                if (queue_family.queue_flags.compute &&
-                    !queue_family_indices.compute.has_value())
+                if ((queue_family.queue_flags & VK_QUEUE_COMPUTE_BIT)
+                    && !queue_family_indices.compute.has_value())
                 {
                     queue_family_indices.compute = i;
                 }
-                if (queue_family.queue_flags.transfer &&
-                    !queue_family_indices.transfer.has_value())
+                if ((queue_family.queue_flags & VK_QUEUE_TRANSFER_BIT)
+                    && !queue_family_indices.transfer.has_value())
                 {
                     queue_family_indices.transfer = i;
                 }
-                if (queue_family.queue_flags.sparse_binding &&
-                    !queue_family_indices.sparse_binding.has_value())
+                if ((queue_family.queue_flags & VK_QUEUE_SPARSE_BINDING_BIT)
+                    && !queue_family_indices.sparse_binding.has_value())
                 {
                     queue_family_indices.sparse_binding = i;
                 }
-                if (queue_family.queue_flags.protected_ &&
-                    !queue_family_indices.protected_.has_value())
+                if ((queue_family.queue_flags & VK_QUEUE_PROTECTED_BIT)
+                    && !queue_family_indices.protected_.has_value())
                 {
                     queue_family_indices.protected_ = i;
                 }
-                if (queue_family.queue_flags.video_decode &&
-                    !queue_family_indices.video_decode.has_value())
+                if ((queue_family.queue_flags & VK_QUEUE_VIDEO_DECODE_BIT_KHR)
+                    && !queue_family_indices.video_decode.has_value())
                 {
                     queue_family_indices.video_decode = i;
                 }
-                if (queue_family.queue_flags.optical_flow_nv &&
-                    !queue_family_indices.optical_flow_nv.has_value())
+                if ((queue_family.queue_flags & VK_QUEUE_OPTICAL_FLOW_BIT_NV)
+                    && !queue_family_indices.optical_flow_nv.has_value())
                 {
                     queue_family_indices.optical_flow_nv = i;
                 }
 
                 bool supports_both_graphics_and_presentation =
-                    queue_family.queue_flags.graphics
-                    && queue_family.queue_flags.presentation;
+                    (queue_family.queue_flags & VK_QUEUE_GRAPHICS_BIT)
+                    && queue_family.surface_support;
 
                 bool already_have_shared_graphics_and_presentation_indices =
                     (
@@ -1743,8 +1728,8 @@ namespace bv
 
     Result<DebugMessenger::ptr> DebugMessenger::create(
         const Context::ptr& context,
-        DebugMessageSeverityFlags message_severity_filter,
-        DebugMessageTypeFlags message_type_filter,
+        VkDebugUtilsMessageSeverityFlagsEXT message_severity_filter,
+        VkDebugUtilsMessageTypeFlagsEXT message_type_filter,
         const DebugCallback& callback
     )
     {
@@ -1760,12 +1745,8 @@ namespace bv
             .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
             .pNext = nullptr,
             .flags = 0,
-            .messageSeverity = DebugMessageSeverityFlags_to_vk(
-                messenger->message_severity_filter()
-            ),
-            .messageType = DebugMessageTypeFlags_to_vk(
-                messenger->message_type_filter()
-            ),
+            .messageSeverity = messenger->message_severity_filter(),
+            .messageType = messenger->message_type_filter(),
             .pfnUserCallback = vk_debug_callback,
             .pUserData = messenger.get()
         };
@@ -1794,8 +1775,8 @@ namespace bv
 
     DebugMessenger::DebugMessenger(
         const Context::ptr& context,
-        const DebugMessageSeverityFlags& message_severity_filter,
-        const DebugMessageTypeFlags& message_type_filter,
+        VkDebugUtilsMessageSeverityFlagsEXT message_severity_filter,
+        VkDebugUtilsMessageTypeFlagsEXT message_type_filter,
         const DebugCallback& callback
     )
         : _context(context),
@@ -1976,27 +1957,23 @@ namespace bv
         VkSwapchainCreateInfoKHR create_info{
             .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
             .pNext = nullptr,
-            .flags = SwapchainFlags_to_vk(sc->config().flags),
+            .flags = sc->config().flags,
             .surface = sc->surface()->vk_surface,
             .minImageCount = sc->config().min_image_count,
-            .imageFormat = Format_to_vk(sc->config().image_format),
-            .imageColorSpace = ColorSpace_to_vk(sc->config().image_color_space),
+            .imageFormat = sc->config().image_format,
+            .imageColorSpace = sc->config().image_color_space,
             .imageExtent = Extent2d_to_vk(sc->config().image_extent),
             .imageArrayLayers = sc->config().image_array_layers,
-            .imageUsage = ImageUsageFlags_to_vk(sc->config().image_usage),
-            .imageSharingMode = SharingMode_to_vk(
-                sc->config().image_sharing_mode
-            ),
+            .imageUsage = sc->config().image_usage,
+            .imageSharingMode = sc->config().image_sharing_mode,
 
             .queueFamilyIndexCount =
             (uint32_t)sc->config().queue_family_indices.size(),
 
             .pQueueFamilyIndices = sc->config().queue_family_indices.data(),
-            .preTransform = SurfaceTransform_to_vk(sc->config().pre_transform),
-            .compositeAlpha = CompositeAlpha_to_vk(
-                sc->config().composite_alpha
-            ),
-            .presentMode = PresentMode_to_vk(sc->config().present_mode),
+            .preTransform = sc->config().pre_transform,
+            .compositeAlpha = sc->config().composite_alpha,
+            .presentMode = sc->config().present_mode,
             .clipped = sc->config().clipped,
             .oldSwapchain = vk_old_swapchain
         };
@@ -2079,10 +2056,10 @@ namespace bv
         VkImageViewCreateInfo create_info{
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
             .pNext = nullptr,
-            .flags = ImageViewFlags_to_vk(view->config().flags),
+            .flags = view->config().flags,
             .image = view->image()->vk_image,
-            .viewType = ImageViewType_to_vk(view->config().view_type),
-            .format = Format_to_vk(view->config().format),
+            .viewType = view->config().view_type,
+            .format = view->config().format,
             .components = ComponentMapping_to_vk(view->config().components),
             .subresourceRange = ImageSubresourceRange_to_vk(
                 view->config().subresource_range
@@ -2179,7 +2156,7 @@ namespace bv
         void* p_user_data,
         size_t size,
         size_t alignment,
-        VkSystemAllocationScope vk_allocation_scope
+        VkSystemAllocationScope allocation_scope
     )
     {
         if (!p_user_data)
@@ -2193,7 +2170,7 @@ namespace bv
         return allocator->allocate(
             size,
             alignment,
-            AllocationScope_from_vk(vk_allocation_scope)
+            allocation_scope
         );
     }
 
@@ -2202,7 +2179,7 @@ namespace bv
         void* p_original,
         size_t size,
         size_t alignment,
-        VkSystemAllocationScope vk_allocation_scope
+        VkSystemAllocationScope allocation_scope
     )
     {
         if (!p_user_data)
@@ -2217,7 +2194,7 @@ namespace bv
             p_original,
             size,
             alignment,
-            AllocationScope_from_vk(vk_allocation_scope)
+            allocation_scope
         );
     }
 
@@ -2240,8 +2217,8 @@ namespace bv
     static void vk_internal_allocation_notification(
         void* p_user_data,
         size_t size,
-        VkInternalAllocationType vk_allocation_type,
-        VkSystemAllocationScope vk_allocation_scope
+        VkInternalAllocationType allocation_type,
+        VkSystemAllocationScope allocation_scope
     )
     {
         if (!p_user_data)
@@ -2255,16 +2232,16 @@ namespace bv
         Allocator* allocator = (Allocator*)p_user_data;
         allocator->internal_allocation_notification(
             size,
-            InternalAllocationType_from_vk(vk_allocation_type),
-            AllocationScope_from_vk(vk_allocation_scope)
+            allocation_type,
+            allocation_scope
         );
     }
 
     static void vk_internal_free_notification(
         void* p_user_data,
         size_t size,
-        VkInternalAllocationType vk_allocation_type,
-        VkSystemAllocationScope vk_allocation_scope
+        VkInternalAllocationType allocation_type,
+        VkSystemAllocationScope allocation_scope
     )
     {
         if (!p_user_data)
@@ -2277,14 +2254,14 @@ namespace bv
         Allocator* allocator = (Allocator*)p_user_data;
         allocator->internal_free_notification(
             size,
-            InternalAllocationType_from_vk(vk_allocation_type),
-            AllocationScope_from_vk(vk_allocation_scope)
+            allocation_type,
+            allocation_scope
         );
     }
 
     static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
-        VkDebugUtilsMessageSeverityFlagBitsEXT vk_message_severity,
-        VkDebugUtilsMessageTypeFlagsEXT vk_message_type_flags,
+        VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+        VkDebugUtilsMessageTypeFlagsEXT message_types,
         const VkDebugUtilsMessengerCallbackDataEXT* p_callback_data,
         void* p_user_data
     )
@@ -2298,8 +2275,8 @@ namespace bv
 
         DebugMessenger* messenger = (DebugMessenger*)p_user_data;
         messenger->callback()(
-            DebugMessageSeverity_from_vk(vk_message_severity),
-            DebugMessageTypeFlags_from_vk(vk_message_type_flags),
+            message_severity,
+            message_types,
             DebugMessageData_from_vk(*p_callback_data)
             );
 
