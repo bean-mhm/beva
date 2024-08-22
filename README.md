@@ -39,6 +39,11 @@ integer using macros like `VK_API_VERSION_XXXX` under the hood.
 - beva provides comments containing links to the Khronos manual on top of every
 wrapper struct or class for convenience.
 
+Disclaimer: beva will __not__ try and catch invalid inputs. It's totally
+possible to get undefined behavior and crashes with beva, if used incorrectly.
+To avoid these situations, read the manual pages linked above structs and
+classes to see how to use them properly.
+
 # Including beva
 
 Make a new directory named `beva` somewhere in your include directories and copy
