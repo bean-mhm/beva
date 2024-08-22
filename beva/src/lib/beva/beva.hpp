@@ -20,7 +20,7 @@
 namespace bv
 {
 
-#pragma region data-only structs, enums, and type aliases
+#pragma region data-only structs and enums
 
     template<typename Enum>
     using EnumStrMap = std::unordered_map<Enum, std::string>;

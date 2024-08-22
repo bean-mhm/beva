@@ -3,7 +3,7 @@
 #include "vulkan/vulkan.h"
 #include "GLFW/glfw3.h"
 
-#include "beva/beva.h"
+#include "beva/beva.hpp"
 
 namespace beva_demo
 {
