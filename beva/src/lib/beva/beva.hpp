@@ -1378,6 +1378,7 @@ namespace bv
     {
     public:
         using ptr = std::shared_ptr<Allocator>;
+        using wptr = std::weak_ptr<Allocator>;
 
         virtual void* allocate(
             size_t size,
@@ -1415,6 +1416,7 @@ namespace bv
     {
     public:
         using ptr = std::shared_ptr<PhysicalDevice>;
+        using wptr = std::weak_ptr<PhysicalDevice>;
 
         PhysicalDevice() = delete;
 
@@ -1483,6 +1485,7 @@ namespace bv
     {
     public:
         using ptr = std::shared_ptr<Context>;
+        using wptr = std::weak_ptr<Context>;
 
         Context() = delete;
         Context(const Context& other) = delete;
@@ -1566,6 +1569,7 @@ namespace bv
     {
     public:
         using ptr = std::shared_ptr<DebugMessenger>;
+        using wptr = std::weak_ptr<DebugMessenger>;
 
         DebugMessenger(const DebugMessenger& other) = delete;
         DebugMessenger(DebugMessenger&& other) = default;
@@ -1624,6 +1628,7 @@ namespace bv
     {
     public:
         using ptr = std::shared_ptr<Surface>;
+        using wptr = std::weak_ptr<Surface>;
 
         Surface() = delete;
         Surface(const Surface& other) = delete;
@@ -1667,6 +1672,7 @@ namespace bv
     {
     public:
         using ptr = std::shared_ptr<Queue>;
+        using wptr = std::weak_ptr<Queue>;
 
         Queue() = delete;
         Queue(const Queue& other) = delete;
@@ -1684,6 +1690,7 @@ namespace bv
     {
     public:
         using ptr = std::shared_ptr<Device>;
+        using wptr = std::weak_ptr<Device>;
 
         Device() = delete;
         Device(const Device& other) = delete;
@@ -1744,6 +1751,7 @@ namespace bv
     {
     public:
         using ptr = std::shared_ptr<Image>;
+        using wptr = std::weak_ptr<Image>;
 
         Image() = delete;
         Image(const Image& other) = delete;
@@ -1764,6 +1772,7 @@ namespace bv
     {
     public:
         using ptr = std::shared_ptr<Swapchain>;
+        using wptr = std::weak_ptr<Swapchain>;
 
         Swapchain() = delete;
         Swapchain(const Swapchain& other) = delete;
@@ -1827,6 +1836,7 @@ namespace bv
     {
     public:
         using ptr = std::shared_ptr<ImageView>;
+        using wptr = std::weak_ptr<ImageView>;
 
         ImageView() = delete;
         ImageView(const ImageView& other) = delete;
@@ -1876,6 +1886,7 @@ namespace bv
     {
     public:
         using ptr = std::shared_ptr<ShaderModule>;
+        using wptr = std::weak_ptr<ShaderModule>;
 
         ShaderModule() = delete;
         ShaderModule(const ShaderModule& other) = delete;
@@ -1915,6 +1926,7 @@ namespace bv
     {
     public:
         using ptr = std::shared_ptr<Sampler>;
+        using wptr = std::weak_ptr<Sampler>;
 
         Sampler() = delete;
         Sampler(const Sampler& other) = delete;
@@ -1961,6 +1973,7 @@ namespace bv
     {
     public:
         using ptr = std::shared_ptr<DescriptorSetLayout>;
+        using wptr = std::weak_ptr<DescriptorSetLayout>;
 
         DescriptorSetLayout() = delete;
         DescriptorSetLayout(const DescriptorSetLayout& other) = delete;
@@ -2003,6 +2016,7 @@ namespace bv
     {
     public:
         using ptr = std::shared_ptr<PipelineLayout>;
+        using wptr = std::weak_ptr<PipelineLayout>;
 
         PipelineLayout() = delete;
         PipelineLayout(const PipelineLayout& other) = delete;
