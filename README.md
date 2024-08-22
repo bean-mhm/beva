@@ -3,7 +3,7 @@
 beva (lowercase) is a thin wrapper for the Vulkan API. It abstracts away very
 little functionality from the original API. My main motive was to get rid of
 annoying boilerplate like the `sType` and `pNext` fields in creation info
-structs and implement RAII wrappers for Vulkan objects, but still keep the
+structs and implement RAII wrappers for Vulkan objects, while still keeping the
 low-level design of the API.
 
 Here's more things beva does to ease the process of using Vulkan:
@@ -27,7 +27,7 @@ constructed from a message and an optional `VkResult` and provides a
 `to_string()` function with descriptions for every `VkResult` based on the
 Vulkan specification.
 
-- beva implements tiny wrappers for Vulkan structs that use STD containers like
+- beva provides tiny wrappers for Vulkan structs that use STD containers like
 `std::vector` and `std::array` instead of raw pointers and arrays.
 
 - beva hides away useless fields like flags that are reserved for the future.
