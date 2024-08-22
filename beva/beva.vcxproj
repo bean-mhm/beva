@@ -99,7 +99,7 @@ $(ProjectDir)shaders/compile.bat
       <AdditionalDependencies>vulkan-1.lib;glfw3.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>XCOPY "$(ProjectDir)licenses/" "$(OutDir)licenses/" /S /Y
+      <Command>XCOPY "$(ProjectDir)licenses\" "$(OutDir)licenses\" /S /Y
 
 set VS_PROJ_DIR=$(ProjectDir)
 set VS_OUT_DIR=$(OutDir)
