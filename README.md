@@ -36,6 +36,9 @@ Vulkan specification.
 the `VK_MAKE_API_VERSION` macro. It can also be constructed from an encoded
 integer using macros like `VK_API_VERSION_XXXX` under the hood.
 
+- beva provides comments containing links to the Khronos manual on top of every
+wrapper struct or class for convenience.
+
 # Including beva
 
 Make a new directory named `beva` somewhere in your include directories and copy
@@ -45,4 +48,5 @@ Vulkan SDK as well, such that `#include "vulkan/vulkan.h"` works.
 
 # Using beva
 
-Check out `app.hpp` and `app.cpp` to see how to render a basic scene with beva.
+Check out `beva/src/app.hpp` and `app.cpp` to see how to render a basic scene
+with beva.
