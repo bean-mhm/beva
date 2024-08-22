@@ -1252,6 +1252,79 @@ namespace bv
         std::vector<PushConstantRange> push_constant_ranges;
     };
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkAttachmentDescription.html
+    struct Attachment
+    {
+        VkAttachmentDescriptionFlags flags;
+        VkFormat format;
+        VkSampleCountFlagBits samples;
+        VkAttachmentLoadOp load_op;
+        VkAttachmentStoreOp store_op;
+        VkAttachmentLoadOp stencil_load_op;
+        VkAttachmentStoreOp stencil_store_op;
+        VkImageLayout initial_layout;
+        VkImageLayout final_layout;
+    };
+
+    VkAttachmentDescription Attachment_to_vk(
+        const Attachment& attachment
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkAttachmentReference.html
+    struct AttachmentReference
+    {
+        uint32_t attachment;
+        VkImageLayout layout;
+    };
+
+    VkAttachmentReference AttachmentReference_to_vk(
+        const AttachmentReference& ref
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSubpassDescription.html
+    struct Subpass
+    {
+        VkSubpassDescriptionFlags flags;
+        VkPipelineBindPoint pipeline_bind_point;
+        std::vector<AttachmentReference> input_attachments;
+        std::vector<AttachmentReference> color_attachments;
+        std::vector<AttachmentReference> resolve_attachments;
+        std::optional<AttachmentReference> depth_stencil_attachment;
+        std::vector<uint32_t> preserve_attachment_indices;
+    };
+
+    VkSubpassDescription Subpass_to_vk(
+        const Subpass& subpass,
+        std::vector<VkAttachmentReference>& waste_vk_input_attachments,
+        std::vector<VkAttachmentReference>& waste_vk_color_attachments,
+        std::vector<VkAttachmentReference>& waste_vk_resolve_attachments,
+        VkAttachmentReference& waste_vk_depth_stencil_attachment,
+        std::vector<uint32_t>& waste_preserve_attachment_indices
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSubpassDependency.html
+    struct SubpassDependency
+    {
+        uint32_t src_subpass;
+        uint32_t dst_subpass;
+        VkPipelineStageFlags src_stage_mask;
+        VkPipelineStageFlags dst_stage_mask;
+        VkAccessFlags src_access_mask;
+        VkAccessFlags dst_access_mask;
+        VkDependencyFlags dependency_flags;
+    };
+
+    VkSubpassDependency SubpassDependency_to_vk(const SubpassDependency& dep);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkRenderPassCreateInfo.html
+    struct RenderPassConfig
+    {
+        VkRenderPassCreateFlags flags;
+        std::vector<Attachment> attachments;
+        std::vector<Subpass> subpasses;
+        std::vector<SubpassDependency> dependencies;
+    };
+
 #pragma endregion
 
 #pragma region error handling
@@ -1743,6 +1816,7 @@ namespace bv
         friend class Sampler;
         friend class DescriptorSetLayout;
         friend class PipelineLayout;
+        friend class RenderPass;
 
     };
 
@@ -2048,6 +2122,47 @@ namespace bv
         PipelineLayout(
             const Device::ptr& device,
             const PipelineLayoutConfig& config
+        );
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkRenderPass.html
+    class RenderPass
+    {
+    public:
+        using ptr = std::shared_ptr<RenderPass>;
+        using wptr = std::weak_ptr<RenderPass>;
+
+        RenderPass() = delete;
+        RenderPass(const RenderPass& other) = delete;
+        RenderPass(RenderPass&& other) = default;
+
+        static Result<RenderPass::ptr> create(
+            const Device::ptr& device,
+            const RenderPassConfig& config
+        );
+
+        constexpr const Device::ptr& device() const
+        {
+            return _device;
+        }
+
+        constexpr const RenderPassConfig& config() const
+        {
+            return _config;
+        }
+
+        ~RenderPass();
+
+    protected:
+        Device::ptr _device;
+        RenderPassConfig _config;
+
+        VkRenderPass vk_render_pass = nullptr;
+
+        RenderPass(
+            const Device::ptr& device,
+            const RenderPassConfig& config
         );
 
     };

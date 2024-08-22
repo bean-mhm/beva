@@ -31,6 +31,7 @@ namespace beva_demo
         bv::Queue::ptr presentation_queue = nullptr;
         bv::Swapchain::ptr swapchain = nullptr;
         std::vector<bv::ImageView::ptr> swapchain_imgviews;
+        bv::RenderPass::ptr render_pass = nullptr;
         bv::PipelineLayout::ptr pipeline_layout = nullptr;
 
         uint32_t graphics_family_idx = 0;
@@ -43,6 +44,7 @@ namespace beva_demo
         void pick_physical_device();
         void create_logical_device();
         void create_swapchain();
+        void create_render_pass();
         void create_graphics_pipeline();
 
         void main_loop();

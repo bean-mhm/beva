@@ -32,6 +32,7 @@ namespace beva_demo
         pick_physical_device();
         create_logical_device();
         create_swapchain();
+        create_render_pass();
         create_graphics_pipeline();
 
         main_loop();
@@ -452,6 +453,54 @@ namespace beva_demo
         }
     }
 
+    void App::create_render_pass()
+    {
+        bv::Attachment color_attachment{
+            .flags = 0,
+            .format = swapchain->config().image_format,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .store_op = VK_ATTACHMENT_STORE_OP_STORE,
+            .stencil_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .stencil_store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .final_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+        };
+
+        bv::AttachmentReference color_attachment_ref{
+            .attachment = 0,
+            .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        };
+
+        bv::Subpass subpass{
+            .flags = 0,
+            .pipeline_bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS,
+            .input_attachments = {},
+            .color_attachments = { color_attachment_ref },
+            .resolve_attachments = {},
+            .depth_stencil_attachment = std::nullopt,
+            .preserve_attachment_indices = {}
+        };
+
+        auto render_pass_result = bv::RenderPass::create(
+            device,
+            {
+                .flags = 0,
+                .attachments = { color_attachment },
+                .subpasses = { subpass },
+                .dependencies = {}
+            }
+        );
+        if (!render_pass_result.ok())
+        {
+            throw std::runtime_error(std::format(
+                "failed to create render pass: {}",
+                render_pass_result.error().to_string()
+            ).c_str());
+        }
+        render_pass = render_pass_result.value();
+    }
+
     void App::create_graphics_pipeline()
     {
         // shader modules
@@ -611,6 +660,7 @@ namespace beva_demo
     void App::cleanup()
     {
         pipeline_layout = nullptr;
+        render_pass = nullptr;
         swapchain_imgviews.clear();
         swapchain = nullptr;
         presentation_queue = nullptr;

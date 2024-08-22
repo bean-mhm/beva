@@ -42,6 +42,7 @@ namespace bv
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Sampler);
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DescriptorSetLayout);
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(PipelineLayout);
+    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(RenderPass);
 
 #pragma region forward declarations
 
@@ -1465,6 +1466,113 @@ namespace bv
         };
     }
 
+    VkAttachmentDescription Attachment_to_vk(
+        const Attachment& attachment
+    )
+    {
+        return VkAttachmentDescription{
+            .flags = attachment.flags,
+            .format = attachment.format,
+            .samples = attachment.samples,
+            .loadOp = attachment.load_op,
+            .storeOp = attachment.store_op,
+            .stencilLoadOp = attachment.stencil_load_op,
+            .stencilStoreOp = attachment.stencil_store_op,
+            .initialLayout = attachment.initial_layout,
+            .finalLayout = attachment.final_layout
+        };
+    }
+
+    VkAttachmentReference AttachmentReference_to_vk(
+        const AttachmentReference& ref
+    )
+    {
+        return VkAttachmentReference{
+            .attachment = ref.attachment,
+            .layout = ref.layout
+        };
+    }
+
+    VkSubpassDescription Subpass_to_vk(
+        const Subpass& subpass,
+        std::vector<VkAttachmentReference>& waste_vk_input_attachments,
+        std::vector<VkAttachmentReference>& waste_vk_color_attachments,
+        std::vector<VkAttachmentReference>& waste_vk_resolve_attachments,
+        VkAttachmentReference& waste_vk_depth_stencil_attachment,
+        std::vector<uint32_t>& waste_preserve_attachment_indices
+    )
+    {
+        waste_vk_input_attachments.resize(subpass.input_attachments.size());
+        for (size_t i = 0; i < subpass.input_attachments.size(); i++)
+        {
+            waste_vk_input_attachments[i] = AttachmentReference_to_vk(
+                subpass.input_attachments[i]
+            );
+        }
+
+        waste_vk_color_attachments.resize(subpass.color_attachments.size());
+        for (size_t i = 0; i < subpass.color_attachments.size(); i++)
+        {
+            waste_vk_color_attachments[i] = AttachmentReference_to_vk(
+                subpass.color_attachments[i]
+            );
+        }
+
+        waste_vk_resolve_attachments.resize(subpass.resolve_attachments.size());
+        for (size_t i = 0; i < subpass.resolve_attachments.size(); i++)
+        {
+            waste_vk_resolve_attachments[i] = AttachmentReference_to_vk(
+                subpass.resolve_attachments[i]
+            );
+        }
+
+        if (subpass.depth_stencil_attachment.has_value())
+        {
+            waste_vk_depth_stencil_attachment = AttachmentReference_to_vk(
+                subpass.depth_stencil_attachment.value()
+            );
+        }
+
+        waste_preserve_attachment_indices = subpass.preserve_attachment_indices;
+
+        return VkSubpassDescription{
+            .flags = subpass.flags,
+            .pipelineBindPoint = subpass.pipeline_bind_point,
+            .inputAttachmentCount = (uint32_t)waste_vk_input_attachments.size(),
+            .pInputAttachments = waste_vk_input_attachments.data(),
+            .colorAttachmentCount = (uint32_t)waste_vk_color_attachments.size(),
+            .pColorAttachments = waste_vk_color_attachments.data(),
+
+            .pResolveAttachments =
+            waste_vk_resolve_attachments.empty()
+            ? nullptr
+            : waste_vk_resolve_attachments.data(),
+
+            .pDepthStencilAttachment =
+            subpass.depth_stencil_attachment.has_value()
+            ? &waste_vk_depth_stencil_attachment
+            : nullptr,
+
+            .preserveAttachmentCount =
+            (uint32_t)waste_preserve_attachment_indices.size(),
+
+            .pPreserveAttachments = waste_preserve_attachment_indices.data()
+        };
+    }
+
+    VkSubpassDependency SubpassDependency_to_vk(const SubpassDependency& dep)
+    {
+        return VkSubpassDependency{
+            .srcSubpass = dep.src_subpass,
+            .dstSubpass = dep.dst_subpass,
+            .srcStageMask = dep.src_stage_mask,
+            .dstStageMask = dep.dst_stage_mask,
+            .srcAccessMask = dep.src_access_mask,
+            .dstAccessMask = dep.dst_access_mask,
+            .dependencyFlags = dep.dependency_flags
+        };
+    }
+
     Error::Error()
         : message("no error information provided"),
         api_result(std::nullopt)
@@ -2667,6 +2775,101 @@ namespace bv
     PipelineLayout::PipelineLayout(
         const Device::ptr& device,
         const PipelineLayoutConfig& config
+    )
+        : _device(device), _config(config)
+    {}
+
+    Result<RenderPass::ptr> RenderPass::create(
+        const Device::ptr& device,
+        const RenderPassConfig& config
+    )
+    {
+        RenderPass::ptr pass = std::make_shared<RenderPass_public_ctor>(
+            device,
+            config
+        );
+
+        std::vector<VkAttachmentDescription> vk_attachments(
+            pass->config().attachments.size()
+        );
+        for (size_t i = 0; i < pass->config().attachments.size(); i++)
+        {
+            vk_attachments[i] = Attachment_to_vk(pass->config().attachments[i]);
+        }
+
+        std::vector<VkSubpassDescription> vk_subpasses(
+            pass->config().subpasses.size()
+        );
+        std::vector<std::vector<VkAttachmentReference>> wastes_vk_input_attachments;
+        std::vector<std::vector<VkAttachmentReference>> wastes_vk_color_attachments;
+        std::vector<std::vector<VkAttachmentReference>> wastes_vk_resolve_attachments;
+        std::vector<VkAttachmentReference> wastes_vk_depth_stencil_attachment;
+        std::vector<std::vector<uint32_t>> wastes_preserve_attachment_indices;
+        for (size_t i = 0; i < pass->config().subpasses.size(); i++)
+        {
+            wastes_vk_input_attachments.push_back({});
+            wastes_vk_color_attachments.push_back({});
+            wastes_vk_resolve_attachments.push_back({});
+            wastes_vk_depth_stencil_attachment.push_back({});
+            wastes_preserve_attachment_indices.push_back({});
+
+            vk_subpasses[i] = Subpass_to_vk(
+                pass->config().subpasses[i],
+                wastes_vk_input_attachments.back(),
+                wastes_vk_color_attachments.back(),
+                wastes_vk_resolve_attachments.back(),
+                wastes_vk_depth_stencil_attachment.back(),
+                wastes_preserve_attachment_indices.back()
+            );
+        }
+
+        std::vector<VkSubpassDependency> vk_dependencies(
+            pass->config().dependencies.size()
+        );
+        for (size_t i = 0; i < pass->config().dependencies.size(); i++)
+        {
+            vk_dependencies[i] = SubpassDependency_to_vk(
+                pass->config().dependencies[i]
+            );
+        }
+
+        VkRenderPassCreateInfo create_info{
+            .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = pass->config().flags,
+            .attachmentCount = (uint32_t)vk_attachments.size(),
+            .pAttachments = vk_attachments.data(),
+            .subpassCount = (uint32_t)vk_subpasses.size(),
+            .pSubpasses = vk_subpasses.data(),
+            .dependencyCount = (uint32_t)vk_dependencies.size(),
+            .pDependencies = vk_dependencies.data()
+        };
+
+        VkResult vk_result = vkCreateRenderPass(
+            pass->device()->vk_device,
+            &create_info,
+            pass->device()->context()->vk_allocator_ptr(),
+            &pass->vk_render_pass
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return pass;
+    }
+
+    RenderPass::~RenderPass()
+    {
+        vkDestroyRenderPass(
+            device()->vk_device,
+            vk_render_pass,
+            device()->context()->vk_allocator_ptr()
+        );
+    }
+
+    RenderPass::RenderPass(
+        const Device::ptr& device,
+        const RenderPassConfig& config
     )
         : _device(device), _config(config)
     {}
