@@ -575,10 +575,24 @@ namespace beva_demo
 
         bv::ColorBlendState color_blend_state{
             .flags = 0,
-            .logic_op = std::nullopt,
+            .logic_op_enable = false,
+            .logic_op = VK_LOGIC_OP_COPY,
             .attachments = { color_blend_attachment },
             .blend_constants = { 0.f, 0.f, 0.f, 0.f }
         };
+
+        auto pipeline_layout_result = bv::PipelineLayout::create(
+            device,
+            { .flags = 0, .set_layouts = {}, .push_constant_ranges = {} }
+        );
+        if (!pipeline_layout_result.ok())
+        {
+            throw std::runtime_error(std::format(
+                "failed to create pipeline layout: {}",
+                pipeline_layout_result.error().to_string()
+            ).c_str());
+        }
+        pipeline_layout = pipeline_layout_result.value();
     }
 
     void App::main_loop()
@@ -596,6 +610,7 @@ namespace beva_demo
 
     void App::cleanup()
     {
+        pipeline_layout = nullptr;
         swapchain_imgviews.clear();
         swapchain = nullptr;
         presentation_queue = nullptr;

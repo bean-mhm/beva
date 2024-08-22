@@ -39,6 +39,9 @@ namespace bv
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Swapchain);
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(ImageView);
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(ShaderModule);
+    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Sampler);
+    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DescriptorSetLayout);
+    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(PipelineLayout);
 
 #pragma region forward declarations
 
@@ -1116,11 +1119,14 @@ namespace bv
 
     VkPipelineShaderStageCreateInfo ShaderStage_to_vk(
         const ShaderStage& stage,
+        std::shared_ptr<ShaderModule>& waste_module,
         VkSpecializationInfo& waste_vk_specialization_info,
         std::vector<VkSpecializationMapEntry>& waste_vk_map_entries,
         std::vector<uint8_t>& waste_data
     )
     {
+        waste_module = stage.module;
+
         if (stage.specialization_info.has_value())
         {
             waste_vk_specialization_info = SpecializationInfo_to_vk(
@@ -1135,7 +1141,7 @@ namespace bv
             .pNext = nullptr,
             .flags = stage.flags,
             .stage = stage.stage,
-            .module = stage.module->vk_shader_module,
+            .module = waste_module->vk_shader_module,
             .pName = stage.entry_point.c_str(),
 
             .pSpecializationInfo =
@@ -1407,12 +1413,8 @@ namespace bv
             .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
             .pNext = nullptr,
             .flags = state.flags,
-            .logicOpEnable = state.logic_op.has_value(),
-
-            .logicOp =
-            state.logic_op.has_value()
-            ? state.logic_op.value()
-            : VK_LOGIC_OP_COPY,
+            .logicOpEnable = state.logic_op_enable,
+            .logicOp = state.logic_op,
 
             .attachmentCount =
             (uint32_t)waste_vk_color_blend_attachments.size(),
@@ -1425,6 +1427,42 @@ namespace bv
             info.blendConstants
         );
         return info;
+    }
+
+    VkDescriptorSetLayoutBinding DescriptorSetLayoutBinding_to_vk(
+        const DescriptorSetLayoutBinding& binding,
+        std::vector<std::shared_ptr<Sampler>>& waste_immutable_samplers,
+        std::vector<VkSampler>& waste_vk_immutable_samplers
+    )
+    {
+        waste_immutable_samplers = binding.immutable_samplers;
+        waste_vk_immutable_samplers.resize(binding.immutable_samplers.size());
+        for (size_t i = 0; i < binding.immutable_samplers.size(); i++)
+        {
+            waste_vk_immutable_samplers[i] =
+                binding.immutable_samplers[i]->vk_sampler;
+        }
+
+        return VkDescriptorSetLayoutBinding{
+            .binding = binding.binding,
+            .descriptorType = binding.descriptor_type,
+            .descriptorCount = binding.descriptor_count,
+            .stageFlags = binding.stage_flags,
+
+            .pImmutableSamplers =
+            waste_vk_immutable_samplers.empty()
+            ? nullptr
+            : waste_vk_immutable_samplers.data()
+        };
+    }
+
+    VkPushConstantRange PushConstantRange_to_vk(const PushConstantRange& range)
+    {
+        return VkPushConstantRange{
+            .stageFlags = range.stage_flags,
+            .offset = range.offset,
+            .size = range.size
+        };
     }
 
     Error::Error()
@@ -2430,6 +2468,207 @@ namespace bv
 
     ShaderModule::ShaderModule(const Device::ptr& device)
         : _device(device)
+    {}
+
+    Result<Sampler::ptr> Sampler::create(
+        const Device::ptr& device,
+        const SamplerConfig& config
+    )
+    {
+        Sampler::ptr sampler = std::make_shared<Sampler_public_ctor>(
+            device,
+            config
+        );
+
+        VkSamplerCreateInfo create_info{
+            .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = sampler->config().flags,
+            .magFilter = sampler->config().mag_filter,
+            .minFilter = sampler->config().min_filter,
+            .mipmapMode = sampler->config().mipmap_mode,
+            .addressModeU = sampler->config().address_mode_u,
+            .addressModeV = sampler->config().address_mode_v,
+            .addressModeW = sampler->config().address_mode_w,
+            .mipLodBias = sampler->config().mip_lod_bias,
+            .anisotropyEnable = sampler->config().anisotropy_enable,
+            .maxAnisotropy = sampler->config().max_anisotropy,
+            .compareEnable = sampler->config().compare_enable,
+            .compareOp = sampler->config().compare_op,
+            .minLod = sampler->config().min_lod,
+            .maxLod = sampler->config().max_lod,
+            .borderColor = sampler->config().border_color,
+
+            .unnormalizedCoordinates =
+            sampler->config().unnormalized_coordinates
+        };
+
+        VkResult vk_result = vkCreateSampler(
+            sampler->device()->vk_device,
+            &create_info,
+            sampler->device()->context()->vk_allocator_ptr(),
+            &sampler->vk_sampler
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return sampler;
+    }
+
+    Sampler::~Sampler()
+    {
+        vkDestroySampler(
+            device()->vk_device,
+            vk_sampler,
+            device()->context()->vk_allocator_ptr()
+        );
+    }
+
+    Sampler::Sampler(
+        const Device::ptr& device,
+        const SamplerConfig& config
+    )
+        : _device(device),
+        _config(config)
+    {}
+
+    Result<DescriptorSetLayout::ptr> DescriptorSetLayout::create(
+        const Device::ptr& device,
+        const DescriptorSetLayoutConfig& config
+    )
+    {
+        DescriptorSetLayout::ptr layout =
+            std::make_shared<DescriptorSetLayout_public_ctor>(
+                device,
+                config
+            );
+
+        std::vector<VkDescriptorSetLayoutBinding> vk_bindings(
+            layout->config().bindings.size()
+        );
+        std::vector<std::vector<std::shared_ptr<Sampler>>>
+            wastes_immutable_samplers;
+        std::vector<std::vector<VkSampler>> wastes_vk_immutable_samplers;
+        for (size_t i = 0; i < layout->config().bindings.size(); i++)
+        {
+            wastes_immutable_samplers.push_back({});
+            wastes_vk_immutable_samplers.push_back({});
+
+            vk_bindings[i] = DescriptorSetLayoutBinding_to_vk(
+                layout->config().bindings[i],
+                wastes_immutable_samplers.back(),
+                wastes_vk_immutable_samplers.back()
+            );
+        }
+
+        VkDescriptorSetLayoutCreateInfo create_info{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = layout->config().flags,
+            .bindingCount = (uint32_t)vk_bindings.size(),
+            .pBindings = vk_bindings.data()
+        };
+
+        VkResult vk_result = vkCreateDescriptorSetLayout(
+            layout->device()->vk_device,
+            &create_info,
+            layout->device()->context()->vk_allocator_ptr(),
+            &layout->vk_descriptor_set_layout
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return layout;
+    }
+
+    DescriptorSetLayout::~DescriptorSetLayout()
+    {
+        vkDestroyDescriptorSetLayout(
+            device()->vk_device,
+            vk_descriptor_set_layout,
+            device()->context()->vk_allocator_ptr()
+        );
+    }
+
+    DescriptorSetLayout::DescriptorSetLayout(
+        const Device::ptr& device,
+        const DescriptorSetLayoutConfig& config
+    )
+        : _device(device),
+        _config(config)
+    {}
+
+    Result<PipelineLayout::ptr> PipelineLayout::create(
+        const Device::ptr& device,
+        const PipelineLayoutConfig& config
+    )
+    {
+        PipelineLayout::ptr layout =
+            std::make_shared<PipelineLayout_public_ctor>(
+                device,
+                config
+            );
+
+        std::vector<VkDescriptorSetLayout> vk_set_layouts(
+            layout->config().set_layouts.size()
+        );
+        for (size_t i = 0; i < layout->config().set_layouts.size(); i++)
+        {
+            vk_set_layouts[i] =
+                layout->config().set_layouts[i]->vk_descriptor_set_layout;
+        }
+
+        std::vector<VkPushConstantRange> vk_push_constant_ranges(
+            layout->config().push_constant_ranges.size()
+        );
+        for (size_t i = 0;
+            i < layout->config().push_constant_ranges.size();
+            i++)
+        {
+            vk_push_constant_ranges[i] = PushConstantRange_to_vk(
+                layout->config().push_constant_ranges[i]
+            );
+        }
+
+        VkPipelineLayoutCreateInfo create_info{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = layout->config().flags,
+            .setLayoutCount = (uint32_t)vk_set_layouts.size(),
+            .pSetLayouts = vk_set_layouts.data(),
+            .pushConstantRangeCount = (uint32_t)vk_push_constant_ranges.size(),
+            .pPushConstantRanges = vk_push_constant_ranges.data()
+        };
+
+        VkResult vk_result = vkCreatePipelineLayout(
+            layout->device()->vk_device,
+            &create_info,
+            layout->device()->context()->vk_allocator_ptr(),
+            &layout->vk_pipeline_layout
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return layout;
+    }
+
+    PipelineLayout::~PipelineLayout()
+    {
+        vkDestroyPipelineLayout(
+            device()->vk_device,
+            vk_pipeline_layout,
+            device()->context()->vk_allocator_ptr()
+        );
+    }
+
+    PipelineLayout::PipelineLayout(
+        const Device::ptr& device,
+        const PipelineLayoutConfig& config
+    )
+        : _device(device), _config(config)
     {}
 
 #pragma region Vulkan callbacks

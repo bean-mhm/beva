@@ -977,6 +977,7 @@ namespace bv
 
     VkPipelineShaderStageCreateInfo ShaderStage_to_vk(
         const ShaderStage& stage,
+        std::shared_ptr<ShaderModule>& waste_module,
         VkSpecializationInfo& waste_vk_specialization_info,
         std::vector<VkSpecializationMapEntry>& waste_vk_map_entries,
         std::vector<uint8_t>& waste_data
@@ -1172,7 +1173,8 @@ namespace bv
     struct ColorBlendState
     {
         VkPipelineColorBlendStateCreateFlags flags;
-        std::optional<VkLogicOp> logic_op;
+        bool logic_op_enable;
+        VkLogicOp logic_op;
         std::vector<ColorBlendAttachment> attachments;
         std::array<float, 4> blend_constants;
     };
@@ -1183,6 +1185,72 @@ namespace bv
         std::vector<VkPipelineColorBlendAttachmentState>&
         waste_vk_color_blend_attachments
     );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSamplerCreateInfo.html
+    struct SamplerConfig
+    {
+        VkSamplerCreateFlags flags;
+        VkFilter mag_filter;
+        VkFilter min_filter;
+        VkSamplerMipmapMode mipmap_mode;
+        VkSamplerAddressMode address_mode_u;
+        VkSamplerAddressMode address_mode_v;
+        VkSamplerAddressMode address_mode_w;
+        float mip_lod_bias;
+        bool anisotropy_enable;
+        float max_anisotropy;
+        bool compare_enable;
+        VkCompareOp compare_op;
+        float min_lod;
+        float max_lod;
+        VkBorderColor border_color;
+        bool unnormalized_coordinates;
+    };
+
+    class Sampler;
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSetLayoutBinding.html
+    struct DescriptorSetLayoutBinding
+    {
+        uint32_t binding;
+        VkDescriptorType descriptor_type;
+        uint32_t descriptor_count;
+        VkShaderStageFlags stage_flags;
+        std::vector<std::shared_ptr<Sampler>> immutable_samplers;
+    };
+
+    VkDescriptorSetLayoutBinding DescriptorSetLayoutBinding_to_vk(
+        const DescriptorSetLayoutBinding& binding,
+        std::vector<std::shared_ptr<Sampler>>& waste_immutable_samplers,
+        std::vector<VkSampler>& waste_vk_immutable_samplers
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSetLayoutCreateInfo.html
+    struct DescriptorSetLayoutConfig
+    {
+        VkDescriptorSetLayoutCreateFlags flags;
+        std::vector<DescriptorSetLayoutBinding> bindings;
+    };
+
+    class DescriptorSetLayout;
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPushConstantRange.html
+    struct PushConstantRange
+    {
+        VkShaderStageFlags stage_flags;
+        uint32_t offset;
+        uint32_t size;
+    };
+
+    VkPushConstantRange PushConstantRange_to_vk(const PushConstantRange& range);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineLayoutCreateInfo.html
+    struct PipelineLayoutConfig
+    {
+        VkPipelineLayoutCreateFlags flags;
+        std::vector<std::shared_ptr<DescriptorSetLayout>> set_layouts;
+        std::vector<PushConstantRange> push_constant_ranges;
+    };
 
 #pragma endregion
 
@@ -1665,6 +1733,9 @@ namespace bv
         friend class Swapchain;
         friend class ImageView;
         friend class ShaderModule;
+        friend class Sampler;
+        friend class DescriptorSetLayout;
+        friend class PipelineLayout;
 
     };
 
@@ -1831,9 +1902,138 @@ namespace bv
 
         friend VkPipelineShaderStageCreateInfo ShaderStage_to_vk(
             const ShaderStage& stage,
+            std::shared_ptr<ShaderModule>& waste_module,
             VkSpecializationInfo& waste_vk_specialization_info,
             std::vector<VkSpecializationMapEntry>& waste_vk_map_entries,
             std::vector<uint8_t>& waste_data
+        );
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSampler.html
+    class Sampler
+    {
+    public:
+        using ptr = std::shared_ptr<Sampler>;
+
+        Sampler() = delete;
+        Sampler(const Sampler& other) = delete;
+        Sampler(Sampler&& other) = default;
+
+        static Result<Sampler::ptr> create(
+            const Device::ptr& device,
+            const SamplerConfig& config
+        );
+
+        constexpr const Device::ptr& device() const
+        {
+            return _device;
+        }
+
+        constexpr const SamplerConfig& config() const
+        {
+            return _config;
+        }
+
+        ~Sampler();
+
+    protected:
+        Device::ptr _device;
+        SamplerConfig _config;
+
+        VkSampler vk_sampler = nullptr;
+
+        Sampler(
+            const Device::ptr& device,
+            const SamplerConfig& config
+        );
+
+        friend VkDescriptorSetLayoutBinding DescriptorSetLayoutBinding_to_vk(
+            const DescriptorSetLayoutBinding& binding,
+            std::vector<std::shared_ptr<Sampler>>& waste_immutable_samplers,
+            std::vector<VkSampler>& waste_vk_immutable_samplers
+        );
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSetLayout.html
+    class DescriptorSetLayout
+    {
+    public:
+        using ptr = std::shared_ptr<DescriptorSetLayout>;
+
+        DescriptorSetLayout() = delete;
+        DescriptorSetLayout(const DescriptorSetLayout& other) = delete;
+        DescriptorSetLayout(DescriptorSetLayout&& other) = default;
+
+        static Result<DescriptorSetLayout::ptr> create(
+            const Device::ptr& device,
+            const DescriptorSetLayoutConfig& config
+        );
+
+        constexpr const Device::ptr& device() const
+        {
+            return _device;
+        }
+
+        constexpr const DescriptorSetLayoutConfig& config() const
+        {
+            return _config;
+        }
+
+        ~DescriptorSetLayout();
+
+    protected:
+        Device::ptr _device;
+        DescriptorSetLayoutConfig _config;
+
+        VkDescriptorSetLayout vk_descriptor_set_layout = nullptr;
+
+        DescriptorSetLayout(
+            const Device::ptr& device,
+            const DescriptorSetLayoutConfig& config
+        );
+
+        friend class PipelineLayout;
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineLayout.html
+    class PipelineLayout
+    {
+    public:
+        using ptr = std::shared_ptr<PipelineLayout>;
+
+        PipelineLayout() = delete;
+        PipelineLayout(const PipelineLayout& other) = delete;
+        PipelineLayout(PipelineLayout&& other) = default;
+
+        static Result<PipelineLayout::ptr> create(
+            const Device::ptr& device,
+            const PipelineLayoutConfig& config
+        );
+
+        constexpr const Device::ptr& device() const
+        {
+            return _device;
+        }
+
+        constexpr const PipelineLayoutConfig& config() const
+        {
+            return _config;
+        }
+
+        ~PipelineLayout();
+
+    protected:
+        Device::ptr _device;
+        PipelineLayoutConfig _config;
+
+        VkPipelineLayout vk_pipeline_layout = nullptr;
+
+        PipelineLayout(
+            const Device::ptr& device,
+            const PipelineLayoutConfig& config
         );
 
     };
