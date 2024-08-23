@@ -45,6 +45,8 @@ namespace bv
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(RenderPass);
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(GraphicsPipeline);
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Framebuffer);
+    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(CommandBuffer);
+    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(CommandPool);
 
 #pragma region forward declarations
 
@@ -1144,7 +1146,7 @@ namespace bv
             .pNext = nullptr,
             .flags = stage.flags,
             .stage = stage.stage,
-            .module = waste_module->vk_shader_module,
+            .module = waste_module->handle(),
             .pName = stage.entry_point.c_str(),
 
             .pSpecializationInfo =
@@ -1455,7 +1457,7 @@ namespace bv
         for (size_t i = 0; i < binding.immutable_samplers.size(); i++)
         {
             waste_vk_immutable_samplers[i] =
-                binding.immutable_samplers[i]->vk_sampler;
+                binding.immutable_samplers[i]->handle();
         }
 
         return VkDescriptorSetLayoutBinding{
@@ -1644,7 +1646,7 @@ namespace bv
 
         uint32_t count = 0;
         vkEnumerateDeviceExtensionProperties(
-            vk_physical_device,
+            handle(),
             layer_name_cstr,
             &count,
             nullptr
@@ -1652,7 +1654,7 @@ namespace bv
 
         std::vector<VkExtensionProperties> vk_extensions(count);
         VkResult vk_result = vkEnumerateDeviceExtensionProperties(
-            vk_physical_device,
+            handle(),
             layer_name_cstr,
             &count,
             vk_extensions.data()
@@ -1672,13 +1674,13 @@ namespace bv
     }
 
     PhysicalDevice::PhysicalDevice(
-        VkPhysicalDevice vk_physical_device,
+        VkPhysicalDevice handle,
         const PhysicalDeviceProperties& properties,
         const PhysicalDeviceFeatures& features,
         const std::vector<QueueFamily>& queue_families,
         const QueueFamilyIndices& queue_family_indices
     )
-        : vk_physical_device(vk_physical_device),
+        : _handle(handle),
         _properties(properties),
         _features(features),
         _queue_families(queue_families),
@@ -1722,8 +1724,8 @@ namespace bv
 
         VkSurfaceCapabilitiesKHR vk_capabilities;
         VkResult vk_result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-            vk_physical_device,
-            surface->vk_surface,
+            handle(),
+            surface->handle(),
             &vk_capabilities
         );
         if (vk_result != VK_SUCCESS)
@@ -1735,8 +1737,8 @@ namespace bv
         {
             uint32_t surface_format_count;
             vkGetPhysicalDeviceSurfaceFormatsKHR(
-                vk_physical_device,
-                surface->vk_surface,
+                handle(),
+                surface->handle(),
                 &surface_format_count,
                 nullptr
             );
@@ -1745,8 +1747,8 @@ namespace bv
                 surface_format_count
             );
             vk_result = vkGetPhysicalDeviceSurfaceFormatsKHR(
-                vk_physical_device,
-                surface->vk_surface,
+                handle(),
+                surface->handle(),
                 &surface_format_count,
                 vk_surface_formats.data()
             );
@@ -1768,16 +1770,16 @@ namespace bv
         {
             uint32_t present_mode_count;
             vkGetPhysicalDeviceSurfacePresentModesKHR(
-                vk_physical_device,
-                surface->vk_surface,
+                handle(),
+                surface->handle(),
                 &present_mode_count,
                 nullptr
             );
 
             present_modes.resize(present_mode_count);
             vk_result = vkGetPhysicalDeviceSurfacePresentModesKHR(
-                vk_physical_device,
-                surface->vk_surface,
+                handle(),
+                surface->handle(),
                 &present_mode_count,
                 present_modes.data()
             );
@@ -2050,7 +2052,7 @@ namespace bv
                     vk_result = vkGetPhysicalDeviceSurfaceSupportKHR(
                         vk_physical_device,
                         (uint32_t)i,
-                        surface->vk_surface,
+                        surface->handle(),
                         &vk_surface_support
                     );
                     if (vk_result != VK_SUCCESS)
@@ -2197,7 +2199,7 @@ namespace bv
             messenger->context()->vk_instance(),
             &create_info,
             messenger->context()->vk_allocator_ptr(),
-            &messenger->vk_debug_messenger
+            &messenger->_handle
         );
         if (vk_result != VK_SUCCESS)
         {
@@ -2210,7 +2212,7 @@ namespace bv
     {
         DestroyDebugUtilsMessengerEXT(
             context()->vk_instance(),
-            vk_debug_messenger,
+            handle(),
             context()->vk_allocator_ptr()
         );
     }
@@ -2229,30 +2231,30 @@ namespace bv
 
     Surface::ptr Surface::create(
         const Context::ptr& context,
-        VkSurfaceKHR vk_surface
+        VkSurfaceKHR handle
     )
     {
-        return std::make_shared<Surface_public_ctor>(context, vk_surface);
+        return std::make_shared<Surface_public_ctor>(context, handle);
     }
 
     Surface::~Surface()
     {
         vkDestroySurfaceKHR(
             _context->vk_instance(),
-            vk_surface,
+            _handle,
             _context->vk_allocator_ptr()
         );
     }
 
     Surface::Surface(
         const Context::ptr& context,
-        VkSurfaceKHR vk_surface
+        VkSurfaceKHR handle
     )
-        : _context(context), vk_surface(vk_surface)
+        : _context(context), _handle(handle)
     {}
 
-    Queue::Queue(VkQueue vk_queue)
-        : vk_queue(vk_queue)
+    Queue::Queue(VkQueue handle)
+        : _handle(handle)
     {}
 
     Result<Device::ptr>Device::create(
@@ -2330,10 +2332,10 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateDevice(
-            device->physical_device()->vk_physical_device,
+            device->physical_device()->handle(),
             &create_info,
             device->context()->vk_allocator_ptr(),
-            &device->vk_device
+            &device->_handle
         );
         if (vk_result != VK_SUCCESS)
         {
@@ -2349,7 +2351,7 @@ namespace bv
     {
         VkQueue vk_queue;
         vkGetDeviceQueue(
-            vk_device,
+            handle(),
             queue_family_index,
             queue_index,
             &vk_queue
@@ -2359,7 +2361,7 @@ namespace bv
 
     Device::~Device()
     {
-        vkDestroyDevice(vk_device, context()->vk_allocator_ptr());
+        vkDestroyDevice(handle(), context()->vk_allocator_ptr());
     }
 
     Device::Device(
@@ -2372,8 +2374,8 @@ namespace bv
         _config(config)
     {}
 
-    Image::Image(VkImage vk_image)
-        : vk_image(vk_image)
+    Image::Image(VkImage handle)
+        : _handle(handle)
     {}
 
     Result<Swapchain::ptr> Swapchain::create(
@@ -2393,14 +2395,14 @@ namespace bv
         VkSwapchainKHR vk_old_swapchain = nullptr;
         if (sc->old_swapchain() != nullptr)
         {
-            vk_old_swapchain = sc->old_swapchain()->vk_swapchain;
+            vk_old_swapchain = sc->old_swapchain()->handle();
         }
 
         VkSwapchainCreateInfoKHR create_info{
             .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
             .pNext = nullptr,
             .flags = sc->config().flags,
-            .surface = sc->surface()->vk_surface,
+            .surface = sc->surface()->handle(),
             .minImageCount = sc->config().min_image_count,
             .imageFormat = sc->config().image_format,
             .imageColorSpace = sc->config().image_color_space,
@@ -2421,10 +2423,10 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateSwapchainKHR(
-            sc->device()->vk_device,
+            sc->device()->handle(),
             &create_info,
             sc->device()->context()->vk_allocator_ptr(),
-            &sc->vk_swapchain
+            &sc->_handle
         );
         if (vk_result != VK_SUCCESS)
         {
@@ -2433,16 +2435,16 @@ namespace bv
 
         uint32_t actual_image_count;
         vkGetSwapchainImagesKHR(
-            sc->device()->vk_device,
-            sc->vk_swapchain,
+            sc->device()->handle(),
+            sc->handle(),
             &actual_image_count,
             nullptr
         );
 
         std::vector<VkImage> vk_images(actual_image_count);
         vk_result = vkGetSwapchainImagesKHR(
-            sc->device()->vk_device,
-            sc->vk_swapchain,
+            sc->device()->handle(),
+            sc->handle(),
             &actual_image_count,
             vk_images.data()
         );
@@ -2465,8 +2467,8 @@ namespace bv
     Swapchain::~Swapchain()
     {
         vkDestroySwapchainKHR(
-            device()->vk_device,
-            vk_swapchain,
+            device()->handle(),
+            handle(),
             device()->context()->vk_allocator_ptr()
         );
     }
@@ -2499,7 +2501,7 @@ namespace bv
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
             .pNext = nullptr,
             .flags = view->config().flags,
-            .image = view->image()->vk_image,
+            .image = view->image()->handle(),
             .viewType = view->config().view_type,
             .format = view->config().format,
             .components = ComponentMapping_to_vk(view->config().components),
@@ -2509,10 +2511,10 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateImageView(
-            view->device()->vk_device,
+            view->device()->handle(),
             &create_info,
             view->device()->context()->vk_allocator_ptr(),
-            &view->vk_image_view
+            &view->_handle
         );
         if (vk_result != VK_SUCCESS)
         {
@@ -2524,8 +2526,8 @@ namespace bv
     ImageView::~ImageView()
     {
         vkDestroyImageView(
-            device()->vk_device,
-            vk_image_view,
+            device()->handle(),
+            handle(),
             device()->context()->vk_allocator_ptr()
         );
     }
@@ -2567,10 +2569,10 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateShaderModule(
-            module->device()->vk_device,
+            module->device()->handle(),
             &create_info,
             module->device()->context()->vk_allocator_ptr(),
-            &module->vk_shader_module
+            &module->_handle
         );
         if (vk_result != VK_SUCCESS)
         {
@@ -2582,8 +2584,8 @@ namespace bv
     ShaderModule::~ShaderModule()
     {
         vkDestroyShaderModule(
-            device()->vk_device,
-            vk_shader_module,
+            device()->handle(),
+            handle(),
             device()->context()->vk_allocator_ptr()
         );
     }
@@ -2626,10 +2628,10 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateSampler(
-            sampler->device()->vk_device,
+            sampler->device()->handle(),
             &create_info,
             sampler->device()->context()->vk_allocator_ptr(),
-            &sampler->vk_sampler
+            &sampler->_handle
         );
         if (vk_result != VK_SUCCESS)
         {
@@ -2641,8 +2643,8 @@ namespace bv
     Sampler::~Sampler()
     {
         vkDestroySampler(
-            device()->vk_device,
-            vk_sampler,
+            device()->handle(),
+            handle(),
             device()->context()->vk_allocator_ptr()
         );
     }
@@ -2693,10 +2695,10 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateDescriptorSetLayout(
-            layout->device()->vk_device,
+            layout->device()->handle(),
             &create_info,
             layout->device()->context()->vk_allocator_ptr(),
-            &layout->vk_descriptor_set_layout
+            &layout->_handle
         );
         if (vk_result != VK_SUCCESS)
         {
@@ -2708,8 +2710,8 @@ namespace bv
     DescriptorSetLayout::~DescriptorSetLayout()
     {
         vkDestroyDescriptorSetLayout(
-            device()->vk_device,
-            vk_descriptor_set_layout,
+            device()->handle(),
+            handle(),
             device()->context()->vk_allocator_ptr()
         );
     }
@@ -2738,8 +2740,7 @@ namespace bv
         );
         for (size_t i = 0; i < layout->config().set_layouts.size(); i++)
         {
-            vk_set_layouts[i] =
-                layout->config().set_layouts[i]->vk_descriptor_set_layout;
+            vk_set_layouts[i] = layout->config().set_layouts[i]->handle();
         }
 
         std::vector<VkPushConstantRange> vk_push_constant_ranges(
@@ -2765,10 +2766,10 @@ namespace bv
         };
 
         VkResult vk_result = vkCreatePipelineLayout(
-            layout->device()->vk_device,
+            layout->device()->handle(),
             &create_info,
             layout->device()->context()->vk_allocator_ptr(),
-            &layout->vk_pipeline_layout
+            &layout->_handle
         );
         if (vk_result != VK_SUCCESS)
         {
@@ -2780,8 +2781,8 @@ namespace bv
     PipelineLayout::~PipelineLayout()
     {
         vkDestroyPipelineLayout(
-            device()->vk_device,
-            vk_pipeline_layout,
+            device()->handle(),
+            handle(),
             device()->context()->vk_allocator_ptr()
         );
     }
@@ -2860,10 +2861,10 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateRenderPass(
-            pass->device()->vk_device,
+            pass->device()->handle(),
             &create_info,
             pass->device()->context()->vk_allocator_ptr(),
-            &pass->vk_render_pass
+            &pass->_handle
         );
         if (vk_result != VK_SUCCESS)
         {
@@ -2875,8 +2876,8 @@ namespace bv
     RenderPass::~RenderPass()
     {
         vkDestroyRenderPass(
-            device()->vk_device,
-            vk_render_pass,
+            device()->handle(),
+            handle(),
             device()->context()->vk_allocator_ptr()
         );
     }
@@ -3052,24 +3053,24 @@ namespace bv
             pipe->config().dynamic_states.empty()
             ? nullptr : &vk_dynamic_states,
 
-            .layout = pipe->config().layout->vk_pipeline_layout,
-            .renderPass = pipe->config().render_pass->vk_render_pass,
-            .subpass = pipe->config().subpass_idx,
+            .layout = pipe->config().layout->handle(),
+            .renderPass = pipe->config().render_pass->handle(),
+            .subpass = pipe->config().subpass_index,
 
             .basePipelineHandle =
             pipe->config().base_pipeline == nullptr
-            ? nullptr : pipe->config().base_pipeline->vk_graphics_pipeline,
+            ? nullptr : pipe->config().base_pipeline->handle(),
 
             .basePipelineIndex = -1
         };
 
         VkResult vk_result = vkCreateGraphicsPipelines(
-            pipe->device()->vk_device,
+            pipe->device()->handle(),
             nullptr,
             1,
             &create_info,
             pipe->device()->context()->vk_allocator_ptr(),
-            &pipe->vk_graphics_pipeline
+            &pipe->_handle
         );
         if (vk_result != VK_SUCCESS)
         {
@@ -3081,8 +3082,8 @@ namespace bv
     GraphicsPipeline::~GraphicsPipeline()
     {
         vkDestroyPipeline(
-            device()->vk_device,
-            vk_graphics_pipeline,
+            device()->handle(),
+            handle(),
             device()->context()->vk_allocator_ptr()
         );
     }
@@ -3109,14 +3110,14 @@ namespace bv
         );
         for (size_t i = 0; i < buf->config().attachments.size(); i++)
         {
-            vk_attachments[i] = buf->config().attachments[i]->vk_image_view;
+            vk_attachments[i] = buf->config().attachments[i]->handle();
         }
 
         VkFramebufferCreateInfo create_info{
             .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
             .pNext = nullptr,
             .flags = buf->config().flags,
-            .renderPass = buf->config().render_pass->vk_render_pass,
+            .renderPass = buf->config().render_pass->handle(),
             .attachmentCount = (uint32_t)vk_attachments.size(),
             .pAttachments = vk_attachments.data(),
             .width = buf->config().width,
@@ -3125,10 +3126,10 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateFramebuffer(
-            buf->device()->vk_device,
+            buf->device()->handle(),
             &create_info,
             buf->device()->context()->vk_allocator_ptr(),
-            &buf->vk_framebuffer
+            &buf->_handle
         );
         if (vk_result != VK_SUCCESS)
         {
@@ -3140,8 +3141,8 @@ namespace bv
     Framebuffer::~Framebuffer()
     {
         vkDestroyFramebuffer(
-            device()->vk_device,
-            vk_framebuffer,
+            device()->handle(),
+            handle(),
             device()->context()->vk_allocator_ptr()
         );
     }
@@ -3149,6 +3150,131 @@ namespace bv
     Framebuffer::Framebuffer(
         const Device::ptr& device,
         const FramebufferConfig& config
+    )
+        : _device(device), _config(config)
+    {}
+
+    Result<> CommandBuffer::begin(
+        VkCommandBufferUsageFlags flags,
+        std::optional<CommandBufferInheritance> inheritance
+    )
+    {
+        VkCommandBufferInheritanceInfo vk_inheritance;
+        if (inheritance.has_value())
+        {
+            vk_inheritance = VkCommandBufferInheritanceInfo{
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
+                .pNext = nullptr,
+                .renderPass = inheritance.value().render_pass->handle(),
+                .subpass = inheritance.value().subpass_index,
+                .framebuffer = inheritance.value().framebuffer->handle(),
+
+                .occlusionQueryEnable =
+                inheritance.value().occlusion_query_enable,
+
+                .queryFlags = inheritance.value().query_flags,
+                .pipelineStatistics = inheritance.value().pipeline_statistics
+            };
+        }
+
+        VkCommandBufferBeginInfo begin_info{};
+        begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        begin_info.pNext = nullptr;
+        begin_info.flags = flags;
+        begin_info.pInheritanceInfo =
+            inheritance.has_value() ? &vk_inheritance : nullptr;
+
+        VkResult vk_result = vkBeginCommandBuffer(handle(), &begin_info);
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return Result();
+    }
+
+    Result<> CommandBuffer::end()
+    {
+        VkResult vk_result = vkEndCommandBuffer(handle());
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return Result();
+    }
+
+    CommandBuffer::CommandBuffer(VkCommandBuffer handle)
+        : _handle(handle)
+    {}
+
+    Result<CommandPool::ptr> CommandPool::create(
+        const Device::ptr& device,
+        const CommandPoolConfig& config
+    )
+    {
+        CommandPool::ptr pool = std::make_shared<CommandPool_public_ctor>(
+            device,
+            config
+        );
+
+        VkCommandPoolCreateInfo create_info{
+            .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = pool->config().flags,
+            .queueFamilyIndex = pool->config().queue_family_index
+        };
+
+        VkResult vk_result = vkCreateCommandPool(
+            pool->device()->handle(),
+            &create_info,
+            pool->device()->context()->vk_allocator_ptr(),
+            &pool->_handle
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return pool;
+    }
+
+    Result<CommandBuffer::ptr> CommandPool::allocate_buffer(
+        VkCommandBufferLevel level
+    )
+    {
+        VkCommandBufferAllocateInfo alloc_info{
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+            .pNext = nullptr,
+            .commandPool = handle(),
+            .level = level,
+            .commandBufferCount = 1
+        };
+
+        VkCommandBuffer vk_command_buffer;
+        VkResult vk_result = vkAllocateCommandBuffers(
+            device()->handle(),
+            &alloc_info,
+            &vk_command_buffer
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return (CommandBuffer::ptr)std::make_shared<CommandBuffer_public_ctor>(
+            vk_command_buffer
+        );
+    }
+
+    CommandPool::~CommandPool()
+    {
+        vkDestroyCommandPool(
+            device()->handle(),
+            handle(),
+            device()->context()->vk_allocator_ptr()
+        );
+    }
+
+    CommandPool::CommandPool(
+        const Device::ptr& device,
+        const CommandPoolConfig& config
     )
         : _device(device), _config(config)
     {}

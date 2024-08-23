@@ -25,6 +25,13 @@ namespace beva_demo
 
     void App::run()
     {
+        init();
+        main_loop();
+        cleanup();
+    }
+
+    void App::init()
+    {
         init_window();
         init_context();
         setup_debug_messenger();
@@ -35,10 +42,41 @@ namespace beva_demo
         create_render_pass();
         create_graphics_pipeline();
         create_framebuffers();
+        create_command_pool_and_buffer();
+    }
 
-        main_loop();
+    void App::main_loop()
+    {
+        while (true)
+        {
+            glfwPollEvents();
 
-        cleanup();
+            if (glfwWindowShouldClose(window))
+            {
+                break;
+            }
+        }
+    }
+
+    void App::cleanup()
+    {
+        cmd_pool = nullptr;
+        swapchain_framebufs.clear();
+        graphics_pipeline = nullptr;
+        pipeline_layout = nullptr;
+        render_pass = nullptr;
+        swapchain_imgviews.clear();
+        swapchain = nullptr;
+        presentation_queue = nullptr;
+        graphics_queue = nullptr;
+        device = nullptr;
+        physical_device = nullptr;
+        surface = nullptr;
+        debug_messenger = nullptr;
+        context = nullptr;
+
+        glfwDestroyWindow(window);
+        glfwTerminate();
     }
 
     void App::init_window()
@@ -662,7 +700,7 @@ namespace beva_demo
                 .dynamic_states = dynamic_states,
                 .layout = pipeline_layout,
                 .render_pass = render_pass,
-                .subpass_idx = 0,
+                .subpass_index = 0,
                 .base_pipeline = nullptr
             }
         );
@@ -703,37 +741,101 @@ namespace beva_demo
         }
     }
 
-    void App::main_loop()
+    void App::create_command_pool_and_buffer()
     {
-        while (true)
-        {
-            glfwPollEvents();
-
-            if (glfwWindowShouldClose(window))
+        auto cmd_pool_result = bv::CommandPool::create(
+            device,
             {
-                break;
+                .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+                .queue_family_index = graphics_family_idx
             }
+        );
+        if (!cmd_pool_result.ok())
+        {
+            throw std::runtime_error(std::format(
+                "failed to create command pool: {}",
+                cmd_pool_result.error().to_string()
+            ).c_str());
         }
+        cmd_pool = cmd_pool_result.value();
+
+        auto cmd_buf_result = cmd_pool->allocate_buffer(
+            VK_COMMAND_BUFFER_LEVEL_PRIMARY
+        );
+        if (!cmd_buf_result.ok())
+        {
+            throw std::runtime_error(std::format(
+                "failed to allocate command buffer: {}",
+                cmd_buf_result.error().to_string()
+            ).c_str());
+        }
+        cmd_buf = cmd_buf_result.value();
     }
 
-    void App::cleanup()
+    void App::record_command_buffer(uint32_t img_idx)
     {
-        swapchain_framebufs.clear();
-        graphics_pipeline = nullptr;
-        pipeline_layout = nullptr;
-        render_pass = nullptr;
-        swapchain_imgviews.clear();
-        swapchain = nullptr;
-        presentation_queue = nullptr;
-        graphics_queue = nullptr;
-        device = nullptr;
-        physical_device = nullptr;
-        surface = nullptr;
-        debug_messenger = nullptr;
-        context = nullptr;
+        auto begin_result = cmd_buf->begin(0);
+        if (!begin_result.ok())
+        {
+            throw std::runtime_error(std::format(
+                "failed to begin recording command buffer: {}",
+                begin_result.error().to_string()
+            ).c_str());
+        }
 
-        glfwDestroyWindow(window);
-        glfwTerminate();
+        VkClearValue clear_val{ { { .1f, .5f, .6f, 1.f } } };
+        VkRenderPassBeginInfo render_pass_info{
+            .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+            .pNext = nullptr,
+            .renderPass = render_pass->handle(),
+            .framebuffer = swapchain_framebufs[img_idx]->handle(),
+            .renderArea = VkRect2D{
+                .offset = { 0, 0 },
+                .extent = bv::Extent2d_to_vk(swapchain->config().image_extent)
+        },
+            .clearValueCount = 1,
+            .pClearValues = &clear_val
+        };
+        vkCmdBeginRenderPass(
+            cmd_buf->handle(),
+            &render_pass_info,
+            VK_SUBPASS_CONTENTS_INLINE
+        );
+
+        vkCmdBindPipeline(
+            cmd_buf->handle(),
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            graphics_pipeline->handle()
+        );
+
+        VkViewport viewport{
+            .x = 0.f,
+            .y = 0.f,
+            .width = (float)(swapchain->config().image_extent.width),
+            .height = (float)(swapchain->config().image_extent.height),
+            .minDepth = 0.f,
+            .maxDepth = 1.f
+        };
+        vkCmdSetViewport(cmd_buf->handle(), 0, 1, &viewport);
+
+        VkRect2D scissor{
+            .offset = { 0, 0 },
+            .extent = bv::Extent2d_to_vk(swapchain->config().image_extent)
+        };
+        vkCmdSetScissor(cmd_buf->handle(), 0, 1, &scissor);
+
+        vkCmdDraw(cmd_buf->handle(), 3, 1, 0, 0);
+
+        vkCmdEndRenderPass(cmd_buf->handle());
+
+        auto end_result = cmd_buf->end();
+        if (!end_result.ok())
+        {
+            throw std::runtime_error(std::format(
+                "failed to end recording command buffer: {}",
+                end_result.error().to_string()
+            ).c_str());
+        }
     }
 
     static std::vector<uint8_t> read_file(const std::string& filename)

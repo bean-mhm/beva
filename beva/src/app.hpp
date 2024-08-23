@@ -35,10 +35,17 @@ namespace beva_demo
         bv::PipelineLayout::ptr pipeline_layout = nullptr;
         bv::GraphicsPipeline::ptr graphics_pipeline = nullptr;
         std::vector<bv::Framebuffer::ptr> swapchain_framebufs;
+        bv::CommandPool::ptr cmd_pool = nullptr;
+        bv::CommandBuffer::ptr cmd_buf = nullptr;
 
         uint32_t graphics_family_idx = 0;
         uint32_t presentation_family_idx = 0;
 
+        void init();
+        void main_loop();
+        void cleanup();
+
+    private:
         void init_window();
         void init_context();
         void setup_debug_messenger();
@@ -49,10 +56,9 @@ namespace beva_demo
         void create_render_pass();
         void create_graphics_pipeline();
         void create_framebuffers();
+        void create_command_pool_and_buffer();
 
-        void main_loop();
-
-        void cleanup();
+        void record_command_buffer(uint32_t img_idx);
 
     };
 

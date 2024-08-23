@@ -42,6 +42,9 @@ namespace bv
     class PipelineLayout;
     class RenderPass;
     class GraphicsPipeline;
+    class Framebuffer;
+    class CommandBuffer;
+    class CommandPool;
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_MAKE_API_VERSION.html
     struct Version
@@ -1363,7 +1366,7 @@ namespace bv
         DynamicStates dynamic_states;
         std::shared_ptr<PipelineLayout> layout;
         std::shared_ptr<RenderPass> render_pass;
-        uint32_t subpass_idx;
+        uint32_t subpass_index;
         std::shared_ptr<GraphicsPipeline> base_pipeline;
     };
 
@@ -1376,6 +1379,24 @@ namespace bv
         uint32_t width;
         uint32_t height;
         uint32_t layers;
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandPoolCreateInfo.html
+    struct CommandPoolConfig
+    {
+        VkCommandPoolCreateFlags flags;
+        uint32_t queue_family_index;
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBufferInheritanceInfo.html
+    struct CommandBufferInheritance
+    {
+        std::shared_ptr<RenderPass> render_pass;
+        uint32_t subpass_index;
+        std::shared_ptr<Framebuffer> framebuffer;
+        bool occlusion_query_enable;
+        VkQueryControlFlags query_flags;
+        VkQueryPipelineStatisticFlags pipeline_statistics;
     };
 
 #pragma endregion
@@ -1544,6 +1565,11 @@ namespace bv
 
         PhysicalDevice() = delete;
 
+        constexpr VkPhysicalDevice handle() const
+        {
+            return _handle;
+        }
+
         constexpr const PhysicalDeviceProperties& properties() const
         {
             return _properties;
@@ -1577,7 +1603,7 @@ namespace bv
         );
 
     protected:
-        VkPhysicalDevice vk_physical_device = nullptr;
+        VkPhysicalDevice _handle = nullptr;
 
         PhysicalDeviceProperties _properties;
         PhysicalDeviceFeatures _features;
@@ -1586,7 +1612,7 @@ namespace bv
         std::optional<SwapchainSupport> _swapchain_support;
 
         PhysicalDevice(
-            VkPhysicalDevice vk_physical_device,
+            VkPhysicalDevice handle,
             const PhysicalDeviceProperties& properties,
             const PhysicalDeviceFeatures& features,
             const std::vector<QueueFamily>& queue_families,
@@ -1598,7 +1624,6 @@ namespace bv
         );
 
         friend class Context;
-        friend class Device;
 
     };
 
@@ -1647,23 +1672,11 @@ namespace bv
             const Allocator::ptr& allocator
         );
 
-        // get the VkInstance handle
-        // * avoid using this as much as possible. it's generally supposed to be
-        //   used internally. the only reason it's public is for surface
-        //   creation which is handed off to the user to write their own little
-        //   implementation based on the platform or the windowing library
-        //   they're using.
         constexpr VkInstance vk_instance() const
         {
             return _vk_instance;
         }
 
-        // get allocation callbacks pointer
-        // * avoid using this as much as possible. it's generally supposed to be
-        //   used internally. the only reason it's public is for surface
-        //   creation which is handed off to the user to write their own little
-        //   implementation based on the platform or the windowing library
-        //   they're using.
         const VkAllocationCallbacks* vk_allocator_ptr() const;
 
         Result<std::vector<PhysicalDevice::ptr>> fetch_physical_devices(
@@ -1727,6 +1740,11 @@ namespace bv
             return _callback;
         }
 
+        constexpr VkDebugUtilsMessengerEXT handle() const
+        {
+            return _handle;
+        }
+
         ~DebugMessenger();
 
     protected:
@@ -1735,7 +1753,7 @@ namespace bv
         VkDebugUtilsMessageTypeFlagsEXT _message_type_filter;
         DebugCallback _callback;
 
-        VkDebugUtilsMessengerEXT vk_debug_messenger = nullptr;
+        VkDebugUtilsMessengerEXT _handle = nullptr;
 
         DebugMessenger(
             const Context::ptr& context,
@@ -1765,7 +1783,7 @@ namespace bv
         //   windowing libraries (like GLFW) provide the list for you.
         static Surface::ptr create(
             const Context::ptr& context,
-            VkSurfaceKHR vk_surface
+            VkSurfaceKHR handle
         );
 
         constexpr const Context::ptr& context() const
@@ -1773,21 +1791,22 @@ namespace bv
             return _context;
         }
 
+        constexpr VkSurfaceKHR handle() const
+        {
+            return _handle;
+        }
+
         ~Surface();
 
     protected:
         Context::ptr _context;
 
-        VkSurfaceKHR vk_surface;
+        VkSurfaceKHR _handle;
 
         Surface(
             const Context::ptr& context,
-            VkSurfaceKHR vk_surface
+            VkSurfaceKHR handle
         );
-
-        friend class Context;
-        friend class PhysicalDevice;
-        friend class Swapchain;
 
     };
 
@@ -1802,10 +1821,15 @@ namespace bv
         Queue(const Queue& other) = delete;
         Queue(Queue&& other) = default;
 
-    protected:
-        VkQueue vk_queue;
+        constexpr VkQueue handle() const
+        {
+            return _handle;
+        }
 
-        Queue(VkQueue vk_queue);
+    protected:
+        VkQueue _handle;
+
+        Queue(VkQueue handle);
 
     };
 
@@ -1841,6 +1865,11 @@ namespace bv
             return _config;
         }
 
+        constexpr VkDevice handle() const
+        {
+            return _handle;
+        }
+
         Queue::ptr retrieve_queue(
             uint32_t queue_family_index,
             uint32_t queue_index
@@ -1853,23 +1882,13 @@ namespace bv
         PhysicalDevice::ptr _physical_device;
         DeviceConfig _config;
 
-        VkDevice vk_device = nullptr;
+        VkDevice _handle = nullptr;
 
         Device(
             const Context::ptr& context,
             const PhysicalDevice::ptr& physical_device,
             const DeviceConfig& config
         );
-
-        friend class Swapchain;
-        friend class ImageView;
-        friend class ShaderModule;
-        friend class Sampler;
-        friend class DescriptorSetLayout;
-        friend class PipelineLayout;
-        friend class RenderPass;
-        friend class GraphicsPipeline;
-        friend class Framebuffer;
 
     };
 
@@ -1884,12 +1903,15 @@ namespace bv
         Image(const Image& other) = delete;
         Image(Image&& other) = default;
 
+        constexpr VkImage handle() const
+        {
+            return _handle;
+        }
+
     protected:
-        VkImage vk_image;
+        VkImage _handle;
 
-        Image(VkImage vk_image);
-
-        friend class ImageView;
+        Image(VkImage handle);
 
     };
 
@@ -1937,6 +1959,11 @@ namespace bv
             return _images;
         }
 
+        constexpr VkSwapchainKHR handle() const
+        {
+            return _handle;
+        }
+
         ~Swapchain();
 
     protected:
@@ -1945,7 +1972,7 @@ namespace bv
         SwapchainConfig _config;
         Swapchain::ptr _old_swapchain;
 
-        VkSwapchainKHR vk_swapchain = nullptr;
+        VkSwapchainKHR _handle = nullptr;
 
         std::vector<Image::ptr> _images;
 
@@ -1990,6 +2017,11 @@ namespace bv
             return _config;
         }
 
+        constexpr VkImageView handle() const
+        {
+            return _handle;
+        }
+
         ~ImageView();
 
     protected:
@@ -1997,15 +2029,13 @@ namespace bv
         Image::ptr _image;
         ImageViewConfig _config;
 
-        VkImageView vk_image_view = nullptr;
+        VkImageView _handle = nullptr;
 
         ImageView(
             const Device::ptr& device,
             const Image::ptr& image,
             const ImageViewConfig& config
         );
-
-        friend class Framebuffer;
 
     };
 
@@ -2031,22 +2061,19 @@ namespace bv
             return _device;
         }
 
+        constexpr VkShaderModule handle() const
+        {
+            return _handle;
+        }
+
         ~ShaderModule();
 
     protected:
         Device::ptr _device;
 
-        VkShaderModule vk_shader_module = nullptr;
+        VkShaderModule _handle = nullptr;
 
         ShaderModule(const Device::ptr& device);
-
-        friend VkPipelineShaderStageCreateInfo ShaderStage_to_vk(
-            const ShaderStage& stage,
-            std::shared_ptr<ShaderModule>& waste_module,
-            VkSpecializationInfo& waste_vk_specialization_info,
-            std::vector<VkSpecializationMapEntry>& waste_vk_map_entries,
-            std::vector<uint8_t>& waste_data
-        );
 
     };
 
@@ -2076,23 +2103,22 @@ namespace bv
             return _config;
         }
 
+        constexpr VkSampler handle() const
+        {
+            return _handle;
+        }
+
         ~Sampler();
 
     protected:
         Device::ptr _device;
         SamplerConfig _config;
 
-        VkSampler vk_sampler = nullptr;
+        VkSampler _handle = nullptr;
 
         Sampler(
             const Device::ptr& device,
             const SamplerConfig& config
-        );
-
-        friend VkDescriptorSetLayoutBinding DescriptorSetLayoutBinding_to_vk(
-            const DescriptorSetLayoutBinding& binding,
-            std::vector<std::shared_ptr<Sampler>>& waste_immutable_samplers,
-            std::vector<VkSampler>& waste_vk_immutable_samplers
         );
 
     };
@@ -2123,20 +2149,23 @@ namespace bv
             return _config;
         }
 
+        constexpr VkDescriptorSetLayout handle() const
+        {
+            return _handle;
+        }
+
         ~DescriptorSetLayout();
 
     protected:
         Device::ptr _device;
         DescriptorSetLayoutConfig _config;
 
-        VkDescriptorSetLayout vk_descriptor_set_layout = nullptr;
+        VkDescriptorSetLayout _handle = nullptr;
 
         DescriptorSetLayout(
             const Device::ptr& device,
             const DescriptorSetLayoutConfig& config
         );
-
-        friend class PipelineLayout;
 
     };
 
@@ -2166,20 +2195,23 @@ namespace bv
             return _config;
         }
 
+        constexpr VkPipelineLayout handle() const
+        {
+            return _handle;
+        }
+
         ~PipelineLayout();
 
     protected:
         Device::ptr _device;
         PipelineLayoutConfig _config;
 
-        VkPipelineLayout vk_pipeline_layout = nullptr;
+        VkPipelineLayout _handle = nullptr;
 
         PipelineLayout(
             const Device::ptr& device,
             const PipelineLayoutConfig& config
         );
-
-        friend class GraphicsPipeline;
 
     };
 
@@ -2209,21 +2241,23 @@ namespace bv
             return _config;
         }
 
+        constexpr VkRenderPass handle() const
+        {
+            return _handle;
+        }
+
         ~RenderPass();
 
     protected:
         Device::ptr _device;
         RenderPassConfig _config;
 
-        VkRenderPass vk_render_pass = nullptr;
+        VkRenderPass _handle = nullptr;
 
         RenderPass(
             const Device::ptr& device,
             const RenderPassConfig& config
         );
-
-        friend class GraphicsPipeline;
-        friend class Framebuffer;
 
     };
 
@@ -2254,13 +2288,18 @@ namespace bv
             return _config;
         }
 
+        constexpr VkPipeline handle() const
+        {
+            return _handle;
+        }
+
         ~GraphicsPipeline();
 
     protected:
         Device::ptr _device;
         GraphicsPipelineConfig _config;
 
-        VkPipeline vk_graphics_pipeline = nullptr;
+        VkPipeline _handle = nullptr;
 
         GraphicsPipeline(
             const Device::ptr& device,
@@ -2295,17 +2334,105 @@ namespace bv
             return _config;
         }
 
+        constexpr VkFramebuffer handle() const
+        {
+            return _handle;
+        }
+
         ~Framebuffer();
 
     protected:
         Device::ptr _device;
         FramebufferConfig _config;
 
-        VkFramebuffer vk_framebuffer = nullptr;
+        VkFramebuffer _handle = nullptr;
 
         Framebuffer(
             const Device::ptr& device,
             const FramebufferConfig& config
+        );
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBuffer.html
+    class CommandBuffer
+    {
+    public:
+        using ptr = std::shared_ptr<CommandBuffer>;
+        using wptr = std::weak_ptr<CommandBuffer>;
+
+        CommandBuffer() = delete;
+        CommandBuffer(const CommandBuffer& other) = delete;
+        CommandBuffer(CommandBuffer&& other) = default;
+
+        constexpr VkCommandBuffer handle() const
+        {
+            return _handle;
+        }
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBufferBeginInfo.html
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkBeginCommandBuffer.html
+        Result<> begin(
+            VkCommandBufferUsageFlags flags,
+            std::optional<CommandBufferInheritance> inheritance = std::nullopt
+        );
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEndCommandBuffer.html
+        Result<> end();
+
+    protected:
+        VkCommandBuffer _handle;
+
+        CommandBuffer(VkCommandBuffer handle);
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandPool.html
+    class CommandPool
+    {
+    public:
+        using ptr = std::shared_ptr<CommandPool>;
+        using wptr = std::weak_ptr<CommandPool>;
+
+        CommandPool() = delete;
+        CommandPool(const CommandPool& other) = delete;
+        CommandPool(CommandPool&& other) = default;
+
+        static Result<CommandPool::ptr> create(
+            const Device::ptr& device,
+            const CommandPoolConfig& config
+        );
+
+        constexpr const Device::ptr& device() const
+        {
+            return _device;
+        }
+
+        constexpr const CommandPoolConfig& config() const
+        {
+            return _config;
+        }
+
+        constexpr VkCommandPool handle() const
+        {
+            return _handle;
+        }
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBufferAllocateInfo.html
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAllocateCommandBuffers.html
+        Result<CommandBuffer::ptr> allocate_buffer(VkCommandBufferLevel level);
+
+        ~CommandPool();
+
+    protected:
+        Device::ptr _device;
+        CommandPoolConfig _config;
+
+        VkCommandPool _handle = nullptr;
+
+        CommandPool(
+            const Device::ptr& device,
+            const CommandPoolConfig& config
         );
 
     };
