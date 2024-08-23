@@ -1,6 +1,6 @@
 # beva
 
-beva (lowercase) is a thin wrapper for the Vulkan API. It abstracts away very
+beva (lowercase) is a thin wrapper over the Vulkan API. It abstracts away very
 little functionality from the original API. My main motive was to get rid of
 annoying boilerplate like the `sType` and `pNext` fields in creation info
 structs and implement RAII wrappers for Vulkan objects, while still keeping the
