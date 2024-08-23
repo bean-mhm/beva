@@ -33,6 +33,7 @@ namespace beva_demo
         std::vector<bv::ImageView::ptr> swapchain_imgviews;
         bv::RenderPass::ptr render_pass = nullptr;
         bv::PipelineLayout::ptr pipeline_layout = nullptr;
+        bv::GraphicsPipeline::ptr graphics_pipeline = nullptr;
 
         uint32_t graphics_family_idx = 0;
         uint32_t presentation_family_idx = 0;

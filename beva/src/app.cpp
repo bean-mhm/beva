@@ -553,12 +553,12 @@ namespace beva_demo
             .specialization_info = std::nullopt
             });
 
-        bv::VertexInputState vertex_input{
+        bv::VertexInputState vertex_input_state{
             .binding_descriptions = {},
             .attribute_descriptions = {}
         };
 
-        bv::InputAssemblyState input_assembly{
+        bv::InputAssemblyState input_assembly_state{
             .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
             .primitive_restart_enable = false
         };
@@ -580,11 +580,6 @@ namespace beva_demo
         bv::ViewportState viewport_state{
             .viewports = { viewport },
             .scissors = { scissor }
-        };
-
-        bv::DynamicStates dynamic_states{
-            VK_DYNAMIC_STATE_VIEWPORT,
-            VK_DYNAMIC_STATE_SCISSOR
         };
 
         bv::RasterizationState rasterization_state{
@@ -630,6 +625,11 @@ namespace beva_demo
             .blend_constants = { 0.f, 0.f, 0.f, 0.f }
         };
 
+        bv::DynamicStates dynamic_states{
+            VK_DYNAMIC_STATE_VIEWPORT,
+            VK_DYNAMIC_STATE_SCISSOR
+        };
+
         auto pipeline_layout_result = bv::PipelineLayout::create(
             device,
             { .flags = 0, .set_layouts = {}, .push_constant_ranges = {} }
@@ -642,6 +642,35 @@ namespace beva_demo
             ).c_str());
         }
         pipeline_layout = pipeline_layout_result.value();
+
+        auto graphics_pipeline_result = bv::GraphicsPipeline::create(
+            device,
+            {
+                .flags = 0,
+                .stages = shader_stages,
+                .vertex_input_state = vertex_input_state,
+                .input_assembly_state = input_assembly_state,
+                .tessellation_state = std::nullopt,
+                .viewport_state = viewport_state,
+                .rasterization_state = rasterization_state,
+                .multisample_state = multisample_state,
+                .depth_stencil_state = std::nullopt,
+                .color_blend_state = color_blend_state,
+                .dynamic_states = dynamic_states,
+                .layout = pipeline_layout,
+                .render_pass = render_pass,
+                .subpass_idx = 0,
+                .base_pipeline = nullptr
+            }
+        );
+        if (!graphics_pipeline_result.ok())
+        {
+            throw std::runtime_error(std::format(
+                "failed to create graphics pipeline: {}",
+                graphics_pipeline_result.error().to_string()
+            ).c_str());
+        }
+        graphics_pipeline = graphics_pipeline_result.value();
     }
 
     void App::main_loop()
@@ -659,6 +688,7 @@ namespace beva_demo
 
     void App::cleanup()
     {
+        graphics_pipeline = nullptr;
         pipeline_layout = nullptr;
         render_pass = nullptr;
         swapchain_imgviews.clear();

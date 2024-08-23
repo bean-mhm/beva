@@ -43,6 +43,7 @@ namespace bv
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DescriptorSetLayout);
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(PipelineLayout);
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(RenderPass);
+    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(GraphicsPipeline);
 
 #pragma region forward declarations
 
@@ -1250,6 +1251,18 @@ namespace bv
             .flags = 0,
             .topology = state.topology,
             .primitiveRestartEnable = state.primitive_restart_enable
+        };
+    }
+
+    VkPipelineTessellationStateCreateInfo TessellationState_to_vk(
+        const TessellationState& state
+    )
+    {
+        return VkPipelineTessellationStateCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .patchControlPoints = state.patch_control_points
         };
     }
 
@@ -2870,6 +2883,212 @@ namespace bv
     RenderPass::RenderPass(
         const Device::ptr& device,
         const RenderPassConfig& config
+    )
+        : _device(device), _config(config)
+    {}
+
+    Result<GraphicsPipeline::ptr> GraphicsPipeline::create(
+        const Device::ptr& device,
+        const GraphicsPipelineConfig& config
+    )
+    {
+        GraphicsPipeline::ptr pipe =
+            std::make_shared<GraphicsPipeline_public_ctor>(
+                device,
+                config
+            );
+
+        std::vector<VkPipelineShaderStageCreateInfo> vk_stages(
+            pipe->config().stages.size()
+        );
+        std::vector<std::shared_ptr<ShaderModule>> wastes_module;
+        std::vector<VkSpecializationInfo> wastes_vk_specialization_info;
+        std::vector<std::vector<VkSpecializationMapEntry>>
+            wastes_vk_map_entries;
+        std::vector<std::vector<uint8_t>> wastes_data;
+        for (size_t i = 0; i < pipe->config().stages.size(); i++)
+        {
+            wastes_module.push_back(nullptr);
+            wastes_vk_specialization_info.push_back({});
+            wastes_vk_map_entries.push_back({});
+            wastes_data.push_back({});
+
+            vk_stages[i] = ShaderStage_to_vk(
+                pipe->config().stages[i],
+                wastes_module.back(),
+                wastes_vk_specialization_info.back(),
+                wastes_vk_map_entries.back(),
+                wastes_data.back()
+            );
+        }
+
+        VkPipelineVertexInputStateCreateInfo vk_vertex_input_state{};
+        std::vector<VkVertexInputBindingDescription>
+            waste_vk_binding_descriptions;
+        std::vector<VkVertexInputAttributeDescription>
+            waste_vk_attribute_descriptions;
+        if (pipe->config().vertex_input_state.has_value())
+        {
+            vk_vertex_input_state = VertexInputState_to_vk(
+                pipe->config().vertex_input_state.value(),
+                waste_vk_binding_descriptions,
+                waste_vk_attribute_descriptions
+            );
+        }
+
+        VkPipelineInputAssemblyStateCreateInfo vk_input_assembly_state{};
+        if (pipe->config().input_assembly_state.has_value())
+        {
+            vk_input_assembly_state = InputAssemblyState_to_vk(
+                pipe->config().input_assembly_state.value()
+            );
+        }
+
+        VkPipelineTessellationStateCreateInfo vk_tessellation_state{};
+        if (pipe->config().tessellation_state.has_value())
+        {
+            vk_tessellation_state = TessellationState_to_vk(
+                pipe->config().tessellation_state.value()
+            );
+        }
+
+        VkPipelineViewportStateCreateInfo vk_viewport_state{};
+        std::vector<VkViewport> waste_vk_viewports;
+        std::vector<VkRect2D> waste_vk_scissors;
+        if (pipe->config().viewport_state.has_value())
+        {
+            vk_viewport_state = ViewportState_to_vk(
+                pipe->config().viewport_state.value(),
+                waste_vk_viewports,
+                waste_vk_scissors
+            );
+        }
+
+        VkPipelineRasterizationStateCreateInfo vk_rasterization_state{};
+        if (pipe->config().rasterization_state.has_value())
+        {
+            vk_rasterization_state = RasterizationState_to_vk(
+                pipe->config().rasterization_state.value()
+            );
+        }
+
+        VkPipelineMultisampleStateCreateInfo vk_multisample_state{};
+        std::vector<VkSampleMask> waste_sample_mask;
+        if (pipe->config().multisample_state.has_value())
+        {
+            vk_multisample_state = MultisampleState_to_vk(
+                pipe->config().multisample_state.value(),
+                waste_sample_mask
+            );
+        }
+
+        VkPipelineDepthStencilStateCreateInfo vk_depth_stencil_state{};
+        if (pipe->config().depth_stencil_state.has_value())
+        {
+            vk_depth_stencil_state = DepthStencilState_to_vk(
+                pipe->config().depth_stencil_state.value()
+            );
+        }
+
+        VkPipelineColorBlendStateCreateInfo vk_color_blend_state{};
+        std::vector<VkPipelineColorBlendAttachmentState>
+            waste_vk_color_blend_attachments;
+        if (pipe->config().color_blend_state.has_value())
+        {
+            vk_color_blend_state = ColorBlendState_to_vk(
+                pipe->config().color_blend_state.value(),
+                waste_vk_color_blend_attachments
+            );
+        }
+
+        std::vector<VkDynamicState> waste_dynamic_states;
+        VkPipelineDynamicStateCreateInfo vk_dynamic_states =
+            DynamicStates_to_vk(
+                pipe->config().dynamic_states,
+                waste_dynamic_states
+            );
+
+        VkGraphicsPipelineCreateInfo create_info{
+            .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = pipe->config().flags,
+            .stageCount = (uint32_t)vk_stages.size(),
+            .pStages = vk_stages.data(),
+
+            .pVertexInputState =
+            pipe->config().vertex_input_state.has_value()
+            ? &vk_vertex_input_state : nullptr,
+
+            .pInputAssemblyState =
+            pipe->config().input_assembly_state.has_value()
+            ? &vk_input_assembly_state : nullptr,
+
+            .pTessellationState =
+            pipe->config().tessellation_state.has_value()
+            ? &vk_tessellation_state : nullptr,
+
+            .pViewportState =
+            pipe->config().viewport_state.has_value()
+            ? &vk_viewport_state : nullptr,
+
+            .pRasterizationState =
+            pipe->config().rasterization_state.has_value()
+            ? &vk_rasterization_state : nullptr,
+
+            .pMultisampleState =
+            pipe->config().multisample_state.has_value()
+            ? &vk_multisample_state : nullptr,
+
+            .pDepthStencilState =
+            pipe->config().depth_stencil_state.has_value()
+            ? &vk_depth_stencil_state : nullptr,
+
+            .pColorBlendState =
+            pipe->config().color_blend_state.has_value()
+            ? &vk_color_blend_state : nullptr,
+
+            .pDynamicState =
+            pipe->config().dynamic_states.empty()
+            ? nullptr : &vk_dynamic_states,
+
+            .layout = pipe->config().layout->vk_pipeline_layout,
+            .renderPass = pipe->config().render_pass->vk_render_pass,
+            .subpass = pipe->config().subpass_idx,
+
+            .basePipelineHandle =
+            pipe->config().base_pipeline == nullptr
+            ? nullptr : pipe->config().base_pipeline->vk_graphics_pipeline,
+
+            .basePipelineIndex = -1
+        };
+
+        VkResult vk_result = vkCreateGraphicsPipelines(
+            pipe->device()->vk_device,
+            nullptr,
+            1,
+            &create_info,
+            pipe->device()->context()->vk_allocator_ptr(),
+            &pipe->vk_graphics_pipeline
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return pipe;
+    }
+
+    GraphicsPipeline::~GraphicsPipeline()
+    {
+        vkDestroyPipeline(
+            device()->vk_device,
+            vk_graphics_pipeline,
+            device()->context()->vk_allocator_ptr()
+        );
+    }
+
+    GraphicsPipeline::GraphicsPipeline(
+        const Device::ptr& device,
+        const GraphicsPipelineConfig& config
     )
         : _device(device), _config(config)
     {}

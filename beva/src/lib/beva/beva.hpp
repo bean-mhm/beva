@@ -1044,6 +1044,16 @@ namespace bv
         const InputAssemblyState& state
     );
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineTessellationStateCreateInfo.html
+    struct TessellationState
+    {
+        uint32_t patch_control_points;
+    };
+
+    VkPipelineTessellationStateCreateInfo TessellationState_to_vk(
+        const TessellationState& state
+    );
+
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkViewport.html
     struct Viewport
     {
@@ -1323,6 +1333,30 @@ namespace bv
         std::vector<Attachment> attachments;
         std::vector<Subpass> subpasses;
         std::vector<SubpassDependency> dependencies;
+    };
+
+    class PipelineLayout;
+    class RenderPass;
+    class GraphicsPipeline;
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkGraphicsPipelineCreateInfo.html
+    struct GraphicsPipelineConfig
+    {
+        VkPipelineCreateFlags flags;
+        std::vector<ShaderStage> stages;
+        std::optional<VertexInputState> vertex_input_state;
+        std::optional<InputAssemblyState> input_assembly_state;
+        std::optional<TessellationState> tessellation_state;
+        std::optional<ViewportState> viewport_state;
+        std::optional<RasterizationState> rasterization_state;
+        std::optional<MultisampleState> multisample_state;
+        std::optional<DepthStencilState> depth_stencil_state;
+        std::optional<ColorBlendState> color_blend_state;
+        DynamicStates dynamic_states;
+        std::shared_ptr<PipelineLayout> layout;
+        std::shared_ptr<RenderPass> render_pass;
+        uint32_t subpass_idx;
+        std::shared_ptr<GraphicsPipeline> base_pipeline;
     };
 
 #pragma endregion
@@ -1817,6 +1851,7 @@ namespace bv
         friend class DescriptorSetLayout;
         friend class PipelineLayout;
         friend class RenderPass;
+        friend class GraphicsPipeline;
 
     };
 
@@ -2124,6 +2159,8 @@ namespace bv
             const PipelineLayoutConfig& config
         );
 
+        friend class GraphicsPipeline;
+
     };
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkRenderPass.html
@@ -2163,6 +2200,50 @@ namespace bv
         RenderPass(
             const Device::ptr& device,
             const RenderPassConfig& config
+        );
+
+        friend class GraphicsPipeline;
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipeline.html
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateGraphicsPipelines.html
+    class GraphicsPipeline
+    {
+    public:
+        using ptr = std::shared_ptr<GraphicsPipeline>;
+        using wptr = std::weak_ptr<GraphicsPipeline>;
+
+        GraphicsPipeline() = delete;
+        GraphicsPipeline(const GraphicsPipeline& other) = delete;
+        GraphicsPipeline(GraphicsPipeline&& other) = default;
+
+        static Result<GraphicsPipeline::ptr> create(
+            const Device::ptr& device,
+            const GraphicsPipelineConfig& config
+        );
+
+        constexpr const Device::ptr& device() const
+        {
+            return _device;
+        }
+
+        constexpr const GraphicsPipelineConfig& config() const
+        {
+            return _config;
+        }
+
+        ~GraphicsPipeline();
+
+    protected:
+        Device::ptr _device;
+        GraphicsPipelineConfig _config;
+
+        VkPipeline vk_graphics_pipeline = nullptr;
+
+        GraphicsPipeline(
+            const Device::ptr& device,
+            const GraphicsPipelineConfig& config
         );
 
     };
