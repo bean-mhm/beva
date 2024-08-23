@@ -27,8 +27,9 @@ constructed from a message and an optional `VkResult` and provides a
 `to_string()` function with descriptions for every `VkResult` based on the
 Vulkan specification.
 
-- beva provides tiny wrappers for Vulkan structs that use STD containers like
-`std::vector` and `std::array` instead of raw pointers and arrays.
+- beva provides tiny wrappers for Vulkan structs that use STD containers and
+types like `std::vector`, `std::array`, and `std::optional` instead of raw
+pointers and arrays.
 
 - beva hides away useless fields like flags that are reserved for the future.
 
@@ -42,7 +43,9 @@ wrapper struct or class for convenience.
 Disclaimer: beva will __not__ try and catch invalid inputs. It's totally
 possible to get undefined behavior and crashes with beva, if used incorrectly.
 To avoid these situations, read the manual pages linked above structs and
-classes to see how to use them properly.
+classes to see how to use them properly. For example, whether a
+`std::shared_ptr` field can be `nullptr` or must have a value, or in what
+conditions a `std::optional` field can actually be `std::nullopt`.
 
 # Including beva
 
