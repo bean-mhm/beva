@@ -25,6 +25,24 @@ namespace bv
     template<typename Enum>
     using EnumStrMap = std::unordered_map<Enum, std::string>;
 
+    // forward declarations
+    class Allocator;
+    class PhysicalDevice;
+    class Context;
+    class DebugMessenger;
+    class Surface;
+    class Queue;
+    class Device;
+    class Image;
+    class Swapchain;
+    class ImageView;
+    class ShaderModule;
+    class Sampler;
+    class DescriptorSetLayout;
+    class PipelineLayout;
+    class RenderPass;
+    class GraphicsPipeline;
+
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_MAKE_API_VERSION.html
     struct Version
     {
@@ -963,8 +981,6 @@ namespace bv
         std::vector<uint8_t>& waste_data
     );
 
-    class ShaderModule;
-
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineShaderStageCreateInfo.html
     struct ShaderStage
     {
@@ -1217,8 +1233,6 @@ namespace bv
         bool unnormalized_coordinates;
     };
 
-    class Sampler;
-
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSetLayoutBinding.html
     struct DescriptorSetLayoutBinding
     {
@@ -1241,8 +1255,6 @@ namespace bv
         VkDescriptorSetLayoutCreateFlags flags;
         std::vector<DescriptorSetLayoutBinding> bindings;
     };
-
-    class DescriptorSetLayout;
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPushConstantRange.html
     struct PushConstantRange
@@ -1335,10 +1347,6 @@ namespace bv
         std::vector<SubpassDependency> dependencies;
     };
 
-    class PipelineLayout;
-    class RenderPass;
-    class GraphicsPipeline;
-
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkGraphicsPipelineCreateInfo.html
     struct GraphicsPipelineConfig
     {
@@ -1357,6 +1365,17 @@ namespace bv
         std::shared_ptr<RenderPass> render_pass;
         uint32_t subpass_idx;
         std::shared_ptr<GraphicsPipeline> base_pipeline;
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFramebufferCreateInfo.html
+    struct FramebufferConfig
+    {
+        VkFramebufferCreateFlags flags;
+        std::shared_ptr<RenderPass> render_pass;
+        std::vector<std::shared_ptr<ImageView>> attachments;
+        uint32_t width;
+        uint32_t height;
+        uint32_t layers;
     };
 
 #pragma endregion
@@ -1515,8 +1534,6 @@ namespace bv
         ) = 0;
 
     };
-
-    class Surface;
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDevice.html
     class PhysicalDevice
@@ -1852,6 +1869,7 @@ namespace bv
         friend class PipelineLayout;
         friend class RenderPass;
         friend class GraphicsPipeline;
+        friend class Framebuffer;
 
     };
 
@@ -1986,6 +2004,8 @@ namespace bv
             const Image::ptr& image,
             const ImageViewConfig& config
         );
+
+        friend class Framebuffer;
 
     };
 
@@ -2203,6 +2223,7 @@ namespace bv
         );
 
         friend class GraphicsPipeline;
+        friend class Framebuffer;
 
     };
 
@@ -2244,6 +2265,47 @@ namespace bv
         GraphicsPipeline(
             const Device::ptr& device,
             const GraphicsPipelineConfig& config
+        );
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFramebuffer.html
+    class Framebuffer
+    {
+    public:
+        using ptr = std::shared_ptr<Framebuffer>;
+        using wptr = std::weak_ptr<Framebuffer>;
+
+        Framebuffer() = delete;
+        Framebuffer(const Framebuffer& other) = delete;
+        Framebuffer(Framebuffer&& other) = default;
+
+        static Result<Framebuffer::ptr> create(
+            const Device::ptr& device,
+            const FramebufferConfig& config
+        );
+
+        constexpr const Device::ptr& device() const
+        {
+            return _device;
+        }
+
+        constexpr const FramebufferConfig& config() const
+        {
+            return _config;
+        }
+
+        ~Framebuffer();
+
+    protected:
+        Device::ptr _device;
+        FramebufferConfig _config;
+
+        VkFramebuffer vk_framebuffer = nullptr;
+
+        Framebuffer(
+            const Device::ptr& device,
+            const FramebufferConfig& config
         );
 
     };

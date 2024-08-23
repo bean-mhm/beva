@@ -15,7 +15,7 @@ namespace beva_demo
         void run();
 
     private:
-        static constexpr const char* initial_title = "beva demo";
+        static constexpr const char* title = "beva demo";
         static constexpr int initial_width = 800;
         static constexpr int initial_height = 450;
 
@@ -34,6 +34,7 @@ namespace beva_demo
         bv::RenderPass::ptr render_pass = nullptr;
         bv::PipelineLayout::ptr pipeline_layout = nullptr;
         bv::GraphicsPipeline::ptr graphics_pipeline = nullptr;
+        std::vector<bv::Framebuffer::ptr> swapchain_framebufs;
 
         uint32_t graphics_family_idx = 0;
         uint32_t presentation_family_idx = 0;
@@ -47,6 +48,7 @@ namespace beva_demo
         void create_swapchain();
         void create_render_pass();
         void create_graphics_pipeline();
+        void create_framebuffers();
 
         void main_loop();
 

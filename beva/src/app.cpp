@@ -34,6 +34,7 @@ namespace beva_demo
         create_swapchain();
         create_render_pass();
         create_graphics_pipeline();
+        create_framebuffers();
 
         main_loop();
 
@@ -55,7 +56,7 @@ namespace beva_demo
         window = glfwCreateWindow(
             initial_width,
             initial_height,
-            initial_title,
+            "pick a physical device within the command line",
             nullptr,
             nullptr
         );
@@ -271,6 +272,8 @@ namespace beva_demo
         }
 
         physical_device = supported_physical_devices[idx];
+
+        glfwSetWindowTitle(window, title);
     }
 
     void App::create_logical_device()
@@ -673,6 +676,33 @@ namespace beva_demo
         graphics_pipeline = graphics_pipeline_result.value();
     }
 
+    void App::create_framebuffers()
+    {
+        for (size_t i = 0; i < swapchain_imgviews.size(); i++)
+        {
+            auto framebuf_result = bv::Framebuffer::create(
+                device,
+                {
+                    .flags = 0,
+                    .render_pass = render_pass,
+                    .attachments = { swapchain_imgviews[i] },
+                    .width = swapchain->config().image_extent.width,
+                    .height = swapchain->config().image_extent.height,
+                    .layers = 1
+                }
+            );
+            if (!framebuf_result.ok())
+            {
+                throw std::runtime_error(std::format(
+                    "failed to create swapchain framebuffer at index {}: {}",
+                    i,
+                    framebuf_result.error().to_string()
+                ).c_str());
+            }
+            swapchain_framebufs.push_back(framebuf_result.value());
+        }
+    }
+
     void App::main_loop()
     {
         while (true)
@@ -688,6 +718,7 @@ namespace beva_demo
 
     void App::cleanup()
     {
+        swapchain_framebufs.clear();
         graphics_pipeline = nullptr;
         pipeline_layout = nullptr;
         render_pass = nullptr;

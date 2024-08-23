@@ -44,6 +44,7 @@ namespace bv
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(PipelineLayout);
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(RenderPass);
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(GraphicsPipeline);
+    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Framebuffer);
 
 #pragma region forward declarations
 
@@ -3089,6 +3090,65 @@ namespace bv
     GraphicsPipeline::GraphicsPipeline(
         const Device::ptr& device,
         const GraphicsPipelineConfig& config
+    )
+        : _device(device), _config(config)
+    {}
+
+    Result<Framebuffer::ptr> Framebuffer::create(
+        const Device::ptr& device,
+        const FramebufferConfig& config
+    )
+    {
+        Framebuffer::ptr buf = std::make_shared<Framebuffer_public_ctor>(
+            device,
+            config
+        );
+
+        std::vector<VkImageView> vk_attachments(
+            buf->config().attachments.size()
+        );
+        for (size_t i = 0; i < buf->config().attachments.size(); i++)
+        {
+            vk_attachments[i] = buf->config().attachments[i]->vk_image_view;
+        }
+
+        VkFramebufferCreateInfo create_info{
+            .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = buf->config().flags,
+            .renderPass = buf->config().render_pass->vk_render_pass,
+            .attachmentCount = (uint32_t)vk_attachments.size(),
+            .pAttachments = vk_attachments.data(),
+            .width = buf->config().width,
+            .height = buf->config().height,
+            .layers = buf->config().layers
+        };
+
+        VkResult vk_result = vkCreateFramebuffer(
+            buf->device()->vk_device,
+            &create_info,
+            buf->device()->context()->vk_allocator_ptr(),
+            &buf->vk_framebuffer
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return buf;
+    }
+
+    Framebuffer::~Framebuffer()
+    {
+        vkDestroyFramebuffer(
+            device()->vk_device,
+            vk_framebuffer,
+            device()->context()->vk_allocator_ptr()
+        );
+    }
+
+    Framebuffer::Framebuffer(
+        const Device::ptr& device,
+        const FramebufferConfig& config
     )
         : _device(device), _config(config)
     {}
