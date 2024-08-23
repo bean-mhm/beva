@@ -40,6 +40,11 @@ integer using macros like `VK_API_VERSION_XXXX` under the hood.
 - beva provides comments containing links to the Khronos manual on top of every
 wrapper struct or class for convenience.
 
+- beva only implements a tiny section of the Vulkan API, mostly the parts I
+needed. You can call `handle()` on a Vulkan object wrapper to get its raw
+handle and directly use the Vulkan API to implement what beva doesn't cover.
+You'll see this being done in the demo app as well.
+
 Disclaimer: beva will __not__ try and catch invalid inputs. It's totally
 possible to get undefined behavior and crashes with beva, if used incorrectly.
 To avoid these situations, read the manual pages linked above structs and
