@@ -47,6 +47,7 @@ namespace beva_demo
         uint32_t graphics_family_idx = 0;
         uint32_t presentation_family_idx = 0;
 
+        bool framebuf_resized = false;
         uint32_t frame_idx = 0;
 
         void init();
@@ -71,6 +72,15 @@ namespace beva_demo
         void record_command_buffer(
             const bv::CommandBuffer::ptr& cmd_buf,
             uint32_t img_idx
+        );
+
+        void cleanup_swapchain();
+        void recreate_swapchain();
+
+        friend void glfw_framebuf_resize_callback(
+            GLFWwindow* window,
+            int width,
+            int height
         );
 
     };

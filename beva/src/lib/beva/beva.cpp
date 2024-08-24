@@ -1675,21 +1675,7 @@ namespace bv
         return extensions;
     }
 
-    PhysicalDevice::PhysicalDevice(
-        VkPhysicalDevice handle,
-        const PhysicalDeviceProperties& properties,
-        const PhysicalDeviceFeatures& features,
-        const std::vector<QueueFamily>& queue_families,
-        const QueueFamilyIndices& queue_family_indices
-    )
-        : _handle(handle),
-        _properties(properties),
-        _features(features),
-        _queue_families(queue_families),
-        _queue_family_indices(queue_family_indices)
-    {}
-
-    Result<> PhysicalDevice::check_swapchain_support(
+    Result<> PhysicalDevice::update_swapchain_support(
         const std::shared_ptr<Surface>& surface
     )
     {
@@ -1799,6 +1785,20 @@ namespace bv
 
         return Result();
     }
+
+    PhysicalDevice::PhysicalDevice(
+        VkPhysicalDevice handle,
+        const PhysicalDeviceProperties& properties,
+        const PhysicalDeviceFeatures& features,
+        const std::vector<QueueFamily>& queue_families,
+        const QueueFamilyIndices& queue_family_indices
+    )
+        : _handle(handle),
+        _properties(properties),
+        _features(features),
+        _queue_families(queue_families),
+        _queue_family_indices(queue_family_indices)
+    {}
 
     Context::Context(Context&& other) noexcept
         : _config(std::move(other._config))
@@ -2146,13 +2146,14 @@ namespace bv
                 )
             );
 
-            auto check_swapchain_support_result =
-                physical_devices.back()->check_swapchain_support(surface);
-            if (!check_swapchain_support_result.ok())
+            auto update_swapchain_support_result =
+                physical_devices.back()->update_swapchain_support(surface);
+            if (!update_swapchain_support_result.ok())
             {
                 return Error(
-                    "failed to check swapchain support for a physical device: "
-                    + check_swapchain_support_result.error().to_string()
+                    "failed to fetch swapchain support details for a physical "
+                    "device: "
+                    + update_swapchain_support_result.error().to_string()
                 );
             }
         }
@@ -2310,10 +2311,11 @@ namespace bv
         return Result();
     }
 
-    Result<ApiResult> Queue::present(
+    Result<> Queue::present(
         const std::vector<std::shared_ptr<Semaphore>>& wait_semaphores,
         const std::shared_ptr<Swapchain>& swapchain,
-        uint32_t image_index
+        uint32_t image_index,
+        ApiResult* out_api_result
     )
     {
         std::vector<VkSemaphore> vk_semaphores(wait_semaphores.size());
@@ -2339,11 +2341,15 @@ namespace bv
             handle(),
             &present_info
         );
-        if (vk_result == VK_SUCCESS || vk_result == VK_SUBOPTIMAL_KHR)
+        if (out_api_result != nullptr)
         {
-            return (ApiResult)vk_result;
+            *out_api_result = (ApiResult)vk_result;
         }
-        return Error(vk_result);
+        if (vk_result != VK_SUCCESS && vk_result != VK_SUBOPTIMAL_KHR)
+        {
+            return Error(vk_result);
+        }
+        return Result();
     }
 
     Queue::Queue(VkQueue handle)
@@ -2567,10 +2573,11 @@ namespace bv
         return sc;
     }
 
-    Result<std::pair<uint32_t, ApiResult>> Swapchain::acquire_next_image(
+    Result<uint32_t> Swapchain::acquire_next_image(
         const std::shared_ptr<Semaphore>& semaphore,
         const std::shared_ptr<Fence>& fence,
-        uint64_t timeout
+        uint64_t timeout,
+        ApiResult* out_api_result
     )
     {
         uint32_t image_index;
@@ -2582,11 +2589,15 @@ namespace bv
             fence == nullptr ? nullptr : fence->handle(),
             &image_index
         );
+        if (out_api_result != nullptr)
+        {
+            *out_api_result = (ApiResult)vk_result;
+        }
         if (vk_result == VK_SUCCESS
             || vk_result == VK_TIMEOUT
             || vk_result == VK_SUBOPTIMAL_KHR)
         {
-            return std::make_pair(image_index, (ApiResult)vk_result);
+            return image_index;
         }
         return Error(vk_result);
     }

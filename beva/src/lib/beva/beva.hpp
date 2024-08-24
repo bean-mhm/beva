@@ -1614,6 +1614,10 @@ namespace bv
             const std::string& layer_name = ""
         );
 
+        Result<> update_swapchain_support(
+            const std::shared_ptr<Surface>& surface
+        );
+
     protected:
         VkPhysicalDevice _handle = nullptr;
 
@@ -1630,12 +1634,6 @@ namespace bv
             const std::vector<QueueFamily>& queue_families,
             const QueueFamilyIndices& queue_family_indices
         );
-
-        Result<> check_swapchain_support(
-            const std::shared_ptr<Surface>& surface
-        );
-
-        friend class Context;
 
     };
 
@@ -1849,13 +1847,13 @@ namespace bv
         );
 
         // provided by VK_KHR_swapchain
-        // returns the success code on success (VK_SUCCESS or VK_SUBOPTIMAL_KHR)
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentInfoKHR.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkQueuePresentKHR.html
-        Result<ApiResult> present(
+        Result<> present(
             const std::vector<std::shared_ptr<Semaphore>>& wait_semaphores,
             const std::shared_ptr<Swapchain>& swapchain,
-            uint32_t image_index
+            uint32_t image_index,
+            ApiResult* out_api_result = nullptr
         );
 
     protected:
@@ -1998,12 +1996,11 @@ namespace bv
             return _handle;
         }
 
-        // on success, returns the image index and the success code (VK_SUCCESS,
-        // VK_TIMEOUT, or VK_SUBOPTIMAL_KHR)
-        Result<std::pair<uint32_t, ApiResult>> acquire_next_image(
+        Result<uint32_t> acquire_next_image(
             const std::shared_ptr<Semaphore>& semaphore = nullptr,
             const std::shared_ptr<Fence>& fence = nullptr,
-            uint64_t timeout = UINT64_MAX
+            uint64_t timeout = UINT64_MAX,
+            ApiResult* out_api_result = nullptr
         );
 
         ~Swapchain();

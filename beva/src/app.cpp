@@ -32,6 +32,11 @@ namespace beva_demo
 
     static std::vector<uint8_t> read_file(const std::string& filename);
     static void glfw_error_callback(int error, const char* description);
+    static void glfw_framebuf_resize_callback(
+        GLFWwindow* window,
+        int width,
+        int height
+    );
 
     void App::run()
     {
@@ -75,18 +80,19 @@ namespace beva_demo
 
     void App::cleanup()
     {
+        cleanup_swapchain();
+
+        graphics_pipeline = nullptr;
+        pipeline_layout = nullptr;
+
+        render_pass = nullptr;
+
         fences_in_flight.clear();
         semaphs_render_finished.clear();
         semaphs_image_available.clear();
+
         cmd_pool = nullptr;
-        swapchain_framebufs.clear();
-        graphics_pipeline = nullptr;
-        pipeline_layout = nullptr;
-        render_pass = nullptr;
-        swapchain_imgviews.clear();
-        swapchain = nullptr;
-        presentation_queue = nullptr;
-        graphics_queue = nullptr;
+
         device = nullptr;
         physical_device = nullptr;
         surface = nullptr;
@@ -107,7 +113,7 @@ namespace beva_demo
         }
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
         window = glfwCreateWindow(
             INITIAL_WIDTH,
@@ -121,6 +127,9 @@ namespace beva_demo
             glfwTerminate();
             throw std::runtime_error("failed to create a window");
         }
+
+        glfwSetWindowUserPointer(window, this);
+        glfwSetFramebufferSizeCallback(window, glfw_framebuf_resize_callback);
     }
 
     void App::init_context()
@@ -358,6 +367,13 @@ namespace beva_demo
 
     void App::create_swapchain()
     {
+        auto result = physical_device->update_swapchain_support(surface);
+        CHECK_BV_RESULT(result, "update swapchain support details");
+
+        if (!physical_device->swapchain_support().has_value())
+        {
+            throw std::runtime_error("presentation no longer supported");
+        }
         const auto& swapchain_support =
             physical_device->swapchain_support().value();
 
@@ -448,6 +464,7 @@ namespace beva_demo
         CHECK_BV_RESULT(swapchain_result, "create swapchain");
         swapchain = swapchain_result.value();
 
+        swapchain_imgviews.clear();
         for (size_t i = 0; i < swapchain->images().size(); i++)
         {
             bv::ImageViewConfig config{
@@ -684,6 +701,7 @@ namespace beva_demo
 
     void App::create_framebuffers()
     {
+        swapchain_framebufs.clear();
         for (size_t i = 0; i < swapchain_imgviews.size(); i++)
         {
             auto framebuf_result = bv::Framebuffer::create(
@@ -755,16 +773,30 @@ namespace beva_demo
         auto result = fences_in_flight[frame_idx]->wait();
         CHECK_BV_RESULT(result, "wait for fence");
 
-        result = fences_in_flight[frame_idx]->reset();
-        CHECK_BV_RESULT(result, "reset fence");
-
+        bv::ApiResult acquire_api_result;
         auto acquire_result = swapchain->acquire_next_image(
             semaphs_image_available[frame_idx],
             nullptr,
-            UINT64_MAX
+            UINT64_MAX,
+            &acquire_api_result
         );
-        CHECK_BV_RESULT(acquire_result, "acquire the next swapchain image");
-        uint32_t img_idx = acquire_result.value().first;
+        if (acquire_api_result == bv::ApiResult::ErrorOutOfDateKhr)
+        {
+            recreate_swapchain();
+            return;
+        }
+        else if (!acquire_result.ok())
+        {
+            throw std::runtime_error(std::format(
+                "failed to acquire the next swapchain image: {}",
+                acquire_result.error().to_string()
+            ).c_str());
+        };
+
+        uint32_t img_idx = acquire_result.value();
+
+        result = fences_in_flight[frame_idx]->reset();
+        CHECK_BV_RESULT(result, "reset fence");
 
         result = cmd_bufs[frame_idx]->reset(0);
         CHECK_BV_RESULT(result, "reset command buffer");
@@ -779,12 +811,27 @@ namespace beva_demo
         );
         CHECK_BV_RESULT(result, "submit command buffer");
 
+        bv::ApiResult present_api_result;
         auto present_result = presentation_queue->present(
             { semaphs_render_finished[frame_idx] },
             swapchain,
-            img_idx
+            img_idx,
+            &present_api_result
         );
-        CHECK_BV_RESULT(present_result, "present image");
+        if (present_api_result == bv::ApiResult::ErrorOutOfDateKhr
+            || present_api_result == bv::ApiResult::SuboptimalKhr
+            || framebuf_resized)
+        {
+            framebuf_resized = false;
+            recreate_swapchain();
+        }
+        else if (!present_result.ok())
+        {
+            throw std::runtime_error(std::format(
+                "failed to present image: {}",
+                present_result.error().to_string()
+            ).c_str());
+        }
 
         frame_idx = (frame_idx + 1) % MAX_FRAMES_IN_FLIGHT;
     }
@@ -846,6 +893,31 @@ namespace beva_demo
         CHECK_BV_RESULT(end_result, "end recording command buffer");
     }
 
+    void App::cleanup_swapchain()
+    {
+        swapchain_framebufs.clear();
+        swapchain_imgviews.clear();
+        swapchain = nullptr;
+    }
+
+    void App::recreate_swapchain()
+    {
+        int width = 0, height = 0;
+        glfwGetFramebufferSize(window, &width, &height);
+        while (width == 0 || height == 0)
+        {
+            glfwGetFramebufferSize(window, &width, &height);
+            glfwWaitEvents();
+        }
+
+        auto result = device->wait_idle();
+        CHECK_BV_RESULT(result, "wait for device idle");
+
+        cleanup_swapchain();
+        create_swapchain();
+        create_framebuffers();
+    }
+
     static std::vector<uint8_t> read_file(const std::string& filename)
     {
         std::ifstream f(filename, std::ios::ate | std::ios::binary);
@@ -871,6 +943,16 @@ namespace beva_demo
     static void glfw_error_callback(int error, const char* description)
     {
         std::cerr << std::format("GLFW error {}: {}\n", error, description);
+    }
+
+    static void glfw_framebuf_resize_callback(
+        GLFWwindow* window,
+        int width,
+        int height
+    )
+    {
+        App* app = (App*)(glfwGetWindowUserPointer(window));
+        app->framebuf_resized = true;
     }
 
 }
