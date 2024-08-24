@@ -2466,6 +2466,13 @@ namespace bv
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAllocateCommandBuffers.html
         Result<CommandBuffer::ptr> allocate_buffer(VkCommandBufferLevel level);
 
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBufferAllocateInfo.html
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAllocateCommandBuffers.html
+        Result<std::vector<CommandBuffer::ptr>> allocate_buffers(
+            VkCommandBufferLevel level,
+            uint32_t count
+        );
+
         ~CommandPool();
 
     protected:

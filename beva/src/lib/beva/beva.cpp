@@ -3400,6 +3400,40 @@ namespace bv
         );
     }
 
+    Result<std::vector<CommandBuffer::ptr>> CommandPool::allocate_buffers(
+        VkCommandBufferLevel level,
+        uint32_t count
+    )
+    {
+        VkCommandBufferAllocateInfo alloc_info{
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+            .pNext = nullptr,
+            .commandPool = handle(),
+            .level = level,
+            .commandBufferCount = count
+        };
+
+        std::vector<VkCommandBuffer> vk_command_buffers(count);
+        VkResult vk_result = vkAllocateCommandBuffers(
+            device()->handle(),
+            &alloc_info,
+            vk_command_buffers.data()
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+
+        std::vector<CommandBuffer::ptr> command_buffers(count);
+        for (size_t i = 0; i < count; i++)
+        {
+            command_buffers[i] = std::make_shared<CommandBuffer_public_ctor>(
+                vk_command_buffers[i]
+            );
+        }
+        return command_buffers;
+    }
+
     CommandPool::~CommandPool()
     {
         vkDestroyCommandPool(

@@ -52,7 +52,7 @@ namespace beva_demo
         create_render_pass();
         create_graphics_pipeline();
         create_framebuffers();
-        create_command_pool_and_buffer();
+        create_command_pool_and_buffers();
         create_sync_objects();
     }
 
@@ -75,9 +75,9 @@ namespace beva_demo
 
     void App::cleanup()
     {
-        fence_in_flight = nullptr;
-        semaphore_render_finished = nullptr;
-        semaphore_image_available = nullptr;
+        fences_in_flight.clear();
+        semaphs_render_finished.clear();
+        semaphs_image_available.clear();
         cmd_pool = nullptr;
         swapchain_framebufs.clear();
         graphics_pipeline = nullptr;
@@ -110,8 +110,8 @@ namespace beva_demo
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
         window = glfwCreateWindow(
-            initial_width,
-            initial_height,
+            INITIAL_WIDTH,
+            INITIAL_HEIGHT,
             "pick a physical device within the command line",
             nullptr,
             nullptr
@@ -126,7 +126,7 @@ namespace beva_demo
     void App::init_context()
     {
         std::vector<std::string> layers;
-        if (debug_mode)
+        if (DEBUG_MODE)
         {
             layers.push_back("VK_LAYER_KHRONOS_validation");
         }
@@ -143,7 +143,7 @@ namespace beva_demo
             }
 
             // debug utils extension
-            if (debug_mode)
+            if (DEBUG_MODE)
             {
                 extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
             }
@@ -167,7 +167,7 @@ namespace beva_demo
 
     void App::setup_debug_messenger()
     {
-        if (!debug_mode)
+        if (!DEBUG_MODE)
         {
             return;
         }
@@ -311,7 +311,7 @@ namespace beva_demo
 
         physical_device = supported_physical_devices[idx];
 
-        glfwSetWindowTitle(window, title);
+        glfwSetWindowTitle(window, TITLE);
     }
 
     void App::create_logical_device()
@@ -709,7 +709,7 @@ namespace beva_demo
         }
     }
 
-    void App::create_command_pool_and_buffer()
+    void App::create_command_pool_and_buffers()
     {
         auto cmd_pool_result = bv::CommandPool::create(
             device,
@@ -721,69 +721,78 @@ namespace beva_demo
         CHECK_BV_RESULT(cmd_pool_result, "create command pool");
         cmd_pool = cmd_pool_result.value();
 
-        auto cmd_buf_result = cmd_pool->allocate_buffer(
-            VK_COMMAND_BUFFER_LEVEL_PRIMARY
+        auto cmd_bufs_result = cmd_pool->allocate_buffers(
+            VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+            MAX_FRAMES_IN_FLIGHT
         );
-        CHECK_BV_RESULT(cmd_buf_result, "allocate command buffer");
-        cmd_buf = cmd_buf_result.value();
+        CHECK_BV_RESULT(cmd_bufs_result, "allocate command buffers");
+        cmd_bufs = cmd_bufs_result.value();
     }
 
     void App::create_sync_objects()
     {
-        auto semaphore_image_available_result = bv::Semaphore::create(device);
-        CHECK_BV_RESULT(semaphore_image_available_result, "create semaphore");
-        semaphore_image_available = semaphore_image_available_result.value();
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        {
+            auto semaph_result = bv::Semaphore::create(device);
+            CHECK_BV_RESULT(semaph_result, "create semaphore");
+            semaphs_image_available.push_back(semaph_result.value());
 
-        auto semaphore_render_finished_result = bv::Semaphore::create(device);
-        CHECK_BV_RESULT(semaphore_render_finished_result, "create semaphore");
-        semaphore_render_finished = semaphore_render_finished_result.value();
+            semaph_result = bv::Semaphore::create(device);
+            CHECK_BV_RESULT(semaph_result, "create semaphore");
+            semaphs_render_finished.push_back(semaph_result.value());
 
-        auto fence_in_flight_result = bv::Fence::create(
-            device,
-            VK_FENCE_CREATE_SIGNALED_BIT
-        );
-        CHECK_BV_RESULT(fence_in_flight_result, "create fence");
-        fence_in_flight = fence_in_flight_result.value();
+            auto fence_result = bv::Fence::create(
+                device,
+                VK_FENCE_CREATE_SIGNALED_BIT
+            );
+            CHECK_BV_RESULT(fence_result, "create fence");
+            fences_in_flight.push_back(fence_result.value());
+        }
     }
 
     void App::draw_frame()
     {
-        auto result = fence_in_flight->wait();
+        auto result = fences_in_flight[frame_idx]->wait();
         CHECK_BV_RESULT(result, "wait for fence");
 
-        result = fence_in_flight->reset();
+        result = fences_in_flight[frame_idx]->reset();
         CHECK_BV_RESULT(result, "reset fence");
 
         auto acquire_result = swapchain->acquire_next_image(
-            semaphore_image_available,
+            semaphs_image_available[frame_idx],
             nullptr,
             UINT64_MAX
         );
         CHECK_BV_RESULT(acquire_result, "acquire the next swapchain image");
         uint32_t img_idx = acquire_result.value().first;
 
-        result = cmd_buf->reset(0);
+        result = cmd_bufs[frame_idx]->reset(0);
         CHECK_BV_RESULT(result, "reset command buffer");
-        record_command_buffer(img_idx);
+        record_command_buffer(cmd_bufs[frame_idx], img_idx);
 
         result = graphics_queue->submit(
             { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT },
-            { semaphore_image_available },
-            { cmd_buf },
-            { semaphore_render_finished },
-            fence_in_flight
+            { semaphs_image_available[frame_idx] },
+            { cmd_bufs[frame_idx] },
+            { semaphs_render_finished[frame_idx] },
+            fences_in_flight[frame_idx]
         );
         CHECK_BV_RESULT(result, "submit command buffer");
 
         auto present_result = presentation_queue->present(
-            { semaphore_render_finished },
+            { semaphs_render_finished[frame_idx] },
             swapchain,
             img_idx
         );
         CHECK_BV_RESULT(present_result, "present image");
+
+        frame_idx = (frame_idx + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
-    void App::record_command_buffer(uint32_t img_idx)
+    void App::record_command_buffer(
+        const bv::CommandBuffer::ptr& cmd_buf,
+        uint32_t img_idx
+    )
     {
         auto begin_result = cmd_buf->begin(0);
         CHECK_BV_RESULT(begin_result, "begin recording command buffer");

@@ -15,11 +15,12 @@ namespace beva_demo
         void run();
 
     private:
-        static constexpr const char* title = "beva demo";
-        static constexpr int initial_width = 960;
-        static constexpr int initial_height = 720;
+        static constexpr const char* TITLE = "beva demo";
+        static constexpr int INITIAL_WIDTH = 960;
+        static constexpr int INITIAL_HEIGHT = 720;
 
-        static constexpr bool debug_mode = true;
+        static constexpr bool DEBUG_MODE = true;
+        static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
         GLFWwindow* window;
         bv::Context::ptr context = nullptr;
@@ -36,13 +37,17 @@ namespace beva_demo
         bv::GraphicsPipeline::ptr graphics_pipeline = nullptr;
         std::vector<bv::Framebuffer::ptr> swapchain_framebufs;
         bv::CommandPool::ptr cmd_pool = nullptr;
-        bv::CommandBuffer::ptr cmd_buf = nullptr;
-        bv::Semaphore::ptr semaphore_image_available = nullptr;
-        bv::Semaphore::ptr semaphore_render_finished = nullptr;
-        bv::Fence::ptr fence_in_flight = nullptr;
+
+        // "per frame" stuff (as in frames in flight)
+        std::vector<bv::CommandBuffer::ptr> cmd_bufs;
+        std::vector<bv::Semaphore::ptr> semaphs_image_available;
+        std::vector<bv::Semaphore::ptr> semaphs_render_finished;
+        std::vector<bv::Fence::ptr> fences_in_flight;
 
         uint32_t graphics_family_idx = 0;
         uint32_t presentation_family_idx = 0;
+
+        uint32_t frame_idx = 0;
 
         void init();
         void main_loop();
@@ -59,11 +64,14 @@ namespace beva_demo
         void create_render_pass();
         void create_graphics_pipeline();
         void create_framebuffers();
-        void create_command_pool_and_buffer();
+        void create_command_pool_and_buffers();
         void create_sync_objects();
 
         void draw_frame();
-        void record_command_buffer(uint32_t img_idx);
+        void record_command_buffer(
+            const bv::CommandBuffer::ptr& cmd_buf,
+            uint32_t img_idx
+        );
 
     };
 
