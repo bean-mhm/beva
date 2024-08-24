@@ -17,6 +17,16 @@
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
 
+#define CHECK_BV_RESULT(result, operation_name) \
+    if (!result.ok())                           \
+    {                                           \
+        throw std::runtime_error(std::format(   \
+            "failed to {}: {}",                 \
+            operation_name,                     \
+            result.error().to_string()          \
+        ).c_str());                             \
+    }
+
 namespace beva_demo
 {
 
@@ -43,6 +53,7 @@ namespace beva_demo
         create_graphics_pipeline();
         create_framebuffers();
         create_command_pool_and_buffer();
+        create_sync_objects();
     }
 
     void App::main_loop()
@@ -50,16 +61,23 @@ namespace beva_demo
         while (true)
         {
             glfwPollEvents();
+            draw_frame();
 
             if (glfwWindowShouldClose(window))
             {
                 break;
             }
         }
+
+        auto result = device->wait_idle();
+        CHECK_BV_RESULT(result, "wait for device idle");
     }
 
     void App::cleanup()
     {
+        fence_in_flight = nullptr;
+        semaphore_render_finished = nullptr;
+        semaphore_image_available = nullptr;
         cmd_pool = nullptr;
         swapchain_framebufs.clear();
         graphics_pipeline = nullptr;
@@ -143,13 +161,7 @@ namespace beva_demo
         };
 
         auto context_result = bv::Context::create(config);
-        if (!context_result.ok())
-        {
-            throw std::runtime_error(std::format(
-                "failed to create context: {}",
-                context_result.error().to_string()
-            ).c_str());
-        }
+        CHECK_BV_RESULT(context_result, "create context");
         context = context_result.value();
     }
 
@@ -183,13 +195,7 @@ namespace beva_demo
                 std::cout << message_data.message << '\n';
             }
         );
-        if (!debug_messenger_result.ok())
-        {
-            throw std::runtime_error(std::format(
-                "failed to create debug messenger: {}",
-                debug_messenger_result.error().to_string()
-            ).c_str());
-        }
+        CHECK_BV_RESULT(debug_messenger_result, "create debug messenger");
         debug_messenger = debug_messenger_result.value();
     }
 
@@ -217,13 +223,7 @@ namespace beva_demo
     void App::pick_physical_device()
     {
         auto physical_devices_result = context->fetch_physical_devices(surface);
-        if (!physical_devices_result.ok())
-        {
-            throw std::runtime_error(std::format(
-                "failed to fetch physical devices: {}",
-                physical_devices_result.error().to_string()
-            ).c_str());
-        }
+        CHECK_BV_RESULT(physical_devices_result, "fetch physical devices");
         auto all_physical_devices = physical_devices_result.value();
 
         std::vector<bv::PhysicalDevice::ptr> supported_physical_devices;
@@ -349,13 +349,7 @@ namespace beva_demo
             physical_device,
             config
         );
-        if (!device_result.ok())
-        {
-            throw std::runtime_error(std::format(
-                "failed to create device: {}",
-                device_result.error().to_string()
-            ).c_str());
-        }
+        CHECK_BV_RESULT(device_result, "create device");
         device = device_result.value();
 
         graphics_queue = device->retrieve_queue(graphics_family_idx, 0);
@@ -451,13 +445,7 @@ namespace beva_demo
         };
 
         auto swapchain_result = bv::Swapchain::create(device, surface, config);
-        if (!swapchain_result.ok())
-        {
-            throw std::runtime_error(std::format(
-                "failed to create swapchain: {}",
-                swapchain_result.error().to_string()
-            ).c_str());
-        }
+        CHECK_BV_RESULT(swapchain_result, "create swapchain");
         swapchain = swapchain_result.value();
 
         for (size_t i = 0; i < swapchain->images().size(); i++)
@@ -523,22 +511,26 @@ namespace beva_demo
             .preserve_attachment_indices = {}
         };
 
+        bv::SubpassDependency dependency{
+            .src_subpass = VK_SUBPASS_EXTERNAL,
+            .dst_subpass = 0,
+            .src_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .dst_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .src_access_mask = 0,
+            .dst_access_mask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            .dependency_flags = 0
+        };
+
         auto render_pass_result = bv::RenderPass::create(
             device,
             {
                 .flags = 0,
                 .attachments = { color_attachment },
                 .subpasses = { subpass },
-                .dependencies = {}
+                .dependencies = { dependency }
             }
         );
-        if (!render_pass_result.ok())
-        {
-            throw std::runtime_error(std::format(
-                "failed to create render pass: {}",
-                render_pass_result.error().to_string()
-            ).c_str());
-        }
+        CHECK_BV_RESULT(render_pass_result, "create render pass");
         render_pass = render_pass_result.value();
     }
 
@@ -551,31 +543,19 @@ namespace beva_demo
         auto vert_shader_code = read_file("./shaders/vert.spv");
         auto frag_shader_code = read_file("./shaders/frag.spv");
 
-        auto vert_shader_module_result = bv::ShaderModule::create(
+        auto vert_module_result = bv::ShaderModule::create(
             device,
             std::move(vert_shader_code)
         );
-        if (!vert_shader_module_result.ok())
-        {
-            throw std::runtime_error(std::format(
-                "failed to create vertex shader module: {}",
-                vert_shader_module_result.error().to_string()
-            ).c_str());
-        }
-        auto vert_shader_module = vert_shader_module_result.value();
+        CHECK_BV_RESULT(vert_module_result, "create vertex shader module");
+        auto vert_shader_module = vert_module_result.value();
 
-        auto frag_shader_module_result = bv::ShaderModule::create(
+        auto frag_module_result = bv::ShaderModule::create(
             device,
             std::move(frag_shader_code)
         );
-        if (!frag_shader_module_result.ok())
-        {
-            throw std::runtime_error(std::format(
-                "failed to create fragment shader module: {}",
-                frag_shader_module_result.error().to_string()
-            ).c_str());
-        }
-        auto frag_shader_module = frag_shader_module_result.value();
+        CHECK_BV_RESULT(frag_module_result, "create fragment shader module");
+        auto frag_shader_module = frag_module_result.value();
 
         // shader stages
         std::vector<bv::ShaderStage> shader_stages;
@@ -675,13 +655,7 @@ namespace beva_demo
             device,
             { .flags = 0, .set_layouts = {}, .push_constant_ranges = {} }
         );
-        if (!pipeline_layout_result.ok())
-        {
-            throw std::runtime_error(std::format(
-                "failed to create pipeline layout: {}",
-                pipeline_layout_result.error().to_string()
-            ).c_str());
-        }
+        CHECK_BV_RESULT(pipeline_layout_result, "create pipeline layout");
         pipeline_layout = pipeline_layout_result.value();
 
         auto graphics_pipeline_result = bv::GraphicsPipeline::create(
@@ -704,13 +678,7 @@ namespace beva_demo
                 .base_pipeline = nullptr
             }
         );
-        if (!graphics_pipeline_result.ok())
-        {
-            throw std::runtime_error(std::format(
-                "failed to create graphics pipeline: {}",
-                graphics_pipeline_result.error().to_string()
-            ).c_str());
-        }
+        CHECK_BV_RESULT(graphics_pipeline_result, "create graphics pipeline");
         graphics_pipeline = graphics_pipeline_result.value();
     }
 
@@ -750,40 +718,77 @@ namespace beva_demo
                 .queue_family_index = graphics_family_idx
             }
         );
-        if (!cmd_pool_result.ok())
-        {
-            throw std::runtime_error(std::format(
-                "failed to create command pool: {}",
-                cmd_pool_result.error().to_string()
-            ).c_str());
-        }
+        CHECK_BV_RESULT(cmd_pool_result, "create command pool");
         cmd_pool = cmd_pool_result.value();
 
         auto cmd_buf_result = cmd_pool->allocate_buffer(
             VK_COMMAND_BUFFER_LEVEL_PRIMARY
         );
-        if (!cmd_buf_result.ok())
-        {
-            throw std::runtime_error(std::format(
-                "failed to allocate command buffer: {}",
-                cmd_buf_result.error().to_string()
-            ).c_str());
-        }
+        CHECK_BV_RESULT(cmd_buf_result, "allocate command buffer");
         cmd_buf = cmd_buf_result.value();
+    }
+
+    void App::create_sync_objects()
+    {
+        auto semaphore_image_available_result = bv::Semaphore::create(device);
+        CHECK_BV_RESULT(semaphore_image_available_result, "create semaphore");
+        semaphore_image_available = semaphore_image_available_result.value();
+
+        auto semaphore_render_finished_result = bv::Semaphore::create(device);
+        CHECK_BV_RESULT(semaphore_render_finished_result, "create semaphore");
+        semaphore_render_finished = semaphore_render_finished_result.value();
+
+        auto fence_in_flight_result = bv::Fence::create(
+            device,
+            VK_FENCE_CREATE_SIGNALED_BIT
+        );
+        CHECK_BV_RESULT(fence_in_flight_result, "create fence");
+        fence_in_flight = fence_in_flight_result.value();
+    }
+
+    void App::draw_frame()
+    {
+        auto result = fence_in_flight->wait();
+        CHECK_BV_RESULT(result, "wait for fence");
+
+        result = fence_in_flight->reset();
+        CHECK_BV_RESULT(result, "reset fence");
+
+        auto acquire_result = swapchain->acquire_next_image(
+            semaphore_image_available,
+            nullptr,
+            UINT64_MAX
+        );
+        CHECK_BV_RESULT(acquire_result, "acquire the next swapchain image");
+        uint32_t img_idx = acquire_result.value().first;
+
+        result = cmd_buf->reset(0);
+        CHECK_BV_RESULT(result, "reset command buffer");
+        record_command_buffer(img_idx);
+
+        result = graphics_queue->submit(
+            { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT },
+            { semaphore_image_available },
+            { cmd_buf },
+            { semaphore_render_finished },
+            fence_in_flight
+        );
+        CHECK_BV_RESULT(result, "submit command buffer");
+
+        auto present_result = presentation_queue->present(
+            { semaphore_render_finished },
+            swapchain,
+            img_idx
+        );
+        CHECK_BV_RESULT(present_result, "present image");
     }
 
     void App::record_command_buffer(uint32_t img_idx)
     {
         auto begin_result = cmd_buf->begin(0);
-        if (!begin_result.ok())
-        {
-            throw std::runtime_error(std::format(
-                "failed to begin recording command buffer: {}",
-                begin_result.error().to_string()
-            ).c_str());
-        }
+        CHECK_BV_RESULT(begin_result, "begin recording command buffer");
 
-        VkClearValue clear_val{ { { .1f, .5f, .6f, 1.f } } };
+        VkClearValue clear_val{ { { .15f, .16f, .2f, 1.f } } };
         VkRenderPassBeginInfo render_pass_info{
             .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
             .pNext = nullptr,
@@ -829,13 +834,7 @@ namespace beva_demo
         vkCmdEndRenderPass(cmd_buf->handle());
 
         auto end_result = cmd_buf->end();
-        if (!end_result.ok())
-        {
-            throw std::runtime_error(std::format(
-                "failed to end recording command buffer: {}",
-                end_result.error().to_string()
-            ).c_str());
-        }
+        CHECK_BV_RESULT(end_result, "end recording command buffer");
     }
 
     static std::vector<uint8_t> read_file(const std::string& filename)

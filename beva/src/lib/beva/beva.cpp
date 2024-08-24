@@ -47,6 +47,8 @@ namespace bv
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Framebuffer);
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(CommandBuffer);
     DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(CommandPool);
+    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Semaphore);
+    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Fence);
 
 #pragma region forward declarations
 
@@ -1590,45 +1592,45 @@ namespace bv
     }
 
     Error::Error()
-        : message("no error information provided"),
-        api_result(std::nullopt)
+        : _message("no error information provided"),
+        _api_result(std::nullopt)
     {}
 
     Error::Error(std::string message)
-        : message(std::move(message)),
-        api_result(std::nullopt)
+        : _message(std::move(message)),
+        _api_result(std::nullopt)
     {}
 
     Error::Error(ApiResult api_result)
-        : message(),
-        api_result(api_result)
+        : _message(),
+        _api_result(api_result)
     {}
 
     Error::Error(std::string message, ApiResult api_result)
-        : message(std::move(message)),
-        api_result(api_result)
+        : _message(std::move(message)),
+        _api_result(api_result)
     {}
 
     Error::Error(VkResult vk_result)
-        : message(),
-        api_result((ApiResult)vk_result)
+        : _message(),
+        _api_result((ApiResult)vk_result)
     {}
 
     Error::Error(std::string message, VkResult vk_result)
-        : message(std::move(message)),
-        api_result((ApiResult)vk_result)
+        : _message(std::move(message)),
+        _api_result((ApiResult)vk_result)
     {}
 
     std::string Error::to_string() const
     {
-        std::string s = message;
-        if (api_result.has_value())
+        std::string s = message();
+        if (api_result().has_value())
         {
-            if (!message.empty())
+            if (!message().empty())
             {
                 s += ": ";
             }
-            s += ApiResult_to_string(api_result.value());
+            s += ApiResult_to_string(api_result().value());
         }
         return s;
     }
@@ -2253,6 +2255,97 @@ namespace bv
         : _context(context), _handle(handle)
     {}
 
+    Result<> Queue::submit(
+        const std::vector<VkPipelineStageFlags>& wait_stages,
+        const std::vector<std::shared_ptr<Semaphore>>& wait_semaphores,
+        const std::vector<std::shared_ptr<CommandBuffer>>& command_buffers,
+        const std::vector<std::shared_ptr<Semaphore>>& signal_semaphores,
+        const std::shared_ptr<Fence>& signal_fence
+    )
+    {
+        std::vector<VkSemaphore> vk_semaphores(
+            wait_semaphores.size() + signal_semaphores.size()
+        );
+        for (size_t i = 0; i < wait_semaphores.size(); i++)
+        {
+            vk_semaphores[i] = wait_semaphores[i]->handle();
+        }
+        for (size_t i = 0; i < signal_semaphores.size(); i++)
+        {
+            vk_semaphores[wait_semaphores.size() + i] =
+                signal_semaphores[i]->handle();
+        }
+
+        std::vector<VkCommandBuffer> vk_command_buffers(command_buffers.size());
+        for (size_t i = 0; i < command_buffers.size(); i++)
+        {
+            vk_command_buffers[i] = command_buffers[i]->handle();
+        }
+
+        VkSubmitInfo submit_info{
+            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .pNext = nullptr,
+            .waitSemaphoreCount = (uint32_t)wait_semaphores.size(),
+            .pWaitSemaphores = vk_semaphores.data(),
+            .pWaitDstStageMask = wait_stages.data(),
+            .commandBufferCount = (uint32_t)vk_command_buffers.size(),
+            .pCommandBuffers = vk_command_buffers.data(),
+            .signalSemaphoreCount = (uint32_t)signal_semaphores.size(),
+
+            .pSignalSemaphores =
+            signal_semaphores.empty()
+            ? nullptr : vk_semaphores.data() + wait_semaphores.size()
+        };
+
+        VkResult vk_result = vkQueueSubmit(
+            handle(),
+            1,
+            &submit_info,
+            signal_fence == nullptr ? nullptr : signal_fence->handle()
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return Result();
+    }
+
+    Result<ApiResult> Queue::present(
+        const std::vector<std::shared_ptr<Semaphore>>& wait_semaphores,
+        const std::shared_ptr<Swapchain>& swapchain,
+        uint32_t image_index
+    )
+    {
+        std::vector<VkSemaphore> vk_semaphores(wait_semaphores.size());
+        for (size_t i = 0; i < wait_semaphores.size(); i++)
+        {
+            vk_semaphores[i] = wait_semaphores[i]->handle();
+        }
+
+        VkSwapchainKHR vk_swapchain = swapchain->handle();
+
+        VkPresentInfoKHR present_info{
+            .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+            .pNext = nullptr,
+            .waitSemaphoreCount = (uint32_t)wait_semaphores.size(),
+            .pWaitSemaphores = vk_semaphores.data(),
+            .swapchainCount = 1,
+            .pSwapchains = &vk_swapchain,
+            .pImageIndices = &image_index,
+            .pResults = nullptr
+        };
+
+        VkResult vk_result = vkQueuePresentKHR(
+            handle(),
+            &present_info
+        );
+        if (vk_result == VK_SUCCESS || vk_result == VK_SUBOPTIMAL_KHR)
+        {
+            return (ApiResult)vk_result;
+        }
+        return Error(vk_result);
+    }
+
     Queue::Queue(VkQueue handle)
         : _handle(handle)
     {}
@@ -2359,6 +2452,16 @@ namespace bv
         return std::make_shared<Queue_public_ctor>(vk_queue);
     }
 
+    Result<> Device::wait_idle()
+    {
+        VkResult vk_result = vkDeviceWaitIdle(_handle);
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return Result();
+    }
+
     Device::~Device()
     {
         vkDestroyDevice(handle(), context()->vk_allocator_ptr());
@@ -2462,6 +2565,30 @@ namespace bv
         }
 
         return sc;
+    }
+
+    Result<std::pair<uint32_t, ApiResult>> Swapchain::acquire_next_image(
+        const std::shared_ptr<Semaphore>& semaphore,
+        const std::shared_ptr<Fence>& fence,
+        uint64_t timeout
+    )
+    {
+        uint32_t image_index;
+        VkResult vk_result = vkAcquireNextImageKHR(
+            device()->handle(),
+            handle(),
+            timeout,
+            semaphore == nullptr ? nullptr : semaphore->handle(),
+            fence == nullptr ? nullptr : fence->handle(),
+            &image_index
+        );
+        if (vk_result == VK_SUCCESS
+            || vk_result == VK_TIMEOUT
+            || vk_result == VK_SUBOPTIMAL_KHR)
+        {
+            return std::make_pair(image_index, (ApiResult)vk_result);
+        }
+        return Error(vk_result);
     }
 
     Swapchain::~Swapchain()
@@ -3154,6 +3281,16 @@ namespace bv
         : _device(device), _config(config)
     {}
 
+    Result<> CommandBuffer::reset(VkCommandBufferResetFlags flags)
+    {
+        VkResult vk_result = vkResetCommandBuffer(_handle, flags);
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return Result();
+    }
+
     Result<> CommandBuffer::begin(
         VkCommandBufferUsageFlags flags,
         std::optional<CommandBufferInheritance> inheritance
@@ -3277,6 +3414,111 @@ namespace bv
         const CommandPoolConfig& config
     )
         : _device(device), _config(config)
+    {}
+
+    Result<Semaphore::ptr> Semaphore::create(const Device::ptr& device)
+    {
+        Semaphore::ptr sema = std::make_shared<Semaphore_public_ctor>(device);
+
+        VkSemaphoreCreateInfo  create_info{
+            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0
+        };
+
+        VkResult vk_result = vkCreateSemaphore(
+            sema->device()->handle(),
+            &create_info,
+            sema->device()->context()->vk_allocator_ptr(),
+            &sema->_handle
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return sema;
+    }
+
+    Semaphore::~Semaphore()
+    {
+        vkDestroySemaphore(
+            device()->handle(),
+            _handle,
+            device()->context()->vk_allocator_ptr()
+        );
+    }
+
+    Semaphore::Semaphore(const Device::ptr& device)
+        : _device(device)
+    {}
+
+    Result<Fence::ptr> Fence::create(
+        const Device::ptr& device,
+        VkFenceCreateFlags flags
+    )
+    {
+        Fence::ptr fence = std::make_shared<Fence_public_ctor>(device);
+
+        VkFenceCreateInfo create_info{
+            .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = flags
+        };
+
+        VkResult vk_result = vkCreateFence(
+            fence->device()->handle(),
+            &create_info,
+            fence->device()->context()->vk_allocator_ptr(),
+            &fence->_handle
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return fence;
+    }
+
+    Result<> Fence::wait(uint64_t timeout)
+    {
+        VkResult vk_result = vkWaitForFences(
+            device()->handle(),
+            1,
+            &_handle,
+            VK_TRUE,
+            timeout
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return Result();
+    }
+
+    Result<> Fence::reset()
+    {
+        VkResult vk_result = vkResetFences(
+            device()->handle(),
+            1,
+            &_handle
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return Result();
+    }
+
+    Fence::~Fence()
+    {
+        vkDestroyFence(
+            device()->handle(),
+            _handle,
+            device()->context()->vk_allocator_ptr()
+        );
+    }
+
+    Fence::Fence(const Device::ptr& device)
+        : _device(device)
     {}
 
 #pragma region Vulkan callbacks

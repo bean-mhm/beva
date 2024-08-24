@@ -45,6 +45,8 @@ namespace bv
     class Framebuffer;
     class CommandBuffer;
     class CommandPool;
+    class Semaphore;
+    class Fence;
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_MAKE_API_VERSION.html
     struct Version
@@ -1413,11 +1415,21 @@ namespace bv
         Error(VkResult vk_result);
         Error(std::string message, VkResult vk_result);
 
+        constexpr const std::string& message() const
+        {
+            return _message;
+        }
+
+        constexpr const std::optional<ApiResult>& api_result() const
+        {
+            return _api_result;
+        }
+
         std::string to_string() const;
 
     private:
-        std::string message;
-        std::optional<ApiResult> api_result;
+        std::string _message;
+        std::optional<ApiResult> _api_result;
 
     };
 
@@ -1826,6 +1838,26 @@ namespace bv
             return _handle;
         }
 
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSubmitInfo.html
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkQueueSubmit.html
+        Result<> submit(
+            const std::vector<VkPipelineStageFlags>& wait_stages,
+            const std::vector<std::shared_ptr<Semaphore>>& wait_semaphores,
+            const std::vector<std::shared_ptr<CommandBuffer>>& command_buffers,
+            const std::vector<std::shared_ptr<Semaphore>>& signal_semaphores,
+            const std::shared_ptr<Fence>& signal_fence = nullptr
+        );
+
+        // provided by VK_KHR_swapchain
+        // returns the success code on success (VK_SUCCESS or VK_SUBOPTIMAL_KHR)
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentInfoKHR.html
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkQueuePresentKHR.html
+        Result<ApiResult> present(
+            const std::vector<std::shared_ptr<Semaphore>>& wait_semaphores,
+            const std::shared_ptr<Swapchain>& swapchain,
+            uint32_t image_index
+        );
+
     protected:
         VkQueue _handle;
 
@@ -1874,6 +1906,8 @@ namespace bv
             uint32_t queue_family_index,
             uint32_t queue_index
         );
+
+        Result<> wait_idle();
 
         ~Device();
 
@@ -1963,6 +1997,14 @@ namespace bv
         {
             return _handle;
         }
+
+        // on success, returns the image index and the success code (VK_SUCCESS,
+        // VK_TIMEOUT, or VK_SUBOPTIMAL_KHR)
+        Result<std::pair<uint32_t, ApiResult>> acquire_next_image(
+            const std::shared_ptr<Semaphore>& semaphore = nullptr,
+            const std::shared_ptr<Fence>& fence = nullptr,
+            uint64_t timeout = UINT64_MAX
+        );
 
         ~Swapchain();
 
@@ -2370,6 +2412,8 @@ namespace bv
             return _handle;
         }
 
+        Result<> reset(VkCommandBufferResetFlags flags);
+
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBufferBeginInfo.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkBeginCommandBuffer.html
         Result<> begin(
@@ -2434,6 +2478,80 @@ namespace bv
             const Device::ptr& device,
             const CommandPoolConfig& config
         );
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSemaphore.html
+    class Semaphore
+    {
+    public:
+        using ptr = std::shared_ptr<Semaphore>;
+        using wptr = std::weak_ptr<Semaphore>;
+
+        Semaphore() = delete;
+        Semaphore(const Semaphore& other) = delete;
+        Semaphore(Semaphore&& other) = default;
+
+        static Result<Semaphore::ptr> create(const Device::ptr& device);
+
+        constexpr const Device::ptr& device() const
+        {
+            return _device;
+        }
+
+        constexpr VkSemaphore handle() const
+        {
+            return _handle;
+        }
+
+        ~Semaphore();
+
+    protected:
+        Device::ptr _device;
+
+        VkSemaphore _handle = nullptr;
+
+        Semaphore(const Device::ptr& device);
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFence.html
+    class Fence
+    {
+    public:
+        using ptr = std::shared_ptr<Fence>;
+        using wptr = std::weak_ptr<Fence>;
+
+        Fence() = delete;
+        Fence(const Fence& other) = delete;
+        Fence(Fence&& other) = default;
+
+        static Result<Fence::ptr> create(
+            const Device::ptr& device,
+            VkFenceCreateFlags flags
+        );
+
+        constexpr const Device::ptr& device() const
+        {
+            return _device;
+        }
+
+        constexpr VkFence handle() const
+        {
+            return _handle;
+        }
+
+        Result<> wait(uint64_t timeout = UINT64_MAX);
+        Result<> reset();
+
+        ~Fence();
+
+    protected:
+        Device::ptr _device;
+
+        VkFence _handle = nullptr;
+
+        Fence(const Device::ptr& device);
 
     };
 

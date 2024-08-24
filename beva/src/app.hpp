@@ -16,8 +16,8 @@ namespace beva_demo
 
     private:
         static constexpr const char* title = "beva demo";
-        static constexpr int initial_width = 800;
-        static constexpr int initial_height = 450;
+        static constexpr int initial_width = 960;
+        static constexpr int initial_height = 720;
 
         static constexpr bool debug_mode = true;
 
@@ -37,6 +37,9 @@ namespace beva_demo
         std::vector<bv::Framebuffer::ptr> swapchain_framebufs;
         bv::CommandPool::ptr cmd_pool = nullptr;
         bv::CommandBuffer::ptr cmd_buf = nullptr;
+        bv::Semaphore::ptr semaphore_image_available = nullptr;
+        bv::Semaphore::ptr semaphore_render_finished = nullptr;
+        bv::Fence::ptr fence_in_flight = nullptr;
 
         uint32_t graphics_family_idx = 0;
         uint32_t presentation_family_idx = 0;
@@ -57,7 +60,9 @@ namespace beva_demo
         void create_graphics_pipeline();
         void create_framebuffers();
         void create_command_pool_and_buffer();
+        void create_sync_objects();
 
+        void draw_frame();
         void record_command_buffer(uint32_t img_idx);
 
     };
