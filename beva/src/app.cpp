@@ -2,20 +2,12 @@
 
 #include <iostream>
 #include <fstream>
-#include <vector>
-#include <string>
 #include <format>
 #include <set>
 #include <limits>
 #include <algorithm>
 #include <stdexcept>
 #include <cstdlib>
-#include <cstdint>
-
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include <glm/vec4.hpp>
-#include <glm/mat4x4.hpp>
 
 #define CHECK_BV_RESULT(result, operation_name) \
     if (!result.ok())                           \
@@ -38,6 +30,29 @@ namespace beva_demo
         int height
     );
 
+    const bv::VertexInputBindingDescription Vertex::binding_description{
+        .binding = 0,
+        .stride = sizeof(Vertex),
+        .input_rate = VK_VERTEX_INPUT_RATE_VERTEX
+    };
+
+    const std::vector<bv::VertexInputAttributeDescription>
+        Vertex::attribute_descriptions
+    {
+        bv::VertexInputAttributeDescription{
+            .location = 0,
+            .binding = 0,
+            .format = VK_FORMAT_R32G32_SFLOAT,
+            .offset = offsetof(Vertex, pos)
+    },
+        bv::VertexInputAttributeDescription{
+            .location = 1,
+            .binding = 0,
+            .format = VK_FORMAT_R32G32B32_SFLOAT,
+            .offset = offsetof(Vertex, col)
+    }
+    };
+
     void App::run()
     {
         init();
@@ -57,7 +72,9 @@ namespace beva_demo
         create_render_pass();
         create_graphics_pipeline();
         create_framebuffers();
-        create_command_pool_and_buffers();
+        create_command_pool();
+        create_vertex_buffer();
+        create_command_buffers();
         create_sync_objects();
     }
 
@@ -81,6 +98,9 @@ namespace beva_demo
     void App::cleanup()
     {
         cleanup_swapchain();
+
+        vertex_buf = nullptr;
+        vertex_buf_mem = nullptr;
 
         graphics_pipeline = nullptr;
         pipeline_layout = nullptr;
@@ -211,7 +231,6 @@ namespace beva_demo
     void App::create_surface()
     {
         VkSurfaceKHR vk_surface;
-
         VkResult vk_result = glfwCreateWindowSurface(
             context->vk_instance(),
             window,
@@ -225,7 +244,6 @@ namespace beva_demo
                 vk_result
             ).to_string().c_str());
         }
-
         surface = bv::Surface::create(context, vk_surface);
     }
 
@@ -235,7 +253,7 @@ namespace beva_demo
         CHECK_BV_RESULT(physical_devices_result, "fetch physical devices");
         auto all_physical_devices = physical_devices_result.value();
 
-        std::vector<bv::PhysicalDevice::ptr> supported_physical_devices;
+        std::vector<bv::PhysicalDevicePtr> supported_physical_devices;
         for (const auto& pdev : all_physical_devices)
         {
             if (!pdev->queue_family_indices().graphics.has_value())
@@ -361,8 +379,11 @@ namespace beva_demo
         CHECK_BV_RESULT(device_result, "create device");
         device = device_result.value();
 
-        graphics_queue = device->retrieve_queue(graphics_family_idx, 0);
-        presentation_queue = device->retrieve_queue(presentation_family_idx, 0);
+        graphics_queue =
+            bv::Device::retrieve_queue(device, graphics_family_idx, 0);
+
+        presentation_queue =
+            bv::Device::retrieve_queue(device, presentation_family_idx, 0);
     }
 
     void App::create_swapchain()
@@ -592,8 +613,8 @@ namespace beva_demo
             });
 
         bv::VertexInputState vertex_input_state{
-            .binding_descriptions = {},
-            .attribute_descriptions = {}
+            .binding_descriptions = { Vertex::binding_description },
+            .attribute_descriptions = Vertex::attribute_descriptions
         };
 
         bv::InputAssemblyState input_assembly_state{
@@ -727,7 +748,7 @@ namespace beva_demo
         }
     }
 
-    void App::create_command_pool_and_buffers()
+    void App::create_command_pool()
     {
         auto cmd_pool_result = bv::CommandPool::create(
             device,
@@ -738,8 +759,62 @@ namespace beva_demo
         );
         CHECK_BV_RESULT(cmd_pool_result, "create command pool");
         cmd_pool = cmd_pool_result.value();
+    }
 
-        auto cmd_bufs_result = cmd_pool->allocate_buffers(
+    void App::create_vertex_buffer()
+    {
+        // create buffer
+        auto vertex_buf_result = bv::Buffer::create(
+            device,
+            {
+                .flags = 0,
+                .size = sizeof(vertices[0]) * vertices.size(),
+                .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                .sharing_mode = VK_SHARING_MODE_EXCLUSIVE,
+                .queue_family_indices = {}
+            }
+        );
+        CHECK_BV_RESULT(vertex_buf_result, "create vertex buffer");
+        vertex_buf = vertex_buf_result.value();
+
+        // create memory
+        uint32_t memory_type_idx = find_memory_type_idx(
+            vertex_buf->memory_requirements().memory_type_bits,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+            | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        );
+        auto vertex_buf_mem_result = bv::DeviceMemory::allocate(
+            device,
+            {
+                .allocation_size = vertex_buf->memory_requirements().size,
+                .memory_type_index = memory_type_idx
+            }
+        );
+        CHECK_BV_RESULT(vertex_buf_mem_result, "allocate vertex buffer memory");
+        vertex_buf_mem = vertex_buf_mem_result.value();
+
+        // bind memory
+        auto bind_result = vertex_buf->bind_memory(vertex_buf_mem, 0);
+        CHECK_BV_RESULT(bind_result, "bind vertex buffer memory");
+
+        // map memory and copy data
+        auto map_result = vertex_buf_mem->map(0, vertex_buf->config().size);
+        CHECK_BV_RESULT(map_result, "map vertex buffer memory");
+        auto mapped_data = map_result.value();
+        {
+            std::copy(
+                vertices.data(),
+                vertices.data() + vertices.size(),
+                (Vertex*)mapped_data
+            );
+        }
+        vertex_buf_mem->unmap();
+    }
+
+    void App::create_command_buffers()
+    {
+        auto cmd_bufs_result = bv::CommandPool::allocate_buffers(
+            cmd_pool,
             VK_COMMAND_BUFFER_LEVEL_PRIMARY,
             MAX_FRAMES_IN_FLIGHT
         );
@@ -766,6 +841,25 @@ namespace beva_demo
             CHECK_BV_RESULT(fence_result, "create fence");
             fences_in_flight.push_back(fence_result.value());
         }
+    }
+
+    uint32_t App::find_memory_type_idx(
+        uint32_t supported_type_bits,
+        VkMemoryPropertyFlags required_properties
+    )
+    {
+        const auto& mem_props = physical_device->memory_properties();
+        for (uint32_t i = 0; i < mem_props.memory_types.size(); i++)
+        {
+            bool has_required_properties =
+                (required_properties & mem_props.memory_types[i].property_flags)
+                == required_properties;
+            if ((supported_type_bits & (1 << i)) && has_required_properties)
+            {
+                return i;
+            }
+        }
+        throw std::runtime_error("failed to find a suitable memory type");
     }
 
     void App::draw_frame()
@@ -837,7 +931,7 @@ namespace beva_demo
     }
 
     void App::record_command_buffer(
-        const bv::CommandBuffer::ptr& cmd_buf,
+        const bv::CommandBufferPtr& cmd_buf,
         uint32_t img_idx
     )
     {
@@ -869,6 +963,16 @@ namespace beva_demo
             graphics_pipeline->handle()
         );
 
+        VkBuffer vk_vertex_bufs[] = { vertex_buf->handle() };
+        VkDeviceSize offsets[] = { 0 };
+        vkCmdBindVertexBuffers(
+            cmd_buf->handle(),
+            0,
+            1,
+            vk_vertex_bufs,
+            offsets
+        );
+
         VkViewport viewport{
             .x = 0.f,
             .y = 0.f,
@@ -885,7 +989,7 @@ namespace beva_demo
         };
         vkCmdSetScissor(cmd_buf->handle(), 0, 1, &scissor);
 
-        vkCmdDraw(cmd_buf->handle(), 3, 1, 0, 0);
+        vkCmdDraw(cmd_buf->handle(), (uint32_t)vertices.size(), 1, 0, 0);
 
         vkCmdEndRenderPass(cmd_buf->handle());
 

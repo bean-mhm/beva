@@ -20,7 +20,7 @@ namespace bv
     // previously private constructors (actually protected, just go with it) as
     // public ones so that they can be used in std::make_shared() or whatever
     // else.
-#define DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(ClassName) \
+#define BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(ClassName) \
     class ClassName##_public_ctor : public ClassName \
     { \
     public: \
@@ -29,26 +29,28 @@ namespace bv
         {} \
     };
 
-    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(PhysicalDevice);
-    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Context);
-    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DebugMessenger);
-    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Surface);
-    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Queue);
-    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Device);
-    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Image);
-    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Swapchain);
-    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(ImageView);
-    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(ShaderModule);
-    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Sampler);
-    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DescriptorSetLayout);
-    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(PipelineLayout);
-    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(RenderPass);
-    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(GraphicsPipeline);
-    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Framebuffer);
-    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(CommandBuffer);
-    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(CommandPool);
-    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Semaphore);
-    DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Fence);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(PhysicalDevice);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Context);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DebugMessenger);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Surface);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Queue);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Device);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Image);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Swapchain);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(ImageView);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(ShaderModule);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Sampler);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DescriptorSetLayout);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(PipelineLayout);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(RenderPass);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(GraphicsPipeline);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Framebuffer);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(CommandBuffer);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(CommandPool);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Semaphore);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Fence);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Buffer);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DeviceMemory);
 
 #pragma region forward declarations
 
@@ -1126,7 +1128,7 @@ namespace bv
 
     VkPipelineShaderStageCreateInfo ShaderStage_to_vk(
         const ShaderStage& stage,
-        std::shared_ptr<ShaderModule>& waste_module,
+        ShaderModulePtr& waste_module,
         VkSpecializationInfo& waste_vk_specialization_info,
         std::vector<VkSpecializationMapEntry>& waste_vk_map_entries,
         std::vector<uint8_t>& waste_data
@@ -1450,7 +1452,7 @@ namespace bv
 
     VkDescriptorSetLayoutBinding DescriptorSetLayoutBinding_to_vk(
         const DescriptorSetLayoutBinding& binding,
-        std::vector<std::shared_ptr<Sampler>>& waste_immutable_samplers,
+        std::vector<SamplerPtr>& waste_immutable_samplers,
         std::vector<VkSampler>& waste_vk_immutable_samplers
     )
     {
@@ -1591,6 +1593,55 @@ namespace bv
         };
     }
 
+    MemoryRequirements MemoryRequirements_from_vk(
+        const VkMemoryRequirements& req
+    )
+    {
+        return MemoryRequirements{
+            .size = req.size,
+            .alignment = req.alignment,
+            .memory_type_bits = req.memoryTypeBits
+        };
+    }
+
+    MemoryType MemoryType_from_vk(const VkMemoryType& type)
+    {
+        return MemoryType{
+            .property_flags = type.propertyFlags,
+            .heap_index = type.heapIndex
+        };
+    }
+
+    MemoryHeap MemoryHeap_from_vk(const VkMemoryHeap& heap)
+    {
+        return MemoryHeap{
+            .size = heap.size,
+            .flags = heap.flags
+        };
+    }
+
+    PhysicalDeviceMemoryProperties PhysicalDeviceMemoryProperties_from_vk(
+        const VkPhysicalDeviceMemoryProperties& properties
+    )
+    {
+        std::vector<MemoryType> memory_types(properties.memoryTypeCount);
+        for (size_t i = 0; i < properties.memoryTypeCount; i++)
+        {
+            memory_types[i] = MemoryType_from_vk(properties.memoryTypes[i]);
+        }
+
+        std::vector<MemoryHeap> memory_heaps(properties.memoryHeapCount);
+        for (size_t i = 0; i < properties.memoryHeapCount; i++)
+        {
+            memory_heaps[i] = MemoryHeap_from_vk(properties.memoryHeaps[i]);
+        }
+
+        return PhysicalDeviceMemoryProperties{
+            .memory_types = memory_types,
+            .memory_heaps = memory_heaps
+        };
+    }
+
     Error::Error()
         : _message("no error information provided"),
         _api_result(std::nullopt)
@@ -1676,7 +1727,7 @@ namespace bv
     }
 
     Result<> PhysicalDevice::update_swapchain_support(
-        const std::shared_ptr<Surface>& surface
+        const SurfacePtr& surface
     )
     {
         _swapchain_support = std::nullopt;
@@ -1790,12 +1841,14 @@ namespace bv
         VkPhysicalDevice handle,
         const PhysicalDeviceProperties& properties,
         const PhysicalDeviceFeatures& features,
+        const PhysicalDeviceMemoryProperties& memory_properties,
         const std::vector<QueueFamily>& queue_families,
         const QueueFamilyIndices& queue_family_indices
     )
         : _handle(handle),
         _properties(properties),
         _features(features),
+        _memory_properties(memory_properties),
         _queue_families(queue_families),
         _queue_family_indices(queue_family_indices)
     {}
@@ -1817,12 +1870,12 @@ namespace bv
         other._vk_instance = nullptr;
     }
 
-    Result<Context::ptr> Context::create(
+    Result<ContextPtr> Context::create(
         const ContextConfig& config,
-        const Allocator::ptr& allocator
+        const AllocatorPtr& allocator
     )
     {
-        Context::ptr c = std::make_shared<Context_public_ctor>(
+        ContextPtr c = std::make_shared<Context_public_ctor>(
             config,
             allocator
         );
@@ -1973,7 +2026,7 @@ namespace bv
         return extensions;
     }
 
-    void Context::set_allocator(const Allocator::ptr& allocator)
+    void Context::set_allocator(const AllocatorPtr& allocator)
     {
         _allocator = allocator;
         _vk_allocator.pUserData = _allocator.get();
@@ -1988,8 +2041,8 @@ namespace bv
         return &_vk_allocator;
     }
 
-    Result<std::vector<PhysicalDevice::ptr>> Context::fetch_physical_devices(
-        const std::shared_ptr<Surface>& surface
+    Result<std::vector<PhysicalDevicePtr>> Context::fetch_physical_devices(
+        const SurfacePtr& surface
     )
     {
         uint32_t count = 0;
@@ -2006,7 +2059,7 @@ namespace bv
             return Error(vk_result);
         }
 
-        std::vector<PhysicalDevice::ptr> physical_devices;
+        std::vector<PhysicalDevicePtr> physical_devices;
         physical_devices.reserve(vk_physical_devices.size());
         for (const auto& vk_physical_device : vk_physical_devices)
         {
@@ -2015,13 +2068,20 @@ namespace bv
                 vk_physical_device,
                 &vk_properties
             );
-
             auto properties = PhysicalDeviceProperties_from_vk(vk_properties);
 
             VkPhysicalDeviceFeatures vk_features;
             vkGetPhysicalDeviceFeatures(vk_physical_device, &vk_features);
-
             auto features = PhysicalDeviceFeatures_from_vk(vk_features);
+
+            VkPhysicalDeviceMemoryProperties vk_memory_properties;
+            vkGetPhysicalDeviceMemoryProperties(
+                vk_physical_device,
+                &vk_memory_properties
+            );
+            auto memory_properties = PhysicalDeviceMemoryProperties_from_vk(
+                vk_memory_properties
+            );
 
             uint32_t queue_family_count = 0;
             vkGetPhysicalDeviceQueueFamilyProperties(
@@ -2141,6 +2201,7 @@ namespace bv
                     vk_physical_device,
                     properties,
                     features,
+                    memory_properties,
                     queue_families,
                     queue_family_indices
                 )
@@ -2168,19 +2229,19 @@ namespace bv
 
     Context::Context(
         const ContextConfig& config,
-        const Allocator::ptr& allocator
+        const AllocatorPtr& allocator
     )
         : _config(config), _allocator(allocator)
     {}
 
-    Result<DebugMessenger::ptr> DebugMessenger::create(
-        const Context::ptr& context,
+    Result<DebugMessengerPtr> DebugMessenger::create(
+        const ContextPtr& context,
         VkDebugUtilsMessageSeverityFlagsEXT message_severity_filter,
         VkDebugUtilsMessageTypeFlagsEXT message_type_filter,
         const DebugCallback& callback
     )
     {
-        DebugMessenger::ptr messenger =
+        DebugMessengerPtr messenger =
             std::make_shared<DebugMessenger_public_ctor>(
                 context,
                 message_severity_filter,
@@ -2221,7 +2282,7 @@ namespace bv
     }
 
     DebugMessenger::DebugMessenger(
-        const Context::ptr& context,
+        const ContextPtr& context,
         VkDebugUtilsMessageSeverityFlagsEXT message_severity_filter,
         VkDebugUtilsMessageTypeFlagsEXT message_type_filter,
         const DebugCallback& callback
@@ -2232,8 +2293,8 @@ namespace bv
         _callback(callback)
     {}
 
-    Surface::ptr Surface::create(
-        const Context::ptr& context,
+    SurfacePtr Surface::create(
+        const ContextPtr& context,
         VkSurfaceKHR handle
     )
     {
@@ -2250,7 +2311,7 @@ namespace bv
     }
 
     Surface::Surface(
-        const Context::ptr& context,
+        const ContextPtr& context,
         VkSurfaceKHR handle
     )
         : _context(context), _handle(handle)
@@ -2258,10 +2319,10 @@ namespace bv
 
     Result<> Queue::submit(
         const std::vector<VkPipelineStageFlags>& wait_stages,
-        const std::vector<std::shared_ptr<Semaphore>>& wait_semaphores,
-        const std::vector<std::shared_ptr<CommandBuffer>>& command_buffers,
-        const std::vector<std::shared_ptr<Semaphore>>& signal_semaphores,
-        const std::shared_ptr<Fence>& signal_fence
+        const std::vector<SemaphorePtr>& wait_semaphores,
+        const std::vector<CommandBufferPtr>& command_buffers,
+        const std::vector<SemaphorePtr>& signal_semaphores,
+        const FencePtr& signal_fence
     )
     {
         std::vector<VkSemaphore> vk_semaphores(
@@ -2312,8 +2373,8 @@ namespace bv
     }
 
     Result<> Queue::present(
-        const std::vector<std::shared_ptr<Semaphore>>& wait_semaphores,
-        const std::shared_ptr<Swapchain>& swapchain,
+        const std::vector<SemaphorePtr>& wait_semaphores,
+        const SwapchainPtr& swapchain,
         uint32_t image_index,
         ApiResult* out_api_result
     )
@@ -2352,17 +2413,25 @@ namespace bv
         return Result();
     }
 
-    Queue::Queue(VkQueue handle)
-        : _handle(handle)
+    Queue::Queue(
+        const DeviceWPtr& device,
+        uint32_t queue_family_index,
+        uint32_t queue_index,
+        VkQueue handle
+    )
+        : _device(device),
+        _queue_family_index(queue_family_index),
+        _queue_index(queue_index),
+        _handle(handle)
     {}
 
-    Result<Device::ptr>Device::create(
-        const Context::ptr& context,
-        const PhysicalDevice::ptr& physical_device,
+    Result<DevicePtr>Device::create(
+        const ContextPtr& context,
+        const PhysicalDevicePtr& physical_device,
         const DeviceConfig& config
     )
     {
-        Device::ptr device = std::make_shared<Device_public_ctor>(
+        DevicePtr device = std::make_shared<Device_public_ctor>(
             context,
             physical_device,
             config
@@ -2443,19 +2512,25 @@ namespace bv
         return device;
     }
 
-    Queue::ptr Device::retrieve_queue(
+    QueuePtr Device::retrieve_queue(
+        const DevicePtr& device,
         uint32_t queue_family_index,
         uint32_t queue_index
     )
     {
         VkQueue vk_queue;
         vkGetDeviceQueue(
-            handle(),
+            device->handle(),
             queue_family_index,
             queue_index,
             &vk_queue
         );
-        return std::make_shared<Queue_public_ctor>(vk_queue);
+        return std::make_shared<Queue_public_ctor>(
+            (DeviceWPtr)device,
+            queue_family_index,
+            queue_index,
+            vk_queue
+        );
     }
 
     Result<> Device::wait_idle()
@@ -2474,8 +2549,8 @@ namespace bv
     }
 
     Device::Device(
-        const Context::ptr& context,
-        const PhysicalDevice::ptr& physical_device,
+        const ContextPtr& context,
+        const PhysicalDevicePtr& physical_device,
         const DeviceConfig& config
     )
         : _context(context),
@@ -2487,14 +2562,14 @@ namespace bv
         : _handle(handle)
     {}
 
-    Result<Swapchain::ptr> Swapchain::create(
-        const Device::ptr& device,
-        const Surface::ptr& surface,
+    Result<SwapchainPtr> Swapchain::create(
+        const DevicePtr& device,
+        const SurfacePtr& surface,
         const SwapchainConfig& config,
-        const Swapchain::ptr& old_swapchain
+        const SwapchainPtr& old_swapchain
     )
     {
-        Swapchain::ptr sc = std::make_shared<Swapchain_public_ctor>(
+        SwapchainPtr sc = std::make_shared<Swapchain_public_ctor>(
             device,
             surface,
             config,
@@ -2574,8 +2649,8 @@ namespace bv
     }
 
     Result<uint32_t> Swapchain::acquire_next_image(
-        const std::shared_ptr<Semaphore>& semaphore,
-        const std::shared_ptr<Fence>& fence,
+        const SemaphorePtr& semaphore,
+        const FencePtr& fence,
         uint64_t timeout,
         ApiResult* out_api_result
     )
@@ -2612,10 +2687,10 @@ namespace bv
     }
 
     Swapchain::Swapchain(
-        const Device::ptr& device,
-        const Surface::ptr& surface,
+        const DevicePtr& device,
+        const SurfacePtr& surface,
         const SwapchainConfig& config,
-        const Swapchain::ptr& old_swapchain
+        const SwapchainPtr& old_swapchain
     )
         : _device(device),
         _surface(surface),
@@ -2623,13 +2698,13 @@ namespace bv
         _old_swapchain(old_swapchain)
     {}
 
-    Result<ImageView::ptr> ImageView::create(
-        const Device::ptr& device,
-        const Image::ptr& image,
+    Result<ImageViewPtr> ImageView::create(
+        const DevicePtr& device,
+        const ImagePtr& image,
         const ImageViewConfig& config
     )
     {
-        ImageView::ptr view = std::make_shared<ImageView_public_ctor>(
+        ImageViewPtr view = std::make_shared<ImageView_public_ctor>(
             device,
             image,
             config
@@ -2671,8 +2746,8 @@ namespace bv
     }
 
     ImageView::ImageView(
-        const Device::ptr& device,
-        const Image::ptr& image,
+        const DevicePtr& device,
+        const ImagePtr& image,
         const ImageViewConfig& config
     )
         : _device(device),
@@ -2680,12 +2755,12 @@ namespace bv
         _config(config)
     {}
 
-    Result<ShaderModule::ptr> ShaderModule::create(
-        const Device::ptr& device,
+    Result<ShaderModulePtr> ShaderModule::create(
+        const DevicePtr& device,
         const std::vector<uint8_t>& code
     )
     {
-        ShaderModule::ptr module = std::make_shared<ShaderModule_public_ctor>(
+        ShaderModulePtr module = std::make_shared<ShaderModule_public_ctor>(
             device
         );
 
@@ -2728,16 +2803,16 @@ namespace bv
         );
     }
 
-    ShaderModule::ShaderModule(const Device::ptr& device)
+    ShaderModule::ShaderModule(const DevicePtr& device)
         : _device(device)
     {}
 
-    Result<Sampler::ptr> Sampler::create(
-        const Device::ptr& device,
+    Result<SamplerPtr> Sampler::create(
+        const DevicePtr& device,
         const SamplerConfig& config
     )
     {
-        Sampler::ptr sampler = std::make_shared<Sampler_public_ctor>(
+        SamplerPtr sampler = std::make_shared<Sampler_public_ctor>(
             device,
             config
         );
@@ -2788,19 +2863,19 @@ namespace bv
     }
 
     Sampler::Sampler(
-        const Device::ptr& device,
+        const DevicePtr& device,
         const SamplerConfig& config
     )
         : _device(device),
         _config(config)
     {}
 
-    Result<DescriptorSetLayout::ptr> DescriptorSetLayout::create(
-        const Device::ptr& device,
+    Result<DescriptorSetLayoutPtr> DescriptorSetLayout::create(
+        const DevicePtr& device,
         const DescriptorSetLayoutConfig& config
     )
     {
-        DescriptorSetLayout::ptr layout =
+        DescriptorSetLayoutPtr layout =
             std::make_shared<DescriptorSetLayout_public_ctor>(
                 device,
                 config
@@ -2809,7 +2884,7 @@ namespace bv
         std::vector<VkDescriptorSetLayoutBinding> vk_bindings(
             layout->config().bindings.size()
         );
-        std::vector<std::vector<std::shared_ptr<Sampler>>>
+        std::vector<std::vector<SamplerPtr>>
             wastes_immutable_samplers;
         std::vector<std::vector<VkSampler>> wastes_vk_immutable_samplers;
         for (size_t i = 0; i < layout->config().bindings.size(); i++)
@@ -2855,19 +2930,19 @@ namespace bv
     }
 
     DescriptorSetLayout::DescriptorSetLayout(
-        const Device::ptr& device,
+        const DevicePtr& device,
         const DescriptorSetLayoutConfig& config
     )
         : _device(device),
         _config(config)
     {}
 
-    Result<PipelineLayout::ptr> PipelineLayout::create(
-        const Device::ptr& device,
+    Result<PipelineLayoutPtr> PipelineLayout::create(
+        const DevicePtr& device,
         const PipelineLayoutConfig& config
     )
     {
-        PipelineLayout::ptr layout =
+        PipelineLayoutPtr layout =
             std::make_shared<PipelineLayout_public_ctor>(
                 device,
                 config
@@ -2926,18 +3001,18 @@ namespace bv
     }
 
     PipelineLayout::PipelineLayout(
-        const Device::ptr& device,
+        const DevicePtr& device,
         const PipelineLayoutConfig& config
     )
         : _device(device), _config(config)
     {}
 
-    Result<RenderPass::ptr> RenderPass::create(
-        const Device::ptr& device,
+    Result<RenderPassPtr> RenderPass::create(
+        const DevicePtr& device,
         const RenderPassConfig& config
     )
     {
-        RenderPass::ptr pass = std::make_shared<RenderPass_public_ctor>(
+        RenderPassPtr pass = std::make_shared<RenderPass_public_ctor>(
             device,
             config
         );
@@ -3021,18 +3096,18 @@ namespace bv
     }
 
     RenderPass::RenderPass(
-        const Device::ptr& device,
+        const DevicePtr& device,
         const RenderPassConfig& config
     )
         : _device(device), _config(config)
     {}
 
-    Result<GraphicsPipeline::ptr> GraphicsPipeline::create(
-        const Device::ptr& device,
+    Result<GraphicsPipelinePtr> GraphicsPipeline::create(
+        const DevicePtr& device,
         const GraphicsPipelineConfig& config
     )
     {
-        GraphicsPipeline::ptr pipe =
+        GraphicsPipelinePtr pipe =
             std::make_shared<GraphicsPipeline_public_ctor>(
                 device,
                 config
@@ -3041,7 +3116,7 @@ namespace bv
         std::vector<VkPipelineShaderStageCreateInfo> vk_stages(
             pipe->config().stages.size()
         );
-        std::vector<std::shared_ptr<ShaderModule>> wastes_module;
+        std::vector<ShaderModulePtr> wastes_module;
         std::vector<VkSpecializationInfo> wastes_vk_specialization_info;
         std::vector<std::vector<VkSpecializationMapEntry>>
             wastes_vk_map_entries;
@@ -3227,18 +3302,18 @@ namespace bv
     }
 
     GraphicsPipeline::GraphicsPipeline(
-        const Device::ptr& device,
+        const DevicePtr& device,
         const GraphicsPipelineConfig& config
     )
         : _device(device), _config(config)
     {}
 
-    Result<Framebuffer::ptr> Framebuffer::create(
-        const Device::ptr& device,
+    Result<FramebufferPtr> Framebuffer::create(
+        const DevicePtr& device,
         const FramebufferConfig& config
     )
     {
-        Framebuffer::ptr buf = std::make_shared<Framebuffer_public_ctor>(
+        FramebufferPtr buf = std::make_shared<Framebuffer_public_ctor>(
             device,
             config
         );
@@ -3286,7 +3361,7 @@ namespace bv
     }
 
     Framebuffer::Framebuffer(
-        const Device::ptr& device,
+        const DevicePtr& device,
         const FramebufferConfig& config
     )
         : _device(device), _config(config)
@@ -3350,16 +3425,35 @@ namespace bv
         return Result();
     }
 
-    CommandBuffer::CommandBuffer(VkCommandBuffer handle)
-        : _handle(handle)
+    CommandBuffer::~CommandBuffer()
+    {
+        if (pool().expired())
+        {
+            return;
+        }
+        auto pool_locked = pool().lock();
+        vkFreeCommandBuffers(
+            pool_locked->device()->handle(),
+            pool_locked->handle(),
+            1,
+            &_handle
+        );
+    }
+
+    CommandBuffer::CommandBuffer(
+        const CommandPoolWPtr& pool,
+        VkCommandBuffer handle
+    )
+        : _pool(pool),
+        _handle(handle)
     {}
 
-    Result<CommandPool::ptr> CommandPool::create(
-        const Device::ptr& device,
+    Result<CommandPoolPtr> CommandPool::create(
+        const DevicePtr& device,
         const CommandPoolConfig& config
     )
     {
-        CommandPool::ptr pool = std::make_shared<CommandPool_public_ctor>(
+        CommandPoolPtr pool = std::make_shared<CommandPool_public_ctor>(
             device,
             config
         );
@@ -3384,21 +3478,22 @@ namespace bv
         return pool;
     }
 
-    Result<CommandBuffer::ptr> CommandPool::allocate_buffer(
+    Result<CommandBufferPtr> CommandPool::allocate_buffer(
+        const CommandPoolPtr& pool,
         VkCommandBufferLevel level
     )
     {
         VkCommandBufferAllocateInfo alloc_info{
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
             .pNext = nullptr,
-            .commandPool = handle(),
+            .commandPool = pool->handle(),
             .level = level,
             .commandBufferCount = 1
         };
 
         VkCommandBuffer vk_command_buffer;
         VkResult vk_result = vkAllocateCommandBuffers(
-            device()->handle(),
+            pool->device()->handle(),
             &alloc_info,
             &vk_command_buffer
         );
@@ -3406,12 +3501,14 @@ namespace bv
         {
             return Error(vk_result);
         }
-        return (CommandBuffer::ptr)std::make_shared<CommandBuffer_public_ctor>(
+        return (CommandBufferPtr)std::make_shared<CommandBuffer_public_ctor>(
+            (CommandPoolWPtr)pool,
             vk_command_buffer
         );
     }
 
-    Result<std::vector<CommandBuffer::ptr>> CommandPool::allocate_buffers(
+    Result<std::vector<CommandBufferPtr>> CommandPool::allocate_buffers(
+        const CommandPoolPtr& pool,
         VkCommandBufferLevel level,
         uint32_t count
     )
@@ -3419,14 +3516,14 @@ namespace bv
         VkCommandBufferAllocateInfo alloc_info{
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
             .pNext = nullptr,
-            .commandPool = handle(),
+            .commandPool = pool->handle(),
             .level = level,
             .commandBufferCount = count
         };
 
         std::vector<VkCommandBuffer> vk_command_buffers(count);
         VkResult vk_result = vkAllocateCommandBuffers(
-            device()->handle(),
+            pool->device()->handle(),
             &alloc_info,
             vk_command_buffers.data()
         );
@@ -3435,10 +3532,11 @@ namespace bv
             return Error(vk_result);
         }
 
-        std::vector<CommandBuffer::ptr> command_buffers(count);
+        std::vector<CommandBufferPtr> command_buffers(count);
         for (size_t i = 0; i < count; i++)
         {
             command_buffers[i] = std::make_shared<CommandBuffer_public_ctor>(
+                (CommandPoolWPtr)pool,
                 vk_command_buffers[i]
             );
         }
@@ -3455,15 +3553,15 @@ namespace bv
     }
 
     CommandPool::CommandPool(
-        const Device::ptr& device,
+        const DevicePtr& device,
         const CommandPoolConfig& config
     )
         : _device(device), _config(config)
     {}
 
-    Result<Semaphore::ptr> Semaphore::create(const Device::ptr& device)
+    Result<SemaphorePtr> Semaphore::create(const DevicePtr& device)
     {
-        Semaphore::ptr sema = std::make_shared<Semaphore_public_ctor>(device);
+        SemaphorePtr sema = std::make_shared<Semaphore_public_ctor>(device);
 
         VkSemaphoreCreateInfo  create_info{
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
@@ -3493,16 +3591,16 @@ namespace bv
         );
     }
 
-    Semaphore::Semaphore(const Device::ptr& device)
+    Semaphore::Semaphore(const DevicePtr& device)
         : _device(device)
     {}
 
-    Result<Fence::ptr> Fence::create(
-        const Device::ptr& device,
+    Result<FencePtr> Fence::create(
+        const DevicePtr& device,
         VkFenceCreateFlags flags
     )
     {
-        Fence::ptr fence = std::make_shared<Fence_public_ctor>(device);
+        FencePtr fence = std::make_shared<Fence_public_ctor>(device);
 
         VkFenceCreateInfo create_info{
             .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
@@ -3562,8 +3660,235 @@ namespace bv
         );
     }
 
-    Fence::Fence(const Device::ptr& device)
+    Fence::Fence(const DevicePtr& device)
         : _device(device)
+    {}
+
+    Result<BufferPtr> Buffer::create(
+        const DevicePtr& device,
+        const BufferConfig& config
+    )
+    {
+        BufferPtr buf = std::make_shared<Buffer_public_ctor>(
+            device,
+            config
+        );
+
+        VkBufferCreateInfo create_info{
+            .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = buf->config().flags,
+            .size = buf->config().size,
+            .usage = buf->config().usage,
+            .sharingMode = buf->config().sharing_mode,
+
+            .queueFamilyIndexCount =
+            (uint32_t)buf->config().queue_family_indices.size(),
+
+            .pQueueFamilyIndices = buf->config().queue_family_indices.data()
+        };
+
+        VkResult vk_result = vkCreateBuffer(
+            buf->device()->handle(),
+            &create_info,
+            buf->device()->context()->vk_allocator_ptr(),
+            &buf->_handle
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+
+        VkMemoryRequirements vk_mem_requirements;
+        vkGetBufferMemoryRequirements(
+            buf->device()->handle(),
+            buf->handle(),
+            &vk_mem_requirements
+        );
+        buf->_memory_requirements = MemoryRequirements_from_vk(
+            vk_mem_requirements
+        );
+
+        return buf;
+    }
+
+    Result<> Buffer::bind_memory(
+        const DeviceMemoryPtr& memory,
+        VkDeviceSize memory_offset
+    )
+    {
+        VkResult vk_result = vkBindBufferMemory(
+            device()->handle(),
+            handle(),
+            memory->handle(),
+            memory_offset
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return Result();
+    }
+
+    Buffer::~Buffer()
+    {
+        vkDestroyBuffer(
+            device()->handle(),
+            handle(),
+            device()->context()->vk_allocator_ptr()
+        );
+    }
+
+    Buffer::Buffer(const DevicePtr& device, const BufferConfig& config)
+        : _device(device), _config(config)
+    {}
+
+    Result<DeviceMemoryPtr> DeviceMemory::allocate(
+        const DevicePtr& device,
+        const DeviceMemoryConfig& config
+    )
+    {
+        DeviceMemoryPtr mem = std::make_shared<DeviceMemory_public_ctor>(
+            device,
+            config
+        );
+
+        VkMemoryAllocateInfo allocate_info{
+            .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            .pNext = nullptr,
+            .allocationSize = mem->config().allocation_size,
+            .memoryTypeIndex = mem->config().memory_type_index
+        };
+
+        VkResult vk_result = vkAllocateMemory(
+            device->handle(),
+            &allocate_info,
+            device->context()->vk_allocator_ptr(),
+            &mem->_handle
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return mem;
+    }
+
+    Result<void*> DeviceMemory::map(VkDeviceSize offset, VkDeviceSize size)
+    {
+        if (device().expired())
+        {
+            return Error("device shared pointer has expired");
+        }
+        auto device_locked = device().lock();
+
+        void* p;
+        VkResult vk_result = vkMapMemory(
+            device_locked->handle(),
+            handle(),
+            offset,
+            size,
+            0,
+            &p
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            unmap();
+            return Error(vk_result);
+        }
+        return p;
+    }
+
+    void DeviceMemory::unmap()
+    {
+        if (device().expired())
+        {
+            return;
+        }
+        auto device_locked = device().lock();
+        vkUnmapMemory(device_locked->handle(), handle());
+    }
+
+    Result<> DeviceMemory::flush_mapped_range(
+        VkDeviceSize offset,
+        VkDeviceSize size
+    )
+    {
+        if (device().expired())
+        {
+            return Error("device shared pointer has expired");
+        }
+        auto device_locked = device().lock();
+
+        VkMappedMemoryRange vk_mapped_range{
+            .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
+            .pNext = nullptr,
+            .memory = handle(),
+            .offset = offset,
+            .size = size
+        };
+
+        VkResult vk_result = vkFlushMappedMemoryRanges(
+            device_locked->handle(),
+            1,
+            &vk_mapped_range
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return Result();
+    }
+
+    Result<> DeviceMemory::invalidate_mapped_range(
+        VkDeviceSize offset,
+        VkDeviceSize size
+    )
+    {
+        if (device().expired())
+        {
+            return Error("device shared pointer has expired");
+        }
+        auto device_locked = device().lock();
+
+        VkMappedMemoryRange vk_mapped_range{
+            .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
+            .pNext = nullptr,
+            .memory = handle(),
+            .offset = offset,
+            .size = size
+        };
+
+        VkResult vk_result = vkInvalidateMappedMemoryRanges(
+            device_locked->handle(),
+            1,
+            &vk_mapped_range
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error(vk_result);
+        }
+        return Result();
+    }
+
+    DeviceMemory::~DeviceMemory()
+    {
+        if (device().expired())
+        {
+            return;
+        }
+        auto device_locked = device().lock();
+        vkFreeMemory(
+            device_locked->handle(),
+            handle(),
+            device_locked->context()->vk_allocator_ptr()
+        );
+    }
+
+    DeviceMemory::DeviceMemory(
+        const DeviceWPtr& device,
+        const DeviceMemoryConfig& config
+    )
+        : _device(device), _config(config)
     {}
 
 #pragma region Vulkan callbacks

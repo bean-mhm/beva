@@ -25,6 +25,11 @@ namespace bv
     template<typename Enum>
     using EnumStrMap = std::unordered_map<Enum, std::string>;
 
+#define BV_DEFINE_SMART_PTR_TYPE_ALIASES(ClassName) \
+    using ClassName##Ptr = std::shared_ptr<ClassName>; \
+    using ClassName##WPtr = std::weak_ptr<ClassName>; \
+    using ClassName##UPtr = std::unique_ptr<ClassName>;
+
     // forward declarations
     class Allocator;
     class PhysicalDevice;
@@ -47,6 +52,33 @@ namespace bv
     class CommandPool;
     class Semaphore;
     class Fence;
+    class Buffer;
+    class DeviceMemory;
+
+    // smart pointer type aliases
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(Allocator);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(PhysicalDevice);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(Context);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(DebugMessenger);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(Surface);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(Queue);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(Device);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(Image);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(Swapchain);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(ImageView);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(ShaderModule);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(Sampler);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(DescriptorSetLayout);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(PipelineLayout);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(RenderPass);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(GraphicsPipeline);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(Framebuffer);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(CommandBuffer);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(CommandPool);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(Semaphore);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(Fence);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(Buffer);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(DeviceMemory);
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_MAKE_API_VERSION.html
     struct Version
@@ -991,14 +1023,14 @@ namespace bv
     {
         VkPipelineShaderStageCreateFlags flags;
         VkShaderStageFlagBits stage;
-        std::shared_ptr<ShaderModule> module;
+        ShaderModulePtr module;
         std::string entry_point;
         std::optional<SpecializationInfo> specialization_info;
     };
 
     VkPipelineShaderStageCreateInfo ShaderStage_to_vk(
         const ShaderStage& stage,
-        std::shared_ptr<ShaderModule>& waste_module,
+        ShaderModulePtr& waste_module,
         VkSpecializationInfo& waste_vk_specialization_info,
         std::vector<VkSpecializationMapEntry>& waste_vk_map_entries,
         std::vector<uint8_t>& waste_data
@@ -1245,12 +1277,12 @@ namespace bv
         VkDescriptorType descriptor_type;
         uint32_t descriptor_count;
         VkShaderStageFlags stage_flags;
-        std::vector<std::shared_ptr<Sampler>> immutable_samplers;
+        std::vector<SamplerPtr> immutable_samplers;
     };
 
     VkDescriptorSetLayoutBinding DescriptorSetLayoutBinding_to_vk(
         const DescriptorSetLayoutBinding& binding,
-        std::vector<std::shared_ptr<Sampler>>& waste_immutable_samplers,
+        std::vector<SamplerPtr>& waste_immutable_samplers,
         std::vector<VkSampler>& waste_vk_immutable_samplers
     );
 
@@ -1275,7 +1307,7 @@ namespace bv
     struct PipelineLayoutConfig
     {
         VkPipelineLayoutCreateFlags flags;
-        std::vector<std::shared_ptr<DescriptorSetLayout>> set_layouts;
+        std::vector<DescriptorSetLayoutPtr> set_layouts;
         std::vector<PushConstantRange> push_constant_ranges;
     };
 
@@ -1366,18 +1398,18 @@ namespace bv
         std::optional<DepthStencilState> depth_stencil_state;
         std::optional<ColorBlendState> color_blend_state;
         DynamicStates dynamic_states;
-        std::shared_ptr<PipelineLayout> layout;
-        std::shared_ptr<RenderPass> render_pass;
+        PipelineLayoutPtr layout;
+        RenderPassPtr render_pass;
         uint32_t subpass_index;
-        std::shared_ptr<GraphicsPipeline> base_pipeline;
+        GraphicsPipelinePtr base_pipeline;
     };
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFramebufferCreateInfo.html
     struct FramebufferConfig
     {
         VkFramebufferCreateFlags flags;
-        std::shared_ptr<RenderPass> render_pass;
-        std::vector<std::shared_ptr<ImageView>> attachments;
+        RenderPassPtr render_pass;
+        std::vector<ImageViewPtr> attachments;
         uint32_t width;
         uint32_t height;
         uint32_t layers;
@@ -1393,12 +1425,70 @@ namespace bv
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBufferInheritanceInfo.html
     struct CommandBufferInheritance
     {
-        std::shared_ptr<RenderPass> render_pass;
+        RenderPassPtr render_pass;
         uint32_t subpass_index;
-        std::shared_ptr<Framebuffer> framebuffer;
+        FramebufferPtr framebuffer;
         bool occlusion_query_enable;
         VkQueryControlFlags query_flags;
         VkQueryPipelineStatisticFlags pipeline_statistics;
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBufferCreateInfo.html
+    struct BufferConfig
+    {
+        VkBufferCreateFlags flags;
+        VkDeviceSize size;
+        VkBufferUsageFlags usage;
+        VkSharingMode sharing_mode;
+        std::vector<uint32_t> queue_family_indices;
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMemoryRequirements.html
+    struct MemoryRequirements
+    {
+        VkDeviceSize size;
+        VkDeviceSize alignment;
+        uint32_t memory_type_bits;
+    };
+
+    MemoryRequirements MemoryRequirements_from_vk(
+        const VkMemoryRequirements& req
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMemoryType.html
+    struct MemoryType
+    {
+        VkMemoryPropertyFlags property_flags;
+        uint32_t heap_index;
+    };
+
+    MemoryType MemoryType_from_vk(const VkMemoryType& type);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMemoryHeap.html
+    struct MemoryHeap
+    {
+        VkDeviceSize size;
+        VkMemoryHeapFlags flags;
+    };
+
+    MemoryHeap MemoryHeap_from_vk(const VkMemoryHeap& heap);
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceMemoryProperties.html
+    struct PhysicalDeviceMemoryProperties
+    {
+        std::vector<MemoryType> memory_types;
+        std::vector<MemoryHeap> memory_heaps;
+    };
+
+    PhysicalDeviceMemoryProperties PhysicalDeviceMemoryProperties_from_vk(
+        const VkPhysicalDeviceMemoryProperties& properties
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkMemoryAllocateInfo.html
+    struct DeviceMemoryConfig
+    {
+        VkDeviceSize allocation_size;
+        uint32_t memory_type_index;
     };
 
 #pragma endregion
@@ -1536,9 +1626,6 @@ namespace bv
     class Allocator
     {
     public:
-        using ptr = std::shared_ptr<Allocator>;
-        using wptr = std::weak_ptr<Allocator>;
-
         virtual void* allocate(
             size_t size,
             size_t alignment,
@@ -1572,9 +1659,6 @@ namespace bv
     class PhysicalDevice
     {
     public:
-        using ptr = std::shared_ptr<PhysicalDevice>;
-        using wptr = std::weak_ptr<PhysicalDevice>;
-
         PhysicalDevice() = delete;
 
         constexpr VkPhysicalDevice handle() const
@@ -1590,6 +1674,12 @@ namespace bv
         constexpr const PhysicalDeviceFeatures& features() const
         {
             return _features;
+        }
+
+        constexpr const PhysicalDeviceMemoryProperties&
+            memory_properties() const
+        {
+            return _memory_properties;
         }
 
         constexpr const std::vector<QueueFamily>& queue_families() const
@@ -1615,7 +1705,7 @@ namespace bv
         );
 
         Result<> update_swapchain_support(
-            const std::shared_ptr<Surface>& surface
+            const SurfacePtr& surface
         );
 
     protected:
@@ -1623,6 +1713,7 @@ namespace bv
 
         PhysicalDeviceProperties _properties;
         PhysicalDeviceFeatures _features;
+        PhysicalDeviceMemoryProperties _memory_properties;
         std::vector<QueueFamily> _queue_families;
         QueueFamilyIndices _queue_family_indices;
         std::optional<SwapchainSupport> _swapchain_support;
@@ -1631,6 +1722,7 @@ namespace bv
             VkPhysicalDevice handle,
             const PhysicalDeviceProperties& properties,
             const PhysicalDeviceFeatures& features,
+            const PhysicalDeviceMemoryProperties& memory_properties,
             const std::vector<QueueFamily>& queue_families,
             const QueueFamilyIndices& queue_family_indices
         );
@@ -1643,9 +1735,6 @@ namespace bv
     class Context
     {
     public:
-        using ptr = std::shared_ptr<Context>;
-        using wptr = std::weak_ptr<Context>;
-
         Context() = delete;
         Context(const Context& other) = delete;
         Context(Context&& other) noexcept;
@@ -1653,9 +1742,9 @@ namespace bv
         // * it's best to keep at least one external reference to the allocator
         //   so that it doesn't die with the Context because the driver might
         //   still use the allocator even after the instance is destroyed.
-        static Result<Context::ptr> create(
+        static Result<ContextPtr> create(
             const ContextConfig& config,
-            const Allocator::ptr& allocator = nullptr
+            const AllocatorPtr& allocator = nullptr
         );
 
         static Result<std::vector<LayerProperties>> fetch_available_layers();
@@ -1670,7 +1759,7 @@ namespace bv
             return _config;
         }
 
-        constexpr const Allocator::ptr& allocator() const
+        constexpr const AllocatorPtr& allocator() const
         {
             return _allocator;
         }
@@ -1679,7 +1768,7 @@ namespace bv
         //   so that it doesn't die with the Context because the driver might
         //   still use the allocator even after the instance is destroyed.
         void set_allocator(
-            const Allocator::ptr& allocator
+            const AllocatorPtr& allocator
         );
 
         constexpr VkInstance vk_instance() const
@@ -1689,8 +1778,8 @@ namespace bv
 
         const VkAllocationCallbacks* vk_allocator_ptr() const;
 
-        Result<std::vector<PhysicalDevice::ptr>> fetch_physical_devices(
-            const std::shared_ptr<Surface>& surface = nullptr
+        Result<std::vector<PhysicalDevicePtr>> fetch_physical_devices(
+            const SurfacePtr& surface = nullptr
         );
 
         ~Context();
@@ -1698,14 +1787,14 @@ namespace bv
     protected:
         ContextConfig _config;
 
-        Allocator::ptr _allocator;
+        AllocatorPtr _allocator;
         VkAllocationCallbacks _vk_allocator{};
 
         VkInstance _vk_instance = nullptr;
 
         Context(
             const ContextConfig& config,
-            const Allocator::ptr& allocator
+            const AllocatorPtr& allocator
         );
 
     };
@@ -1715,20 +1804,17 @@ namespace bv
     class DebugMessenger
     {
     public:
-        using ptr = std::shared_ptr<DebugMessenger>;
-        using wptr = std::weak_ptr<DebugMessenger>;
-
         DebugMessenger(const DebugMessenger& other) = delete;
         DebugMessenger(DebugMessenger&& other) = default;
 
-        static Result<DebugMessenger::ptr> create(
-            const Context::ptr& context,
+        static Result<DebugMessengerPtr> create(
+            const ContextPtr& context,
             VkDebugUtilsMessageSeverityFlagsEXT message_severity_filter,
             VkDebugUtilsMessageTypeFlagsEXT message_type_filter,
             const DebugCallback& callback
         );
 
-        constexpr const Context::ptr& context() const
+        constexpr const ContextPtr& context() const
         {
             return _context;
         }
@@ -1758,7 +1844,7 @@ namespace bv
         ~DebugMessenger();
 
     protected:
-        Context::ptr _context;
+        ContextPtr _context;
         VkDebugUtilsMessageSeverityFlagsEXT _message_severity_filter;
         VkDebugUtilsMessageTypeFlagsEXT _message_type_filter;
         DebugCallback _callback;
@@ -1766,7 +1852,7 @@ namespace bv
         VkDebugUtilsMessengerEXT _handle = nullptr;
 
         DebugMessenger(
-            const Context::ptr& context,
+            const ContextPtr& context,
             VkDebugUtilsMessageSeverityFlagsEXT message_severity_filter,
             VkDebugUtilsMessageTypeFlagsEXT message_type_filter,
             const DebugCallback& callback
@@ -1779,9 +1865,6 @@ namespace bv
     class Surface
     {
     public:
-        using ptr = std::shared_ptr<Surface>;
-        using wptr = std::weak_ptr<Surface>;
-
         Surface() = delete;
         Surface(const Surface& other) = delete;
         Surface(Surface&& other) = default;
@@ -1791,12 +1874,12 @@ namespace bv
         // platform or the windowing library they're using.
         // * make sure to enable the required extensions for surfaces. some
         //   windowing libraries (like GLFW) provide the list for you.
-        static Surface::ptr create(
-            const Context::ptr& context,
+        static SurfacePtr create(
+            const ContextPtr& context,
             VkSurfaceKHR handle
         );
 
-        constexpr const Context::ptr& context() const
+        constexpr const ContextPtr& context() const
         {
             return _context;
         }
@@ -1809,12 +1892,12 @@ namespace bv
         ~Surface();
 
     protected:
-        Context::ptr _context;
+        ContextPtr _context;
 
         VkSurfaceKHR _handle;
 
         Surface(
-            const Context::ptr& context,
+            const ContextPtr& context,
             VkSurfaceKHR handle
         );
 
@@ -1824,12 +1907,22 @@ namespace bv
     class Queue
     {
     public:
-        using ptr = std::shared_ptr<Queue>;
-        using wptr = std::weak_ptr<Queue>;
-
         Queue() = delete;
         Queue(const Queue& other) = delete;
         Queue(Queue&& other) = default;
+
+        constexpr const DeviceWPtr& device() const
+        {
+            return _device;
+        }
+        constexpr uint32_t queue_family_index() const
+        {
+            return _queue_family_index;
+        }
+        constexpr uint32_t queue_index() const
+        {
+            return _queue_index;
+        }
 
         constexpr VkQueue handle() const
         {
@@ -1840,26 +1933,34 @@ namespace bv
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkQueueSubmit.html
         Result<> submit(
             const std::vector<VkPipelineStageFlags>& wait_stages,
-            const std::vector<std::shared_ptr<Semaphore>>& wait_semaphores,
-            const std::vector<std::shared_ptr<CommandBuffer>>& command_buffers,
-            const std::vector<std::shared_ptr<Semaphore>>& signal_semaphores,
-            const std::shared_ptr<Fence>& signal_fence = nullptr
+            const std::vector<SemaphorePtr>& wait_semaphores,
+            const std::vector<CommandBufferPtr>& command_buffers,
+            const std::vector<SemaphorePtr>& signal_semaphores,
+            const FencePtr& signal_fence = nullptr
         );
 
         // provided by VK_KHR_swapchain
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentInfoKHR.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkQueuePresentKHR.html
         Result<> present(
-            const std::vector<std::shared_ptr<Semaphore>>& wait_semaphores,
-            const std::shared_ptr<Swapchain>& swapchain,
+            const std::vector<SemaphorePtr>& wait_semaphores,
+            const SwapchainPtr& swapchain,
             uint32_t image_index,
             ApiResult* out_api_result = nullptr
         );
 
     protected:
+        DeviceWPtr _device;
+        uint32_t _queue_family_index;
+        uint32_t _queue_index;
         VkQueue _handle;
 
-        Queue(VkQueue handle);
+        Queue(
+            const DeviceWPtr& device,
+            uint32_t queue_family_index,
+            uint32_t queue_index,
+            VkQueue handle
+        );
 
     };
 
@@ -1867,25 +1968,22 @@ namespace bv
     class Device
     {
     public:
-        using ptr = std::shared_ptr<Device>;
-        using wptr = std::weak_ptr<Device>;
-
         Device() = delete;
         Device(const Device& other) = delete;
         Device(Device&& other) = default;
 
-        static Result<Device::ptr> create(
-            const Context::ptr& context,
-            const PhysicalDevice::ptr& physical_device,
+        static Result<DevicePtr> create(
+            const ContextPtr& context,
+            const PhysicalDevicePtr& physical_device,
             const DeviceConfig& config
         );
 
-        constexpr const Context::ptr& context() const
+        constexpr const ContextPtr& context() const
         {
             return _context;
         }
 
-        constexpr const PhysicalDevice::ptr& physical_device() const
+        constexpr const PhysicalDevicePtr& physical_device() const
         {
             return _physical_device;
         }
@@ -1900,7 +1998,8 @@ namespace bv
             return _handle;
         }
 
-        Queue::ptr retrieve_queue(
+        static QueuePtr retrieve_queue(
+            const DevicePtr& device,
             uint32_t queue_family_index,
             uint32_t queue_index
         );
@@ -1910,15 +2009,15 @@ namespace bv
         ~Device();
 
     protected:
-        Context::ptr _context;
-        PhysicalDevice::ptr _physical_device;
+        ContextPtr _context;
+        PhysicalDevicePtr _physical_device;
         DeviceConfig _config;
 
         VkDevice _handle = nullptr;
 
         Device(
-            const Context::ptr& context,
-            const PhysicalDevice::ptr& physical_device,
+            const ContextPtr& context,
+            const PhysicalDevicePtr& physical_device,
             const DeviceConfig& config
         );
 
@@ -1928,9 +2027,6 @@ namespace bv
     class Image
     {
     public:
-        using ptr = std::shared_ptr<Image>;
-        using wptr = std::weak_ptr<Image>;
-
         Image() = delete;
         Image(const Image& other) = delete;
         Image(Image&& other) = default;
@@ -1952,26 +2048,23 @@ namespace bv
     class Swapchain
     {
     public:
-        using ptr = std::shared_ptr<Swapchain>;
-        using wptr = std::weak_ptr<Swapchain>;
-
         Swapchain() = delete;
         Swapchain(const Swapchain& other) = delete;
         Swapchain(Swapchain&& other) = default;
 
-        static Result<Swapchain::ptr> create(
-            const Device::ptr& device,
-            const Surface::ptr& surface,
+        static Result<SwapchainPtr> create(
+            const DevicePtr& device,
+            const SurfacePtr& surface,
             const SwapchainConfig& config,
-            const Swapchain::ptr& old_swapchain = nullptr
+            const SwapchainPtr& old_swapchain = nullptr
         );
 
-        constexpr const Device::ptr& device() const
+        constexpr const DevicePtr& device() const
         {
             return _device;
         }
 
-        constexpr const Surface::ptr& surface() const
+        constexpr const SurfacePtr& surface() const
         {
             return _surface;
         }
@@ -1981,12 +2074,12 @@ namespace bv
             return _config;
         }
 
-        constexpr const Swapchain::ptr& old_swapchain() const
+        constexpr const SwapchainPtr& old_swapchain() const
         {
             return _old_swapchain;
         }
 
-        const std::vector<Image::ptr>& images() const
+        const std::vector<ImagePtr>& images() const
         {
             return _images;
         }
@@ -1997,8 +2090,8 @@ namespace bv
         }
 
         Result<uint32_t> acquire_next_image(
-            const std::shared_ptr<Semaphore>& semaphore = nullptr,
-            const std::shared_ptr<Fence>& fence = nullptr,
+            const SemaphorePtr& semaphore = nullptr,
+            const FencePtr& fence = nullptr,
             uint64_t timeout = UINT64_MAX,
             ApiResult* out_api_result = nullptr
         );
@@ -2006,20 +2099,20 @@ namespace bv
         ~Swapchain();
 
     protected:
-        Device::ptr _device;
-        Surface::ptr _surface;
+        DevicePtr _device;
+        SurfacePtr _surface;
         SwapchainConfig _config;
-        Swapchain::ptr _old_swapchain;
+        SwapchainPtr _old_swapchain;
 
         VkSwapchainKHR _handle = nullptr;
 
-        std::vector<Image::ptr> _images;
+        std::vector<ImagePtr> _images;
 
         Swapchain(
-            const Device::ptr& device,
-            const Surface::ptr& surface,
+            const DevicePtr& device,
+            const SurfacePtr& surface,
             const SwapchainConfig& config,
-            const Swapchain::ptr& old_swapchain = nullptr
+            const SwapchainPtr& old_swapchain = nullptr
         );
 
     };
@@ -2028,25 +2121,22 @@ namespace bv
     class ImageView
     {
     public:
-        using ptr = std::shared_ptr<ImageView>;
-        using wptr = std::weak_ptr<ImageView>;
-
         ImageView() = delete;
         ImageView(const ImageView& other) = delete;
         ImageView(ImageView&& other) = default;
 
-        static Result<ImageView::ptr> create(
-            const Device::ptr& device,
-            const Image::ptr& image,
+        static Result<ImageViewPtr> create(
+            const DevicePtr& device,
+            const ImagePtr& image,
             const ImageViewConfig& config
         );
 
-        constexpr const Device::ptr& device() const
+        constexpr const DevicePtr& device() const
         {
             return _device;
         }
 
-        constexpr const Image::ptr& image() const
+        constexpr const ImagePtr& image() const
         {
             return _image;
         }
@@ -2064,15 +2154,15 @@ namespace bv
         ~ImageView();
 
     protected:
-        Device::ptr _device;
-        Image::ptr _image;
+        DevicePtr _device;
+        ImagePtr _image;
         ImageViewConfig _config;
 
         VkImageView _handle = nullptr;
 
         ImageView(
-            const Device::ptr& device,
-            const Image::ptr& image,
+            const DevicePtr& device,
+            const ImagePtr& image,
             const ImageViewConfig& config
         );
 
@@ -2083,19 +2173,16 @@ namespace bv
     class ShaderModule
     {
     public:
-        using ptr = std::shared_ptr<ShaderModule>;
-        using wptr = std::weak_ptr<ShaderModule>;
-
         ShaderModule() = delete;
         ShaderModule(const ShaderModule& other) = delete;
         ShaderModule(ShaderModule&& other) = default;
 
-        static Result<ShaderModule::ptr> create(
-            const Device::ptr& device,
+        static Result<ShaderModulePtr> create(
+            const DevicePtr& device,
             const std::vector<uint8_t>& code
         );
 
-        constexpr const Device::ptr& device() const
+        constexpr const DevicePtr& device() const
         {
             return _device;
         }
@@ -2108,11 +2195,11 @@ namespace bv
         ~ShaderModule();
 
     protected:
-        Device::ptr _device;
+        DevicePtr _device;
 
         VkShaderModule _handle = nullptr;
 
-        ShaderModule(const Device::ptr& device);
+        ShaderModule(const DevicePtr& device);
 
     };
 
@@ -2120,19 +2207,16 @@ namespace bv
     class Sampler
     {
     public:
-        using ptr = std::shared_ptr<Sampler>;
-        using wptr = std::weak_ptr<Sampler>;
-
         Sampler() = delete;
         Sampler(const Sampler& other) = delete;
         Sampler(Sampler&& other) = default;
 
-        static Result<Sampler::ptr> create(
-            const Device::ptr& device,
+        static Result<SamplerPtr> create(
+            const DevicePtr& device,
             const SamplerConfig& config
         );
 
-        constexpr const Device::ptr& device() const
+        constexpr const DevicePtr& device() const
         {
             return _device;
         }
@@ -2150,13 +2234,13 @@ namespace bv
         ~Sampler();
 
     protected:
-        Device::ptr _device;
+        DevicePtr _device;
         SamplerConfig _config;
 
         VkSampler _handle = nullptr;
 
         Sampler(
-            const Device::ptr& device,
+            const DevicePtr& device,
             const SamplerConfig& config
         );
 
@@ -2166,19 +2250,16 @@ namespace bv
     class DescriptorSetLayout
     {
     public:
-        using ptr = std::shared_ptr<DescriptorSetLayout>;
-        using wptr = std::weak_ptr<DescriptorSetLayout>;
-
         DescriptorSetLayout() = delete;
         DescriptorSetLayout(const DescriptorSetLayout& other) = delete;
         DescriptorSetLayout(DescriptorSetLayout&& other) = default;
 
-        static Result<DescriptorSetLayout::ptr> create(
-            const Device::ptr& device,
+        static Result<DescriptorSetLayoutPtr> create(
+            const DevicePtr& device,
             const DescriptorSetLayoutConfig& config
         );
 
-        constexpr const Device::ptr& device() const
+        constexpr const DevicePtr& device() const
         {
             return _device;
         }
@@ -2196,13 +2277,13 @@ namespace bv
         ~DescriptorSetLayout();
 
     protected:
-        Device::ptr _device;
+        DevicePtr _device;
         DescriptorSetLayoutConfig _config;
 
         VkDescriptorSetLayout _handle = nullptr;
 
         DescriptorSetLayout(
-            const Device::ptr& device,
+            const DevicePtr& device,
             const DescriptorSetLayoutConfig& config
         );
 
@@ -2212,19 +2293,16 @@ namespace bv
     class PipelineLayout
     {
     public:
-        using ptr = std::shared_ptr<PipelineLayout>;
-        using wptr = std::weak_ptr<PipelineLayout>;
-
         PipelineLayout() = delete;
         PipelineLayout(const PipelineLayout& other) = delete;
         PipelineLayout(PipelineLayout&& other) = default;
 
-        static Result<PipelineLayout::ptr> create(
-            const Device::ptr& device,
+        static Result<PipelineLayoutPtr> create(
+            const DevicePtr& device,
             const PipelineLayoutConfig& config
         );
 
-        constexpr const Device::ptr& device() const
+        constexpr const DevicePtr& device() const
         {
             return _device;
         }
@@ -2242,13 +2320,13 @@ namespace bv
         ~PipelineLayout();
 
     protected:
-        Device::ptr _device;
+        DevicePtr _device;
         PipelineLayoutConfig _config;
 
         VkPipelineLayout _handle = nullptr;
 
         PipelineLayout(
-            const Device::ptr& device,
+            const DevicePtr& device,
             const PipelineLayoutConfig& config
         );
 
@@ -2258,19 +2336,16 @@ namespace bv
     class RenderPass
     {
     public:
-        using ptr = std::shared_ptr<RenderPass>;
-        using wptr = std::weak_ptr<RenderPass>;
-
         RenderPass() = delete;
         RenderPass(const RenderPass& other) = delete;
         RenderPass(RenderPass&& other) = default;
 
-        static Result<RenderPass::ptr> create(
-            const Device::ptr& device,
+        static Result<RenderPassPtr> create(
+            const DevicePtr& device,
             const RenderPassConfig& config
         );
 
-        constexpr const Device::ptr& device() const
+        constexpr const DevicePtr& device() const
         {
             return _device;
         }
@@ -2288,13 +2363,13 @@ namespace bv
         ~RenderPass();
 
     protected:
-        Device::ptr _device;
+        DevicePtr _device;
         RenderPassConfig _config;
 
         VkRenderPass _handle = nullptr;
 
         RenderPass(
-            const Device::ptr& device,
+            const DevicePtr& device,
             const RenderPassConfig& config
         );
 
@@ -2305,19 +2380,16 @@ namespace bv
     class GraphicsPipeline
     {
     public:
-        using ptr = std::shared_ptr<GraphicsPipeline>;
-        using wptr = std::weak_ptr<GraphicsPipeline>;
-
         GraphicsPipeline() = delete;
         GraphicsPipeline(const GraphicsPipeline& other) = delete;
         GraphicsPipeline(GraphicsPipeline&& other) = default;
 
-        static Result<GraphicsPipeline::ptr> create(
-            const Device::ptr& device,
+        static Result<GraphicsPipelinePtr> create(
+            const DevicePtr& device,
             const GraphicsPipelineConfig& config
         );
 
-        constexpr const Device::ptr& device() const
+        constexpr const DevicePtr& device() const
         {
             return _device;
         }
@@ -2335,13 +2407,13 @@ namespace bv
         ~GraphicsPipeline();
 
     protected:
-        Device::ptr _device;
+        DevicePtr _device;
         GraphicsPipelineConfig _config;
 
         VkPipeline _handle = nullptr;
 
         GraphicsPipeline(
-            const Device::ptr& device,
+            const DevicePtr& device,
             const GraphicsPipelineConfig& config
         );
 
@@ -2351,19 +2423,16 @@ namespace bv
     class Framebuffer
     {
     public:
-        using ptr = std::shared_ptr<Framebuffer>;
-        using wptr = std::weak_ptr<Framebuffer>;
-
         Framebuffer() = delete;
         Framebuffer(const Framebuffer& other) = delete;
         Framebuffer(Framebuffer&& other) = default;
 
-        static Result<Framebuffer::ptr> create(
-            const Device::ptr& device,
+        static Result<FramebufferPtr> create(
+            const DevicePtr& device,
             const FramebufferConfig& config
         );
 
-        constexpr const Device::ptr& device() const
+        constexpr const DevicePtr& device() const
         {
             return _device;
         }
@@ -2381,13 +2450,13 @@ namespace bv
         ~Framebuffer();
 
     protected:
-        Device::ptr _device;
+        DevicePtr _device;
         FramebufferConfig _config;
 
         VkFramebuffer _handle = nullptr;
 
         Framebuffer(
-            const Device::ptr& device,
+            const DevicePtr& device,
             const FramebufferConfig& config
         );
 
@@ -2397,12 +2466,14 @@ namespace bv
     class CommandBuffer
     {
     public:
-        using ptr = std::shared_ptr<CommandBuffer>;
-        using wptr = std::weak_ptr<CommandBuffer>;
-
         CommandBuffer() = delete;
         CommandBuffer(const CommandBuffer& other) = delete;
         CommandBuffer(CommandBuffer&& other) = default;
+
+        constexpr const CommandPoolWPtr& pool() const
+        {
+            return _pool;
+        }
 
         constexpr VkCommandBuffer handle() const
         {
@@ -2421,10 +2492,16 @@ namespace bv
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEndCommandBuffer.html
         Result<> end();
 
+        ~CommandBuffer();
+
     protected:
+        CommandPoolWPtr _pool;
         VkCommandBuffer _handle;
 
-        CommandBuffer(VkCommandBuffer handle);
+        CommandBuffer(
+            const CommandPoolWPtr& pool,
+            VkCommandBuffer handle
+        );
 
     };
 
@@ -2432,19 +2509,16 @@ namespace bv
     class CommandPool
     {
     public:
-        using ptr = std::shared_ptr<CommandPool>;
-        using wptr = std::weak_ptr<CommandPool>;
-
         CommandPool() = delete;
         CommandPool(const CommandPool& other) = delete;
         CommandPool(CommandPool&& other) = default;
 
-        static Result<CommandPool::ptr> create(
-            const Device::ptr& device,
+        static Result<CommandPoolPtr> create(
+            const DevicePtr& device,
             const CommandPoolConfig& config
         );
 
-        constexpr const Device::ptr& device() const
+        constexpr const DevicePtr& device() const
         {
             return _device;
         }
@@ -2461,11 +2535,15 @@ namespace bv
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBufferAllocateInfo.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAllocateCommandBuffers.html
-        Result<CommandBuffer::ptr> allocate_buffer(VkCommandBufferLevel level);
+        static Result<CommandBufferPtr> allocate_buffer(
+            const CommandPoolPtr& pool,
+            VkCommandBufferLevel level
+        );
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBufferAllocateInfo.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAllocateCommandBuffers.html
-        Result<std::vector<CommandBuffer::ptr>> allocate_buffers(
+        static Result<std::vector<CommandBufferPtr>> allocate_buffers(
+            const CommandPoolPtr& pool,
             VkCommandBufferLevel level,
             uint32_t count
         );
@@ -2473,13 +2551,13 @@ namespace bv
         ~CommandPool();
 
     protected:
-        Device::ptr _device;
+        DevicePtr _device;
         CommandPoolConfig _config;
 
         VkCommandPool _handle = nullptr;
 
         CommandPool(
-            const Device::ptr& device,
+            const DevicePtr& device,
             const CommandPoolConfig& config
         );
 
@@ -2489,16 +2567,13 @@ namespace bv
     class Semaphore
     {
     public:
-        using ptr = std::shared_ptr<Semaphore>;
-        using wptr = std::weak_ptr<Semaphore>;
-
         Semaphore() = delete;
         Semaphore(const Semaphore& other) = delete;
         Semaphore(Semaphore&& other) = default;
 
-        static Result<Semaphore::ptr> create(const Device::ptr& device);
+        static Result<SemaphorePtr> create(const DevicePtr& device);
 
-        constexpr const Device::ptr& device() const
+        constexpr const DevicePtr& device() const
         {
             return _device;
         }
@@ -2511,11 +2586,11 @@ namespace bv
         ~Semaphore();
 
     protected:
-        Device::ptr _device;
+        DevicePtr _device;
 
         VkSemaphore _handle = nullptr;
 
-        Semaphore(const Device::ptr& device);
+        Semaphore(const DevicePtr& device);
 
     };
 
@@ -2523,19 +2598,16 @@ namespace bv
     class Fence
     {
     public:
-        using ptr = std::shared_ptr<Fence>;
-        using wptr = std::weak_ptr<Fence>;
-
         Fence() = delete;
         Fence(const Fence& other) = delete;
         Fence(Fence&& other) = default;
 
-        static Result<Fence::ptr> create(
-            const Device::ptr& device,
+        static Result<FencePtr> create(
+            const DevicePtr& device,
             VkFenceCreateFlags flags
         );
 
-        constexpr const Device::ptr& device() const
+        constexpr const DevicePtr& device() const
         {
             return _device;
         }
@@ -2551,11 +2623,118 @@ namespace bv
         ~Fence();
 
     protected:
-        Device::ptr _device;
+        DevicePtr _device;
 
         VkFence _handle = nullptr;
 
-        Fence(const Device::ptr& device);
+        Fence(const DevicePtr& device);
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBuffer.html
+    class Buffer
+    {
+    public:
+        Buffer() = delete;
+        Buffer(const Buffer& other) = delete;
+        Buffer(Buffer&& other) = default;
+
+        static Result<BufferPtr> create(
+            const DevicePtr& device,
+            const BufferConfig& config
+        );
+
+        constexpr const DevicePtr& device() const
+        {
+            return _device;
+        }
+
+        constexpr const BufferConfig& config() const
+        {
+            return _config;
+        }
+
+        constexpr const MemoryRequirements& memory_requirements() const
+        {
+            return _memory_requirements;
+        }
+
+        constexpr VkBuffer handle() const
+        {
+            return _handle;
+        }
+
+        Result<> bind_memory(
+            const DeviceMemoryPtr& memory,
+            VkDeviceSize memory_offset
+        );
+
+        ~Buffer();
+
+    protected:
+        DevicePtr _device;
+        BufferConfig _config;
+
+        MemoryRequirements _memory_requirements{};
+
+        VkBuffer _handle = nullptr;
+
+        Buffer(
+            const DevicePtr& device,
+            const BufferConfig& config
+        );
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceMemory.html
+    class DeviceMemory
+    {
+    public:
+        DeviceMemory() = delete;
+        DeviceMemory(const DeviceMemory& other) = delete;
+        DeviceMemory(DeviceMemory&& other) = default;
+
+        static Result<DeviceMemoryPtr> allocate(
+            const DevicePtr& device,
+            const DeviceMemoryConfig& config
+        );
+
+        constexpr const DeviceWPtr& device() const
+        {
+            return _device;
+        }
+
+        constexpr const DeviceMemoryConfig& config() const
+        {
+            return _config;
+        }
+
+        constexpr VkDeviceMemory handle() const
+        {
+            return _handle;
+        }
+
+        Result<void*> map(VkDeviceSize offset, VkDeviceSize size);
+        void unmap();
+
+        Result<> flush_mapped_range(VkDeviceSize offset, VkDeviceSize size);
+        Result<> invalidate_mapped_range(
+            VkDeviceSize offset,
+            VkDeviceSize size
+        );
+
+        ~DeviceMemory();
+
+    protected:
+        DeviceWPtr _device;
+        DeviceMemoryConfig _config;
+
+        VkDeviceMemory _handle = nullptr;
+
+        DeviceMemory(
+            const DeviceWPtr& device,
+            const DeviceMemoryConfig& config
+        );
 
     };
 
