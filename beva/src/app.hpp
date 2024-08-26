@@ -66,6 +66,7 @@ namespace beva_demo
         bv::GraphicsPipelinePtr graphics_pipeline = nullptr;
         std::vector<bv::FramebufferPtr> swapchain_framebufs;
         bv::CommandPoolPtr cmd_pool = nullptr;
+        bv::CommandPoolPtr transfer_cmd_pool = nullptr;
 
         bv::BufferPtr vertex_buf = nullptr;
         bv::DeviceMemoryPtr vertex_buf_mem = nullptr;
@@ -97,24 +98,39 @@ namespace beva_demo
         void create_render_pass();
         void create_graphics_pipeline();
         void create_framebuffers();
-        void create_command_pool();
+        void create_command_pools();
         void create_vertex_buffer();
         void create_command_buffers();
         void create_sync_objects();
+
+        void draw_frame();
+
+        void cleanup_swapchain();
+        void recreate_swapchain();
 
         uint32_t find_memory_type_idx(
             uint32_t supported_type_bits,
             VkMemoryPropertyFlags required_properties
         );
 
-        void draw_frame();
+        void create_buffer(
+            VkDeviceSize size,
+            VkBufferUsageFlags usage,
+            VkMemoryPropertyFlags properties,
+            bv::BufferPtr& out_buffer,
+            bv::DeviceMemoryPtr& out_buffer_memory
+        );
+
+        void copy_buffer(
+            bv::BufferPtr src,
+            bv::BufferPtr dst,
+            VkDeviceSize size
+        );
+
         void record_command_buffer(
             const bv::CommandBufferPtr& cmd_buf,
             uint32_t img_idx
         );
-
-        void cleanup_swapchain();
-        void recreate_swapchain();
 
         friend void glfw_framebuf_resize_callback(
             GLFWwindow* window,

@@ -72,7 +72,7 @@ namespace beva_demo
         create_render_pass();
         create_graphics_pipeline();
         create_framebuffers();
-        create_command_pool();
+        create_command_pools();
         create_vertex_buffer();
         create_command_buffers();
         create_sync_objects();
@@ -111,6 +111,7 @@ namespace beva_demo
         semaphs_render_finished.clear();
         semaphs_image_available.clear();
 
+        transfer_cmd_pool = nullptr;
         cmd_pool = nullptr;
 
         device = nullptr;
@@ -241,7 +242,8 @@ namespace beva_demo
         {
             throw std::runtime_error(bv::Error(
                 "failed to create window surface",
-                vk_result
+                (bv::ApiResult)vk_result,
+                false
             ).to_string().c_str());
         }
         surface = bv::Surface::create(context, vk_surface);
@@ -748,67 +750,63 @@ namespace beva_demo
         }
     }
 
-    void App::create_command_pool()
+    void App::create_command_pools()
     {
-        auto cmd_pool_result = bv::CommandPool::create(
+        auto pool_result = bv::CommandPool::create(
             device,
             {
                 .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
                 .queue_family_index = graphics_family_idx
             }
         );
-        CHECK_BV_RESULT(cmd_pool_result, "create command pool");
-        cmd_pool = cmd_pool_result.value();
+        CHECK_BV_RESULT(pool_result, "create command pool");
+        cmd_pool = pool_result.value();
+
+        auto transfer_pool_result = bv::CommandPool::create(
+            device,
+            {
+                .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
+                .queue_family_index = graphics_family_idx
+            }
+        );
+        CHECK_BV_RESULT(transfer_pool_result, "create transfer command pool");
+        transfer_cmd_pool = transfer_pool_result.value();
     }
 
     void App::create_vertex_buffer()
     {
-        // create buffer
-        auto vertex_buf_result = bv::Buffer::create(
-            device,
-            {
-                .flags = 0,
-                .size = sizeof(vertices[0]) * vertices.size(),
-                .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                .sharing_mode = VK_SHARING_MODE_EXCLUSIVE,
-                .queue_family_indices = {}
-            }
-        );
-        CHECK_BV_RESULT(vertex_buf_result, "create vertex buffer");
-        vertex_buf = vertex_buf_result.value();
+        VkDeviceSize size = sizeof(vertices[0]) * vertices.size();
 
-        // create memory
-        uint32_t memory_type_idx = find_memory_type_idx(
-            vertex_buf->memory_requirements().memory_type_bits,
+        bv::BufferPtr staging_buf;
+        bv::DeviceMemoryPtr staging_buf_mem;
+        create_buffer(
+            size,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-            | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-        );
-        auto vertex_buf_mem_result = bv::DeviceMemory::allocate(
-            device,
-            {
-                .allocation_size = vertex_buf->memory_requirements().size,
-                .memory_type_index = memory_type_idx
-            }
-        );
-        CHECK_BV_RESULT(vertex_buf_mem_result, "allocate vertex buffer memory");
-        vertex_buf_mem = vertex_buf_mem_result.value();
+            | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 
-        // bind memory
-        auto bind_result = vertex_buf->bind_memory(vertex_buf_mem, 0);
-        CHECK_BV_RESULT(bind_result, "bind vertex buffer memory");
+            staging_buf,
+            staging_buf_mem
+        );
 
-        // map memory and copy data
-        auto map_result = vertex_buf_mem->map(0, vertex_buf->config().size);
-        CHECK_BV_RESULT(map_result, "map vertex buffer memory");
-        auto mapped_data = map_result.value();
-        {
-            std::copy(
-                vertices.data(),
-                vertices.data() + vertices.size(),
-                (Vertex*)mapped_data
-            );
-        }
-        vertex_buf_mem->unmap();
+        auto upload_result = staging_buf_mem->upload(
+            (void*)vertices.data(),
+            size
+        );
+        CHECK_BV_RESULT(upload_result, "upload vertex data");
+
+        create_buffer(
+            size,
+
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT
+            | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            vertex_buf,
+            vertex_buf_mem
+        );
+        copy_buffer(staging_buf, vertex_buf, size);
     }
 
     void App::create_command_buffers()
@@ -841,25 +839,6 @@ namespace beva_demo
             CHECK_BV_RESULT(fence_result, "create fence");
             fences_in_flight.push_back(fence_result.value());
         }
-    }
-
-    uint32_t App::find_memory_type_idx(
-        uint32_t supported_type_bits,
-        VkMemoryPropertyFlags required_properties
-    )
-    {
-        const auto& mem_props = physical_device->memory_properties();
-        for (uint32_t i = 0; i < mem_props.memory_types.size(); i++)
-        {
-            bool has_required_properties =
-                (required_properties & mem_props.memory_types[i].property_flags)
-                == required_properties;
-            if ((supported_type_bits & (1 << i)) && has_required_properties)
-            {
-                return i;
-            }
-        }
-        throw std::runtime_error("failed to find a suitable memory type");
     }
 
     void App::draw_frame()
@@ -930,6 +909,133 @@ namespace beva_demo
         frame_idx = (frame_idx + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
+    void App::cleanup_swapchain()
+    {
+        swapchain_framebufs.clear();
+        swapchain_imgviews.clear();
+        swapchain = nullptr;
+    }
+
+    void App::recreate_swapchain()
+    {
+        int width = 0, height = 0;
+        glfwGetFramebufferSize(window, &width, &height);
+        while (width == 0 || height == 0)
+        {
+            glfwGetFramebufferSize(window, &width, &height);
+            glfwWaitEvents();
+        }
+
+        auto result = device->wait_idle();
+        CHECK_BV_RESULT(result, "wait for device idle");
+
+        cleanup_swapchain();
+        create_swapchain();
+        create_framebuffers();
+    }
+
+    uint32_t App::find_memory_type_idx(
+        uint32_t supported_type_bits,
+        VkMemoryPropertyFlags required_properties
+    )
+    {
+        const auto& mem_props = physical_device->memory_properties();
+        for (uint32_t i = 0; i < mem_props.memory_types.size(); i++)
+        {
+            bool has_required_properties =
+                (required_properties & mem_props.memory_types[i].property_flags)
+                == required_properties;
+            if ((supported_type_bits & (1 << i)) && has_required_properties)
+            {
+                return i;
+            }
+        }
+        throw std::runtime_error("failed to find a suitable memory type");
+    }
+
+    void App::create_buffer(
+        VkDeviceSize size,
+        VkBufferUsageFlags usage,
+        VkMemoryPropertyFlags properties,
+        bv::BufferPtr& out_buffer,
+        bv::DeviceMemoryPtr& out_buffer_memory
+    )
+    {
+        // create buffer
+        auto buf_result = bv::Buffer::create(
+            device,
+            {
+                .flags = 0,
+                .size = size,
+                .usage = usage,
+                .sharing_mode = VK_SHARING_MODE_EXCLUSIVE,
+                .queue_family_indices = {}
+            }
+        );
+        CHECK_BV_RESULT(buf_result, "create buffer");
+        out_buffer = buf_result.value();
+
+        // create memory
+        uint32_t memory_type_idx = find_memory_type_idx(
+            out_buffer->memory_requirements().memory_type_bits,
+            properties
+        );
+        auto buf_mem_result = bv::DeviceMemory::allocate(
+            device,
+            {
+                .allocation_size = out_buffer->memory_requirements().size,
+                .memory_type_index = memory_type_idx
+            }
+        );
+        CHECK_BV_RESULT(buf_mem_result, "allocate buffer memory");
+        out_buffer_memory = buf_mem_result.value();
+
+        // bind memory
+        auto bind_result = out_buffer->bind_memory(out_buffer_memory, 0);
+        CHECK_BV_RESULT(bind_result, "bind buffer memory");
+    }
+
+    void App::copy_buffer(
+        bv::BufferPtr src,
+        bv::BufferPtr dst,
+        VkDeviceSize size
+    )
+    {
+        auto transfer_cmd_buf_result = bv::CommandPool::allocate_buffer(
+            transfer_cmd_pool,
+            VK_COMMAND_BUFFER_LEVEL_PRIMARY
+        );
+        CHECK_BV_RESULT(transfer_cmd_buf_result, "allocate command buffer");
+        auto transfer_cmd_buf = transfer_cmd_buf_result.value();
+
+        auto result = transfer_cmd_buf->begin(
+            VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+        );
+        CHECK_BV_RESULT(result, "begin command buffer");
+
+        VkBufferCopy copy_region{
+            .srcOffset = 0,
+            .dstOffset = 0,
+            .size = size
+        };
+        vkCmdCopyBuffer(
+            transfer_cmd_buf->handle(),
+            src->handle(),
+            dst->handle(),
+            1,
+            &copy_region
+        );
+
+        result = transfer_cmd_buf->end();
+        CHECK_BV_RESULT(result, "end command buffer");
+
+        result = graphics_queue->submit({}, {}, { transfer_cmd_buf }, {});
+        CHECK_BV_RESULT(result, "submit command buffer");
+
+        result = graphics_queue->wait_idle();
+        CHECK_BV_RESULT(result, "wait for queue idle");
+    }
+
     void App::record_command_buffer(
         const bv::CommandBufferPtr& cmd_buf,
         uint32_t img_idx
@@ -995,31 +1101,6 @@ namespace beva_demo
 
         auto end_result = cmd_buf->end();
         CHECK_BV_RESULT(end_result, "end recording command buffer");
-    }
-
-    void App::cleanup_swapchain()
-    {
-        swapchain_framebufs.clear();
-        swapchain_imgviews.clear();
-        swapchain = nullptr;
-    }
-
-    void App::recreate_swapchain()
-    {
-        int width = 0, height = 0;
-        glfwGetFramebufferSize(window, &width, &height);
-        while (width == 0 || height == 0)
-        {
-            glfwGetFramebufferSize(window, &width, &height);
-            glfwWaitEvents();
-        }
-
-        auto result = device->wait_idle();
-        CHECK_BV_RESULT(result, "wait for device idle");
-
-        cleanup_swapchain();
-        create_swapchain();
-        create_framebuffers();
     }
 
     static std::vector<uint8_t> read_file(const std::string& filename)

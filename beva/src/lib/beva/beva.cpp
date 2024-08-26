@@ -1644,38 +1644,24 @@ namespace bv
 
     Error::Error()
         : _message("no error information provided"),
-        _api_result(std::nullopt)
+        _api_result(std::nullopt),
+        print_api_result(false)
     {}
 
-    Error::Error(std::string message)
+    Error::Error(
+        std::string message,
+        const std::optional<ApiResult>& api_result,
+        bool api_result_already_embedded_in_message
+    )
         : _message(std::move(message)),
-        _api_result(std::nullopt)
-    {}
-
-    Error::Error(ApiResult api_result)
-        : _message(),
-        _api_result(api_result)
-    {}
-
-    Error::Error(std::string message, ApiResult api_result)
-        : _message(std::move(message)),
-        _api_result(api_result)
-    {}
-
-    Error::Error(VkResult vk_result)
-        : _message(),
-        _api_result((ApiResult)vk_result)
-    {}
-
-    Error::Error(std::string message, VkResult vk_result)
-        : _message(std::move(message)),
-        _api_result((ApiResult)vk_result)
+        _api_result(api_result),
+        print_api_result(!api_result_already_embedded_in_message)
     {}
 
     std::string Error::to_string() const
     {
         std::string s = message();
-        if (api_result().has_value())
+        if (api_result().has_value() && print_api_result)
         {
             if (!message().empty())
             {
@@ -1714,7 +1700,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
 
         std::vector<ExtensionProperties> extensions;
@@ -1769,7 +1755,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
 
         std::vector<SurfaceFormat> surface_formats;
@@ -1793,7 +1779,7 @@ namespace bv
             );
             if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
             {
-                return Error(vk_result);
+                return Error("", (ApiResult)vk_result, false);
             }
 
             surface_formats.reserve(vk_surface_formats.size());
@@ -1824,7 +1810,7 @@ namespace bv
             );
             if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
             {
-                return Error(vk_result);
+                return Error("", (ApiResult)vk_result, false);
             }
         }
 
@@ -1956,7 +1942,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return c;
     }
@@ -1976,7 +1962,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
 
         std::vector<LayerProperties> layers;
@@ -2014,7 +2000,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
 
         std::vector<ExtensionProperties> extensions;
@@ -2056,7 +2042,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
 
         std::vector<PhysicalDevicePtr> physical_devices;
@@ -2121,7 +2107,8 @@ namespace bv
                     {
                         return Error(
                             "failed to check surface support",
-                            vk_result
+                            (ApiResult)vk_result,
+                            false
                         );
                     }
                 }
@@ -2211,10 +2198,13 @@ namespace bv
                 physical_devices.back()->update_swapchain_support(surface);
             if (!update_swapchain_support_result.ok())
             {
+                auto err = update_swapchain_support_result.error();
                 return Error(
                     "failed to fetch swapchain support details for a physical "
                     "device: "
-                    + update_swapchain_support_result.error().to_string()
+                    + err.to_string(),
+                    err.api_result(),
+                    true
                 );
             }
         }
@@ -2267,7 +2257,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return messenger;
     }
@@ -2367,7 +2357,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return Result();
     }
@@ -2408,7 +2398,17 @@ namespace bv
         }
         if (vk_result != VK_SUCCESS && vk_result != VK_SUBOPTIMAL_KHR)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
+        }
+        return Result();
+    }
+
+    Result<> Queue::wait_idle()
+    {
+        VkResult vk_result = vkQueueWaitIdle(handle());
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error("", (ApiResult)vk_result, false);
         }
         return Result();
     }
@@ -2446,7 +2446,9 @@ namespace bv
             {
                 return Error(
                     "there should be the same number of queue priorities as "
-                    "the number of queues to create"
+                    "the number of queues to create",
+                    std::nullopt,
+                    false
                 );
             }
 
@@ -2507,7 +2509,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return device;
     }
@@ -2538,7 +2540,7 @@ namespace bv
         VkResult vk_result = vkDeviceWaitIdle(_handle);
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return Result();
     }
@@ -2614,7 +2616,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
 
         uint32_t actual_image_count;
@@ -2634,7 +2636,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
         {
-            return Error("failed to retrieve images", vk_result);
+            return Error(
+                "failed to retrieve images",
+                (ApiResult)vk_result,
+                false
+            );
         }
 
         sc->_images.reserve(actual_image_count);
@@ -2674,7 +2680,7 @@ namespace bv
         {
             return image_index;
         }
-        return Error(vk_result);
+        return Error("", (ApiResult)vk_result, false);
     }
 
     Swapchain::~Swapchain()
@@ -2731,7 +2737,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return view;
     }
@@ -2789,7 +2795,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return module;
     }
@@ -2848,7 +2854,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return sampler;
     }
@@ -2915,7 +2921,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return layout;
     }
@@ -2986,7 +2992,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return layout;
     }
@@ -3081,7 +3087,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return pass;
     }
@@ -3287,7 +3293,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return pipe;
     }
@@ -3346,7 +3352,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return buf;
     }
@@ -3372,7 +3378,7 @@ namespace bv
         VkResult vk_result = vkResetCommandBuffer(_handle, flags);
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return Result();
     }
@@ -3410,7 +3416,7 @@ namespace bv
         VkResult vk_result = vkBeginCommandBuffer(handle(), &begin_info);
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return Result();
     }
@@ -3420,7 +3426,7 @@ namespace bv
         VkResult vk_result = vkEndCommandBuffer(handle());
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return Result();
     }
@@ -3473,7 +3479,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return pool;
     }
@@ -3499,7 +3505,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return (CommandBufferPtr)std::make_shared<CommandBuffer_public_ctor>(
             (CommandPoolWPtr)pool,
@@ -3529,7 +3535,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
 
         std::vector<CommandBufferPtr> command_buffers(count);
@@ -3577,7 +3583,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return sema;
     }
@@ -3586,7 +3592,7 @@ namespace bv
     {
         vkDestroySemaphore(
             device()->handle(),
-            _handle,
+            handle(),
             device()->context()->vk_allocator_ptr()
         );
     }
@@ -3616,7 +3622,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return fence;
     }
@@ -3632,7 +3638,33 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
+        }
+        return Result();
+    }
+
+    Result<> Fence::wait_multiple(
+        const std::vector<FencePtr>& fences,
+        bool wait_all,
+        uint64_t timeout
+    )
+    {
+        std::vector<VkFence> vk_fences(fences.size());
+        for (size_t i = 0; i < fences.size(); i++)
+        {
+            vk_fences[i] = fences[i]->handle();
+        }
+
+        VkResult vk_result = vkWaitForFences(
+            fences[0]->device()->handle(),
+            vk_fences.size(),
+            vk_fences.data(),
+            wait_all,
+            timeout
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error("", (ApiResult)vk_result, false);
         }
         return Result();
     }
@@ -3646,16 +3678,33 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return Result();
+    }
+
+    Result<bool> Fence::is_signaled() const
+    {
+        VkResult vk_result = vkGetFenceStatus(
+            device()->handle(),
+            handle()
+        );
+        if (vk_result == VK_SUCCESS)
+        {
+            return true;
+        }
+        else if (vk_result == VK_NOT_READY)
+        {
+            return false;
+        }
+        return Error("", (ApiResult)vk_result, false);
     }
 
     Fence::~Fence()
     {
         vkDestroyFence(
             device()->handle(),
-            _handle,
+            handle(),
             device()->context()->vk_allocator_ptr()
         );
     }
@@ -3696,7 +3745,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
 
         VkMemoryRequirements vk_mem_requirements;
@@ -3725,7 +3774,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return Result();
     }
@@ -3768,7 +3817,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return mem;
     }
@@ -3777,7 +3826,11 @@ namespace bv
     {
         if (device().expired())
         {
-            return Error("device shared pointer has expired");
+            return Error(
+                "device shared pointer has expired",
+                std::nullopt,
+                false
+            );
         }
         auto device_locked = device().lock();
 
@@ -3793,7 +3846,7 @@ namespace bv
         if (vk_result != VK_SUCCESS)
         {
             unmap();
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return p;
     }
@@ -3815,7 +3868,11 @@ namespace bv
     {
         if (device().expired())
         {
-            return Error("device shared pointer has expired");
+            return Error(
+                "device shared pointer has expired",
+                std::nullopt,
+                false
+            );
         }
         auto device_locked = device().lock();
 
@@ -3834,7 +3891,7 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
         return Result();
     }
@@ -3846,7 +3903,11 @@ namespace bv
     {
         if (device().expired())
         {
-            return Error("device shared pointer has expired");
+            return Error(
+                "device shared pointer has expired",
+                std::nullopt,
+                false
+            );
         }
         auto device_locked = device().lock();
 
@@ -3865,8 +3926,50 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error(vk_result);
+            return Error("", (ApiResult)vk_result, false);
         }
+        return Result();
+    }
+
+    Result<> DeviceMemory::upload(void* data, VkDeviceSize data_size)
+    {
+        if (data_size > config().allocation_size)
+        {
+            return Error("data is too big", std::nullopt, false);
+        }
+
+        auto map_result = map(0, config().allocation_size);
+        if (!map_result.ok())
+        {
+            return Error(
+                "failed to map memory: " + map_result.error().to_string(),
+                map_result.error().api_result(),
+                true
+            );
+        }
+
+        auto mapped_data = map_result.value();
+        {
+            std::copy(
+                (uint8_t*)data,
+                (uint8_t*)data + data_size,
+                (uint8_t*)mapped_data
+            );
+        }
+
+        auto flush_result = flush_mapped_range(0, VK_WHOLE_SIZE);
+        if (!flush_result.ok())
+        {
+            return Error(
+                "failed to flush mapped memory range: "
+                + flush_result.error().to_string(),
+                flush_result.error().api_result(),
+                true
+            );
+        }
+
+        unmap();
+
         return Result();
     }
 

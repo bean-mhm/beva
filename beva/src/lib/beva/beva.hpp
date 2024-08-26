@@ -1499,11 +1499,12 @@ namespace bv
     {
     public:
         Error();
-        Error(std::string message);
-        Error(ApiResult api_result);
-        Error(std::string message, ApiResult api_result);
-        Error(VkResult vk_result);
-        Error(std::string message, VkResult vk_result);
+
+        Error(
+            std::string message,
+            const std::optional<ApiResult>& api_result,
+            bool api_result_already_embedded_in_message
+        );
 
         constexpr const std::string& message() const
         {
@@ -1520,6 +1521,7 @@ namespace bv
     private:
         std::string _message;
         std::optional<ApiResult> _api_result;
+        bool print_api_result;
 
     };
 
@@ -1948,6 +1950,9 @@ namespace bv
             uint32_t image_index,
             ApiResult* out_api_result = nullptr
         );
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkQueueWaitIdle.html
+        Result<> wait_idle();
 
     protected:
         DeviceWPtr _device;
@@ -2617,8 +2622,23 @@ namespace bv
             return _handle;
         }
 
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkWaitForFences.html
         Result<> wait(uint64_t timeout = UINT64_MAX);
+
+        // all fences must be created within the same device, bad things might
+        // happen otherwise
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkWaitForFences.html
+        static Result<> wait_multiple(
+            const std::vector<FencePtr>& fences,
+            bool wait_all,
+            uint64_t timeout = UINT64_MAX
+        );
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkResetFences.html
         Result<> reset();
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetFenceStatus.html
+        Result<bool> is_signaled() const;
 
         ~Fence();
 
@@ -2714,14 +2734,24 @@ namespace bv
             return _handle;
         }
 
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkMapMemory.html
         Result<void*> map(VkDeviceSize offset, VkDeviceSize size);
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkUnmapMemory.html
         void unmap();
 
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkFlushMappedMemoryRanges.html
         Result<> flush_mapped_range(VkDeviceSize offset, VkDeviceSize size);
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkInvalidateMappedMemoryRanges.html
         Result<> invalidate_mapped_range(
             VkDeviceSize offset,
             VkDeviceSize size
         );
+
+        // map the whole memory, copy the provided data, flush, and unmap.
+        // you should make sure that mapping is possible for this memory.
+        Result<> upload(void* data, VkDeviceSize data_size);
 
         ~DeviceMemory();
 
