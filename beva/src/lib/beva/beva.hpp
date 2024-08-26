@@ -54,6 +54,9 @@ namespace bv
     class Fence;
     class Buffer;
     class DeviceMemory;
+    class DescriptorSet;
+    class DescriptorPool;
+    class BufferView;
 
     // smart pointer type aliases
     BV_DEFINE_SMART_PTR_TYPE_ALIASES(Allocator);
@@ -79,6 +82,9 @@ namespace bv
     BV_DEFINE_SMART_PTR_TYPE_ALIASES(Fence);
     BV_DEFINE_SMART_PTR_TYPE_ALIASES(Buffer);
     BV_DEFINE_SMART_PTR_TYPE_ALIASES(DeviceMemory);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(DescriptorSet);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(DescriptorPool);
+    BV_DEFINE_SMART_PTR_TYPE_ALIASES(BufferView);
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_MAKE_API_VERSION.html
     struct Version
@@ -1491,6 +1497,106 @@ namespace bv
         uint32_t memory_type_index;
     };
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorPoolSize.html
+    struct DescriptorPoolSize
+    {
+        VkDescriptorType type;
+        uint32_t descriptor_count;
+    };
+
+    VkDescriptorPoolSize DescriptorPoolSize_to_vk(
+        const DescriptorPoolSize& pool_size
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorPoolCreateInfo.html
+    struct DescriptorPoolConfig
+    {
+        VkDescriptorPoolCreateFlags flags;
+        uint32_t max_sets;
+        std::vector<DescriptorPoolSize> pool_sizes;
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorImageInfo.html
+    struct DescriptorImageInfo
+    {
+        SamplerPtr sampler;
+        ImageViewPtr image_view;
+        VkImageLayout image_layout;
+    };
+
+    VkDescriptorImageInfo DescriptorImageInfo_to_vk(
+        const DescriptorImageInfo& info,
+        SamplerPtr& waste_sampler,
+        ImageViewPtr& waste_image_view
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorBufferInfo.html
+    struct DescriptorBufferInfo
+    {
+        BufferPtr buffer;
+        VkDeviceSize offset;
+        VkDeviceSize range;
+    };
+
+    VkDescriptorBufferInfo DescriptorBufferInfo_to_vk(
+        const DescriptorBufferInfo& info,
+        BufferPtr& waste_buffer
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkWriteDescriptorSet.html
+    struct WriteDescriptorSet
+    {
+        DescriptorSetPtr dst_set;
+        uint32_t dst_binding;
+        uint32_t dst_array_element;
+        uint32_t descriptor_count;
+        VkDescriptorType descriptor_type;
+        std::vector<DescriptorImageInfo> image_infos;
+        std::vector<DescriptorBufferInfo> buffer_infos;
+        std::vector<BufferViewPtr> texel_buffer_views;
+    };
+
+    VkWriteDescriptorSet WriteDescriptorSet_to_vk(
+        const WriteDescriptorSet& write,
+        DescriptorSetPtr& waste_dst_set,
+
+        std::vector<VkDescriptorImageInfo>& waste_vk_image_infos,
+        std::vector<SamplerPtr>& waste_image_infos_sampler,
+        std::vector<ImageViewPtr>& waste_image_infos_image_view,
+
+        std::vector<VkDescriptorBufferInfo>& waste_vk_buffer_infos,
+        std::vector<BufferPtr>& waste_buffer_infos_buffer,
+
+        std::vector<BufferViewPtr>& waste_texel_buffer_views,
+        std::vector<VkBufferView>& waste_vk_texel_buffer_views
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCopyDescriptorSet.html
+    struct CopyDescriptorSet
+    {
+        DescriptorSetPtr src_set;
+        uint32_t src_binding;
+        uint32_t src_array_element;
+        DescriptorSetPtr dst_set;
+        uint32_t dst_binding;
+        uint32_t dst_array_element;
+        uint32_t descriptor_count;
+    };
+
+    VkCopyDescriptorSet CopyDescriptorSet_to_vk(
+        const CopyDescriptorSet& copy,
+        DescriptorSetPtr& waste_src_set,
+        DescriptorSetPtr& waste_dst_set
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBufferViewCreateInfo.html
+    struct BufferViewConfig
+    {
+        VkFormat format;
+        VkDeviceSize offset;
+        VkDeviceSize range;
+    };
+
 #pragma endregion
 
 #pragma region error handling
@@ -2625,8 +2731,8 @@ namespace bv
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkWaitForFences.html
         Result<> wait(uint64_t timeout = UINT64_MAX);
 
-        // all fences must be created within the same device, bad things might
-        // happen otherwise
+        // all provided fences must be from the same device, bad things might
+        // happen otherwise.
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkWaitForFences.html
         static Result<> wait_multiple(
             const std::vector<FencePtr>& fences,
@@ -2764,6 +2870,155 @@ namespace bv
         DeviceMemory(
             const DeviceWPtr& device,
             const DeviceMemoryConfig& config
+        );
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSet.html
+    class DescriptorSet
+    {
+    public:
+        DescriptorSet() = delete;
+        DescriptorSet(const DescriptorSet& other) = delete;
+        DescriptorSet(DescriptorSet&& other) = default;
+
+        constexpr const DescriptorPoolWPtr& pool() const
+        {
+            return _pool;
+        }
+
+        constexpr VkDescriptorSet handle() const
+        {
+            return _handle;
+        }
+
+        // all provided sets and nested objects must be from the provided
+        // device, bad things might happen otherwise.
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkUpdateDescriptorSets.html
+        static void update_sets(
+            const DevicePtr& device,
+            const std::vector<WriteDescriptorSet>& writes,
+            const std::vector<CopyDescriptorSet>& copies
+        );
+
+        ~DescriptorSet();
+
+    protected:
+        DescriptorPoolWPtr _pool;
+        VkDescriptorSet _handle;
+
+        DescriptorSet(
+            const DescriptorPoolWPtr& pool,
+            VkDescriptorSet handle
+        );
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorPool.html
+    class DescriptorPool
+    {
+    public:
+        DescriptorPool() = delete;
+        DescriptorPool(const DescriptorPool& other) = delete;
+        DescriptorPool(DescriptorPool&& other) = default;
+
+        static Result<DescriptorPoolPtr> create(
+            const DevicePtr& device,
+            const DescriptorPoolConfig& config
+        );
+
+        constexpr const DevicePtr& device() const
+        {
+            return _device;
+        }
+
+        constexpr const DescriptorPoolConfig& config() const
+        {
+            return _config;
+        }
+
+        constexpr VkDescriptorPool handle() const
+        {
+            return _handle;
+        }
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSetAllocateInfo.html
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAllocateDescriptorSets.html
+        static Result<DescriptorSetPtr> allocate_set(
+            const DescriptorPoolPtr& pool,
+            const DescriptorSetLayoutPtr& set_layout
+        );
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSetAllocateInfo.html
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAllocateDescriptorSets.html
+        static Result<std::vector<DescriptorSetPtr>> allocate_sets(
+            const DescriptorPoolPtr& pool,
+            uint32_t count,
+            const std::vector<DescriptorSetLayoutPtr>& set_layouts
+        );
+
+        ~DescriptorPool();
+
+    protected:
+        DevicePtr _device;
+        DescriptorPoolConfig _config;
+
+        VkDescriptorPool _handle = nullptr;
+
+        DescriptorPool(
+            const DevicePtr& device,
+            const DescriptorPoolConfig& config
+        );
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkBufferView.html
+    class BufferView
+    {
+    public:
+        BufferView() = delete;
+        BufferView(const BufferView& other) = delete;
+        BufferView(BufferView&& other) = default;
+
+        static Result<BufferViewPtr> create(
+            const DevicePtr& device,
+            const BufferPtr& buffer,
+            const BufferViewConfig& config
+        );
+
+        constexpr const DevicePtr& device() const
+        {
+            return _device;
+        }
+
+        constexpr const BufferPtr& buffer() const
+        {
+            return _buffer;
+        }
+
+        constexpr const BufferViewConfig& config() const
+        {
+            return _config;
+        }
+
+        constexpr VkBufferView handle() const
+        {
+            return _handle;
+        }
+
+        ~BufferView();
+
+    protected:
+        DevicePtr _device;
+        BufferPtr _buffer;
+        BufferViewConfig _config;
+
+        VkBufferView _handle = nullptr;
+
+        BufferView(
+            const DevicePtr& device,
+            const BufferPtr& buffer,
+            const BufferViewConfig& config
         );
 
     };

@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <array>
+#include <chrono>
 #include <cstdint>
 
 #include "vulkan/vulkan.h"
@@ -12,11 +13,18 @@
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include <glm/vec4.hpp>
-#include <glm/mat4x4.hpp>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 namespace beva_demo
 {
+
+    struct UniformBufferObject
+    {
+        glm::mat4 model;
+        glm::mat4 view;
+        glm::mat4 proj;
+    };
 
     struct Vertex
     {
@@ -64,6 +72,7 @@ namespace beva_demo
         bv::SwapchainPtr swapchain = nullptr;
         std::vector<bv::ImageViewPtr> swapchain_imgviews;
         bv::RenderPassPtr render_pass = nullptr;
+        bv::DescriptorSetLayoutPtr descriptor_set_layout = nullptr;
         bv::PipelineLayoutPtr pipeline_layout = nullptr;
         bv::GraphicsPipelinePtr graphics_pipeline = nullptr;
         std::vector<bv::FramebufferPtr> swapchain_framebufs;
@@ -76,6 +85,13 @@ namespace beva_demo
         bv::BufferPtr index_buf = nullptr;
         bv::DeviceMemoryPtr index_buf_mem = nullptr;
 
+        std::vector<bv::BufferPtr> uniform_bufs;
+        std::vector<bv::DeviceMemoryPtr> uniform_bufs_mem;
+        std::vector<void*> uniform_bufs_mapped;
+
+        bv::DescriptorPoolPtr descriptor_pool = nullptr;
+        std::vector<bv::DescriptorSetPtr> descriptor_sets;
+
         // "per frame" stuff (as in frames in flight)
         std::vector<bv::CommandBufferPtr> cmd_bufs;
         std::vector<bv::SemaphorePtr> semaphs_image_available;
@@ -87,6 +103,8 @@ namespace beva_demo
 
         bool framebuf_resized = false;
         uint32_t frame_idx = 0;
+
+        std::chrono::steady_clock::time_point start_time;
 
         void init();
         void main_loop();
@@ -101,11 +119,15 @@ namespace beva_demo
         void create_logical_device();
         void create_swapchain();
         void create_render_pass();
+        void create_descriptor_set_layout();
         void create_graphics_pipeline();
         void create_framebuffers();
         void create_command_pools();
         void create_vertex_buffer();
         void create_index_buffer();
+        void create_uniform_buffers();
+        void create_descriptor_pool();
+        void create_descriptor_sets();
         void create_command_buffers();
         void create_sync_objects();
 
@@ -137,6 +159,8 @@ namespace beva_demo
             const bv::CommandBufferPtr& cmd_buf,
             uint32_t img_idx
         );
+
+        void update_uniform_buffer(uint32_t frame_idx);
 
         friend void glfw_framebuf_resize_callback(
             GLFWwindow* window,

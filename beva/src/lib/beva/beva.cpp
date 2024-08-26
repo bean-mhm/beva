@@ -51,6 +51,9 @@ namespace bv
     BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Fence);
     BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Buffer);
     BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DeviceMemory);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DescriptorSet);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DescriptorPool);
+    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(BufferView);
 
 #pragma region forward declarations
 
@@ -1642,6 +1645,135 @@ namespace bv
         };
     }
 
+    VkDescriptorPoolSize DescriptorPoolSize_to_vk(
+        const DescriptorPoolSize& pool_size
+    )
+    {
+        return VkDescriptorPoolSize{
+            .type = pool_size.type,
+            .descriptorCount = pool_size.descriptor_count
+        };
+    }
+
+    VkDescriptorImageInfo DescriptorImageInfo_to_vk(
+        const DescriptorImageInfo& info,
+        SamplerPtr& waste_sampler,
+        ImageViewPtr& waste_image_view
+    )
+    {
+        waste_sampler = info.sampler;
+        waste_image_view = info.image_view;
+
+        return VkDescriptorImageInfo{
+            .sampler = waste_sampler->handle(),
+            .imageView = waste_image_view->handle(),
+            .imageLayout = info.image_layout
+        };
+    }
+
+    VkDescriptorBufferInfo DescriptorBufferInfo_to_vk(
+        const DescriptorBufferInfo& info,
+        BufferPtr& waste_buffer
+    )
+    {
+        waste_buffer = info.buffer;
+        return VkDescriptorBufferInfo{
+            .buffer = waste_buffer->handle(),
+            .offset = info.offset,
+            .range = info.range
+        };
+    }
+
+    VkWriteDescriptorSet WriteDescriptorSet_to_vk(
+        const WriteDescriptorSet& write,
+        DescriptorSetPtr& waste_dst_set,
+
+        std::vector<VkDescriptorImageInfo>& waste_vk_image_infos,
+        std::vector<SamplerPtr>& waste_image_infos_sampler,
+        std::vector<ImageViewPtr>& waste_image_infos_image_view,
+
+        std::vector<VkDescriptorBufferInfo>& waste_vk_buffer_infos,
+        std::vector<BufferPtr>& waste_buffer_infos_buffer,
+
+        std::vector<BufferViewPtr>& waste_texel_buffer_views,
+        std::vector<VkBufferView>& waste_vk_texel_buffer_views
+    )
+    {
+        waste_dst_set = write.dst_set;
+
+        waste_vk_image_infos.resize(write.image_infos.size());
+        waste_image_infos_sampler.resize(write.image_infos.size());
+        waste_image_infos_image_view.resize(write.image_infos.size());
+        for (size_t i = 0; i < write.image_infos.size(); i++)
+        {
+            waste_vk_image_infos[i] = DescriptorImageInfo_to_vk(
+                write.image_infos[i],
+                waste_image_infos_sampler[i],
+                waste_image_infos_image_view[i]
+            );
+        }
+
+        waste_vk_buffer_infos.resize(write.buffer_infos.size());
+        waste_buffer_infos_buffer.resize(write.buffer_infos.size());
+        for (size_t i = 0; i < write.buffer_infos.size(); i++)
+        {
+            waste_vk_buffer_infos[i] = DescriptorBufferInfo_to_vk(
+                write.buffer_infos[i],
+                waste_buffer_infos_buffer[i]
+            );
+        }
+
+        waste_texel_buffer_views.resize(write.texel_buffer_views.size());
+        waste_vk_texel_buffer_views.resize(write.texel_buffer_views.size());
+        for (size_t i = 0; i < write.texel_buffer_views.size(); i++)
+        {
+            waste_texel_buffer_views[i] = write.texel_buffer_views[i];
+            waste_vk_texel_buffer_views[i] =
+                write.texel_buffer_views[i]->handle();
+        }
+
+        return VkWriteDescriptorSet{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .pNext = nullptr,
+            .dstSet = waste_dst_set->handle(),
+            .dstBinding = write.dst_binding,
+            .dstArrayElement = write.dst_array_element,
+            .descriptorCount = write.descriptor_count,
+            .descriptorType = write.descriptor_type,
+
+            .pImageInfo = waste_vk_image_infos.empty()
+            ? nullptr : waste_vk_image_infos.data(),
+
+            .pBufferInfo = waste_vk_buffer_infos.empty()
+            ? nullptr : waste_vk_buffer_infos.data(),
+
+            .pTexelBufferView = waste_vk_texel_buffer_views.empty()
+            ? nullptr : waste_vk_texel_buffer_views.data()
+        };
+    }
+
+    VkCopyDescriptorSet CopyDescriptorSet_to_vk(
+        const CopyDescriptorSet& copy,
+        DescriptorSetPtr& waste_src_set,
+        DescriptorSetPtr& waste_dst_set
+    )
+    {
+        waste_src_set = copy.src_set;
+        waste_dst_set = copy.dst_set;
+
+        return VkCopyDescriptorSet{
+            .sType = VK_STRUCTURE_TYPE_COPY_DESCRIPTOR_SET,
+            .pNext = nullptr,
+            .srcSet = waste_src_set->handle(),
+            .srcBinding = copy.src_binding,
+            .srcArrayElement = copy.src_array_element,
+            .dstSet = waste_dst_set->handle(),
+            .dstBinding = copy.dst_binding,
+            .dstArrayElement = copy.dst_array_element,
+            .descriptorCount = copy.descriptor_count
+        };
+    }
+
     Error::Error()
         : _message("no error information provided"),
         _api_result(std::nullopt),
@@ -2438,9 +2570,13 @@ namespace bv
         );
 
         std::vector<VkDeviceQueueCreateInfo> vk_queue_requests;
-        std::vector<std::vector<float>> wastes_priorities;
-        for (const auto& queue_request : device->config().queue_requests)
+        std::vector<std::vector<float>> wastes_priorities(
+            device->config().queue_requests.size()
+        );
+        for (size_t i = 0; i < device->config().queue_requests.size(); i++)
         {
+            const auto& queue_request = device->config().queue_requests[i];
+
             if (queue_request.priorities.size()
                 != queue_request.num_queues_to_create)
             {
@@ -2452,11 +2588,10 @@ namespace bv
                 );
             }
 
-            wastes_priorities.push_back(std::vector<float>());
             vk_queue_requests.push_back(
                 QueueRequest_to_vk(
                     queue_request,
-                    wastes_priorities.back()
+                    wastes_priorities[i]
                 )
             );
         }
@@ -2891,17 +3026,18 @@ namespace bv
             layout->config().bindings.size()
         );
         std::vector<std::vector<SamplerPtr>>
-            wastes_immutable_samplers;
-        std::vector<std::vector<VkSampler>> wastes_vk_immutable_samplers;
+            wastes_immutable_samplers(
+                layout->config().bindings.size()
+            );
+        std::vector<std::vector<VkSampler>> wastes_vk_immutable_samplers(
+            layout->config().bindings.size()
+        );
         for (size_t i = 0; i < layout->config().bindings.size(); i++)
         {
-            wastes_immutable_samplers.push_back({});
-            wastes_vk_immutable_samplers.push_back({});
-
             vk_bindings[i] = DescriptorSetLayoutBinding_to_vk(
                 layout->config().bindings[i],
-                wastes_immutable_samplers.back(),
-                wastes_vk_immutable_samplers.back()
+                wastes_immutable_samplers[i],
+                wastes_vk_immutable_samplers[i]
             );
         }
 
@@ -3034,26 +3170,27 @@ namespace bv
         std::vector<VkSubpassDescription> vk_subpasses(
             pass->config().subpasses.size()
         );
-        std::vector<std::vector<VkAttachmentReference>> wastes_vk_input_attachments;
-        std::vector<std::vector<VkAttachmentReference>> wastes_vk_color_attachments;
-        std::vector<std::vector<VkAttachmentReference>> wastes_vk_resolve_attachments;
-        std::vector<VkAttachmentReference> wastes_vk_depth_stencil_attachment;
-        std::vector<std::vector<uint32_t>> wastes_preserve_attachment_indices;
+        std::vector<std::vector<VkAttachmentReference>>
+            wastes_vk_input_attachments(pass->config().subpasses.size());
+        std::vector<std::vector<VkAttachmentReference>>
+            wastes_vk_color_attachments(pass->config().subpasses.size());
+        std::vector<std::vector<VkAttachmentReference>>
+            wastes_vk_resolve_attachments(pass->config().subpasses.size());
+        std::vector<VkAttachmentReference> wastes_vk_depth_stencil_attachment(
+            pass->config().subpasses.size()
+        );
+        std::vector<std::vector<uint32_t>> wastes_preserve_attachment_indices(
+            pass->config().subpasses.size()
+        );
         for (size_t i = 0; i < pass->config().subpasses.size(); i++)
         {
-            wastes_vk_input_attachments.push_back({});
-            wastes_vk_color_attachments.push_back({});
-            wastes_vk_resolve_attachments.push_back({});
-            wastes_vk_depth_stencil_attachment.push_back({});
-            wastes_preserve_attachment_indices.push_back({});
-
             vk_subpasses[i] = Subpass_to_vk(
                 pass->config().subpasses[i],
-                wastes_vk_input_attachments.back(),
-                wastes_vk_color_attachments.back(),
-                wastes_vk_resolve_attachments.back(),
-                wastes_vk_depth_stencil_attachment.back(),
-                wastes_preserve_attachment_indices.back()
+                wastes_vk_input_attachments[i],
+                wastes_vk_color_attachments[i],
+                wastes_vk_resolve_attachments[i],
+                wastes_vk_depth_stencil_attachment[i],
+                wastes_preserve_attachment_indices[i]
             );
         }
 
@@ -3122,24 +3259,25 @@ namespace bv
         std::vector<VkPipelineShaderStageCreateInfo> vk_stages(
             pipe->config().stages.size()
         );
-        std::vector<ShaderModulePtr> wastes_module;
-        std::vector<VkSpecializationInfo> wastes_vk_specialization_info;
+        std::vector<ShaderModulePtr> wastes_module(
+            pipe->config().stages.size()
+        );
+        std::vector<VkSpecializationInfo> wastes_vk_specialization_info(
+            pipe->config().stages.size()
+        );
         std::vector<std::vector<VkSpecializationMapEntry>>
-            wastes_vk_map_entries;
-        std::vector<std::vector<uint8_t>> wastes_data;
+            wastes_vk_map_entries(pipe->config().stages.size());
+        std::vector<std::vector<uint8_t>> wastes_data(
+            pipe->config().stages.size()
+        );
         for (size_t i = 0; i < pipe->config().stages.size(); i++)
         {
-            wastes_module.push_back(nullptr);
-            wastes_vk_specialization_info.push_back({});
-            wastes_vk_map_entries.push_back({});
-            wastes_data.push_back({});
-
             vk_stages[i] = ShaderStage_to_vk(
                 pipe->config().stages[i],
-                wastes_module.back(),
-                wastes_vk_specialization_info.back(),
-                wastes_vk_map_entries.back(),
-                wastes_data.back()
+                wastes_module[i],
+                wastes_vk_specialization_info[i],
+                wastes_vk_map_entries[i],
+                wastes_data[i]
             );
         }
 
@@ -3649,6 +3787,11 @@ namespace bv
         uint64_t timeout
     )
     {
+        if (fences.empty())
+        {
+            return Result();
+        }
+
         std::vector<VkFence> vk_fences(fences.size());
         for (size_t i = 0; i < fences.size(); i++)
         {
@@ -3992,6 +4135,252 @@ namespace bv
         const DeviceMemoryConfig& config
     )
         : _device(device), _config(config)
+    {}
+
+    void DescriptorSet::update_sets(
+        const DevicePtr& device,
+        const std::vector<WriteDescriptorSet>& writes,
+        const std::vector<CopyDescriptorSet>& copies
+    )
+    {
+        if (writes.empty() && copies.empty())
+        {
+            return;
+        }
+
+        std::vector<VkWriteDescriptorSet> vk_writes(writes.size());
+        std::vector<DescriptorSetPtr> wastes_dst_set(writes.size());
+        std::vector<std::vector<VkDescriptorImageInfo>> wastes_vk_image_infos(
+            writes.size()
+        );
+        std::vector<std::vector<SamplerPtr>> wastes_image_infos_sampler(
+            writes.size()
+        );
+        std::vector<std::vector<ImageViewPtr>> wastes_image_infos_image_view(
+            writes.size()
+        );
+        std::vector<std::vector<VkDescriptorBufferInfo>> wastes_vk_buffer_infos(
+            writes.size()
+        );
+        std::vector<std::vector<BufferPtr>> wastes_buffer_infos_buffer(
+            writes.size()
+        );
+        std::vector<std::vector<BufferViewPtr>> wastes_texel_buffer_views(
+            writes.size()
+        );
+        std::vector<std::vector<VkBufferView>> wastes_vk_texel_buffer_views(
+            writes.size()
+        );
+        for (size_t i = 0; i < writes.size(); i++)
+        {
+            vk_writes[i] = WriteDescriptorSet_to_vk(
+                writes[i],
+                wastes_dst_set[i],
+                wastes_vk_image_infos[i],
+                wastes_image_infos_sampler[i],
+                wastes_image_infos_image_view[i],
+                wastes_vk_buffer_infos[i],
+                wastes_buffer_infos_buffer[i],
+                wastes_texel_buffer_views[i],
+                wastes_vk_texel_buffer_views[i]
+            );
+        }
+
+        std::vector<VkCopyDescriptorSet> vk_copies(copies.size());
+        std::vector<DescriptorSetPtr> wastes_src_set(copies.size());
+        std::vector<DescriptorSetPtr> wastes_dst_set2(copies.size());
+        for (size_t i = 0; i < copies.size(); i++)
+        {
+            vk_copies[i] = CopyDescriptorSet_to_vk(
+                copies[i],
+                wastes_src_set[i],
+                wastes_dst_set2[i]
+            );
+        }
+
+        vkUpdateDescriptorSets(
+            device->handle(),
+            (uint32_t)vk_writes.size(),
+            vk_writes.data(),
+            (uint32_t)vk_copies.size(),
+            vk_copies.data()
+        );
+    }
+
+    DescriptorSet::~DescriptorSet()
+    {
+        if (pool().expired())
+        {
+            return;
+        }
+        auto pool_locked = pool().lock();
+        vkFreeDescriptorSets(
+            pool_locked->device()->handle(),
+            pool_locked->handle(),
+            1,
+            &_handle
+        );
+    }
+
+    DescriptorSet::DescriptorSet(
+        const DescriptorPoolWPtr& pool,
+        VkDescriptorSet handle
+    )
+        : _pool(pool), _handle(handle)
+    {}
+
+    Result<DescriptorPoolPtr> DescriptorPool::create(
+        const DevicePtr& device,
+        const DescriptorPoolConfig& config
+    )
+    {
+        DescriptorPoolPtr pool = std::make_shared<DescriptorPool_public_ctor>(
+            device,
+            config
+        );
+
+        std::vector<VkDescriptorPoolSize> vk_pool_sizes(
+            pool->config().pool_sizes.size()
+        );
+        for (size_t i = 0; i < pool->config().pool_sizes.size(); i++)
+        {
+            vk_pool_sizes[i] = DescriptorPoolSize_to_vk(
+                pool->config().pool_sizes[i]
+            );
+        }
+
+        VkDescriptorPoolCreateInfo create_info{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = pool->config().flags,
+            .maxSets = pool->config().max_sets,
+            .poolSizeCount = (uint32_t)vk_pool_sizes.size(),
+            .pPoolSizes = vk_pool_sizes.data()
+        };
+
+        VkResult vk_result = vkCreateDescriptorPool(
+            pool->device()->handle(),
+            &create_info,
+            pool->device()->context()->vk_allocator_ptr(),
+            &pool->_handle
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error("", (ApiResult)vk_result, false);
+        }
+        return pool;
+    }
+
+    Result<std::vector<DescriptorSetPtr>> DescriptorPool::allocate_sets(
+        const DescriptorPoolPtr& pool,
+        uint32_t count,
+        const std::vector<DescriptorSetLayoutPtr>& set_layouts
+    )
+    {
+        std::vector<VkDescriptorSetLayout> vk_set_layouts(set_layouts.size());
+        for (size_t i = 0; i < set_layouts.size(); i++)
+        {
+            vk_set_layouts[i] = set_layouts[i]->handle();
+        }
+
+        VkDescriptorSetAllocateInfo alloc_info{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            .pNext = nullptr,
+            .descriptorPool = pool->handle(),
+            .descriptorSetCount = count,
+            .pSetLayouts = vk_set_layouts.data()
+        };
+
+        std::vector<VkDescriptorSet> vk_sets(count);
+        VkResult vk_result = vkAllocateDescriptorSets(
+            pool->device()->handle(),
+            &alloc_info,
+            vk_sets.data()
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error("", (ApiResult)vk_result, false);
+        }
+
+        std::vector<DescriptorSetPtr> sets;
+        for (auto vk_set : vk_sets)
+        {
+            sets.push_back(std::make_shared<DescriptorSet_public_ctor>(
+                (DescriptorPoolWPtr)pool,
+                vk_set
+            ));
+        }
+        return sets;
+    }
+
+    DescriptorPool::~DescriptorPool()
+    {
+        vkDestroyDescriptorPool(
+            device()->handle(),
+            handle(),
+            device()->context()->vk_allocator_ptr()
+        );
+    }
+
+    DescriptorPool::DescriptorPool(
+        const DevicePtr& device,
+        const DescriptorPoolConfig& config
+    )
+        : _device(device), _config(config)
+    {}
+
+    Result<BufferViewPtr> BufferView::create(
+        const DevicePtr& device,
+        const BufferPtr& buffer,
+        const BufferViewConfig& config
+    )
+    {
+        BufferViewPtr view = std::make_shared<BufferView_public_ctor>(
+            device,
+            buffer,
+            config
+        );
+
+        VkBufferViewCreateInfo create_info{
+            .sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .buffer = view->buffer()->handle(),
+            .format = view->config().format,
+            .offset = view->config().offset,
+            .range = view->config().range
+        };
+
+        VkResult vk_result = vkCreateBufferView(
+            view->device()->handle(),
+            &create_info,
+            view->device()->context()->vk_allocator_ptr(),
+            &view->_handle
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error("", (ApiResult)vk_result, false);
+        }
+        return view;
+    }
+
+    BufferView::~BufferView()
+    {
+        vkDestroyBufferView(
+            device()->handle(),
+            handle(),
+            device()->context()->vk_allocator_ptr()
+        );
+    }
+
+    BufferView::BufferView(
+        const DevicePtr& device,
+        const BufferPtr& buffer,
+        const BufferViewConfig& config
+    )
+        : _device(device),
+        _buffer(buffer),
+        _config(config)
     {}
 
 #pragma region Vulkan callbacks

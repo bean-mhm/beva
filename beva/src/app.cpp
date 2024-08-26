@@ -62,6 +62,8 @@ namespace beva_demo
 
     void App::init()
     {
+        start_time = std::chrono::high_resolution_clock::now();
+
         init_window();
         init_context();
         setup_debug_messenger();
@@ -70,11 +72,15 @@ namespace beva_demo
         create_logical_device();
         create_swapchain();
         create_render_pass();
+        create_descriptor_set_layout();
         create_graphics_pipeline();
         create_framebuffers();
         create_command_pools();
         create_vertex_buffer();
         create_index_buffer();
+        create_uniform_buffers();
+        create_descriptor_pool();
+        create_descriptor_sets();
         create_command_buffers();
         create_sync_objects();
     }
@@ -99,6 +105,13 @@ namespace beva_demo
     void App::cleanup()
     {
         cleanup_swapchain();
+
+        uniform_bufs.clear();
+        uniform_bufs_mem.clear();
+
+        descriptor_pool = nullptr;
+
+        descriptor_set_layout = nullptr;
 
         index_buf = nullptr;
         index_buf_mem = nullptr;
@@ -216,7 +229,7 @@ namespace beva_demo
             | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT
             | VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT;
 
-        auto debug_messenger_result = bv::DebugMessenger::create(
+        auto messenger_result = bv::DebugMessenger::create(
             context,
             severity_filter,
             tpye_filter,
@@ -229,8 +242,8 @@ namespace beva_demo
                 std::cout << message_data.message << '\n';
             }
         );
-        CHECK_BV_RESULT(debug_messenger_result, "create debug messenger");
-        debug_messenger = debug_messenger_result.value();
+        CHECK_BV_RESULT(messenger_result, "create debug messenger");
+        debug_messenger = messenger_result.value();
     }
 
     void App::create_surface()
@@ -582,6 +595,27 @@ namespace beva_demo
         render_pass = render_pass_result.value();
     }
 
+    void App::create_descriptor_set_layout()
+    {
+        bv::DescriptorSetLayoutBinding binding{
+            .binding = 0,
+            .descriptor_type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptor_count = 1,
+            .stage_flags = VK_SHADER_STAGE_VERTEX_BIT,
+            .immutable_samplers = {}
+        };
+
+        auto layout_result = bv::DescriptorSetLayout::create(
+            device,
+            {
+                .flags = 0,
+                .bindings = { binding }
+            }
+        );
+        CHECK_BV_RESULT(layout_result, "create descriptor set layout");
+        descriptor_set_layout = layout_result.value();
+    }
+
     void App::create_graphics_pipeline()
     {
         // shader modules
@@ -656,7 +690,7 @@ namespace beva_demo
             .rasterizer_discard_enable = false,
             .polygon_mode = VK_POLYGON_MODE_FILL,
             .cull_mode = VK_CULL_MODE_BACK_BIT,
-            .front_face = VK_FRONT_FACE_CLOCKWISE,
+            .front_face = VK_FRONT_FACE_COUNTER_CLOCKWISE,
             .depth_bias_enable = false,
             .depth_bias_constant_factor = 0.f,
             .depth_bias_clamp = 0.f,
@@ -701,7 +735,11 @@ namespace beva_demo
 
         auto pipeline_layout_result = bv::PipelineLayout::create(
             device,
-            { .flags = 0, .set_layouts = {}, .push_constant_ranges = {} }
+            {
+                .flags = 0,
+                .set_layouts = { descriptor_set_layout },
+                .push_constant_ranges = {}
+            }
         );
         CHECK_BV_RESULT(pipeline_layout_result, "create pipeline layout");
         pipeline_layout = pipeline_layout_result.value();
@@ -859,6 +897,88 @@ namespace beva_demo
         staging_buf_mem = nullptr;
     }
 
+    void App::create_uniform_buffers()
+    {
+        VkDeviceSize size = sizeof(UniformBufferObject);
+
+        uniform_bufs.resize(MAX_FRAMES_IN_FLIGHT);
+        uniform_bufs_mem.resize(MAX_FRAMES_IN_FLIGHT);
+        uniform_bufs_mapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        {
+            create_buffer(
+                size,
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+                | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+
+                uniform_bufs[i],
+                uniform_bufs_mem[i]
+            );
+
+            auto map_result = uniform_bufs_mem[i]->map(0, size);
+            CHECK_BV_RESULT(map_result, "map memory");
+            uniform_bufs_mapped[i] = map_result.value();
+        }
+    }
+
+    void App::create_descriptor_pool()
+    {
+        bv::DescriptorPoolSize pool_size{
+            .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptor_count = MAX_FRAMES_IN_FLIGHT
+        };
+
+        auto pool_result = bv::DescriptorPool::create(
+            device,
+            {
+                .flags = 0,
+                .max_sets = MAX_FRAMES_IN_FLIGHT,
+                .pool_sizes = { pool_size }
+            }
+        );
+        CHECK_BV_RESULT(pool_result, "create descriptor pool");
+        descriptor_pool = pool_result.value();
+    }
+
+    void App::create_descriptor_sets()
+    {
+        auto sets_result = bv::DescriptorPool::allocate_sets(
+            descriptor_pool,
+            MAX_FRAMES_IN_FLIGHT,
+            std::vector<bv::DescriptorSetLayoutPtr>(
+                MAX_FRAMES_IN_FLIGHT,
+                descriptor_set_layout
+            )
+        );
+        CHECK_BV_RESULT(sets_result, "allocate descriptor sets");
+        descriptor_sets = sets_result.value();
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        {
+            bv::DescriptorBufferInfo buffer_info{
+                .buffer = uniform_bufs[i],
+                .offset = 0,
+                .range = sizeof(UniformBufferObject)
+            };
+
+            bv::WriteDescriptorSet descriptor_write{
+                .dst_set = descriptor_sets[i],
+                .dst_binding = 0,
+                .dst_array_element = 0,
+                .descriptor_count = 1,
+                .descriptor_type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                .image_infos = {},
+                .buffer_infos = { buffer_info },
+                .texel_buffer_views = {}
+            };
+
+            bv::DescriptorSet::update_sets(device, { descriptor_write }, {});
+        }
+    }
+
     void App::create_command_buffers()
     {
         auto cmd_bufs_result = bv::CommandPool::allocate_buffers(
@@ -917,6 +1037,8 @@ namespace beva_demo
         };
 
         uint32_t img_idx = acquire_result.value();
+
+        update_uniform_buffer(frame_idx);
 
         result = fences_in_flight[frame_idx]->reset();
         CHECK_BV_RESULT(result, "reset fence");
@@ -1152,6 +1274,18 @@ namespace beva_demo
         };
         vkCmdSetScissor(cmd_buf->handle(), 0, 1, &scissor);
 
+        auto vk_descriptor_set = descriptor_sets[frame_idx]->handle();
+        vkCmdBindDescriptorSets(
+            cmd_buf->handle(),
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            pipeline_layout->handle(),
+            0,
+            1,
+            &vk_descriptor_set,
+            0,
+            nullptr
+        );
+
         vkCmdDrawIndexed(
             cmd_buf->handle(),
             (uint32_t)(indices.size()),
@@ -1162,6 +1296,42 @@ namespace beva_demo
 
         auto end_result = cmd_buf->end();
         CHECK_BV_RESULT(end_result, "end recording command buffer");
+    }
+
+    void App::update_uniform_buffer(uint32_t frame_idx)
+    {
+        auto curr_time = std::chrono::high_resolution_clock::now();
+        float elapsed =
+            std::chrono::duration<float>(curr_time - start_time).count();
+
+        UniformBufferObject ubo{};
+
+        ubo.model = glm::rotate(
+            glm::mat4(1.f),
+            elapsed * glm::radians(90.f),
+            glm::vec3(0.f, 0.f, 1.f)
+        );
+
+        ubo.view = glm::lookAt(
+            glm::vec3(2.f, 2.f, 2.f),
+            glm::vec3(0.f, 0.f, 0.f),
+            glm::vec3(0.f, 0.f, 1.f)
+        );
+
+        auto sc_extent = swapchain->config().image_extent;
+        ubo.proj = glm::perspective(
+            glm::radians(45.f),
+            (float)sc_extent.width / (float)sc_extent.height,
+            .1f,
+            10.f
+        );
+        ubo.proj[1][1] *= -1.f;
+
+        std::copy(
+            &ubo,
+            &ubo + 1,
+            (UniformBufferObject*)uniform_bufs_mapped[frame_idx]
+        );
     }
 
     static std::vector<uint8_t> read_file(const std::string& filename)
