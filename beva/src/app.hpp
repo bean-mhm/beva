@@ -29,12 +29,14 @@ namespace beva_demo
     };
 
     static const std::vector<Vertex> vertices{
-        Vertex{ .pos = { -.5f, .5f }, .col = { .6f, .4f, .05f } }, // bl
-        Vertex{ .pos = { -.5f, -.5f }, .col = { .1f, .1f, .1f } }, // tl
-        Vertex{ .pos = { .5f, -.5f }, .col = { .05f, .2f, .7f } }, // tr
-        Vertex{ .pos = { -.5f, .5f }, .col = { .6f, .4f, .05f } }, // bl
-        Vertex{ .pos = { .5f, -.5f }, .col = { .05f, .2f, .7f } }, // tr
-        Vertex{ .pos = { .5f, .5f }, .col = { .65f, .65f, .65f } }, // br
+        Vertex{ .pos = { -.5f, .5f }, .col = { .6f, .4f, .05f } },
+        Vertex{ .pos = { -.5f, -.5f }, .col = { .1f, .1f, .1f } },
+        Vertex{ .pos = { .5f, -.5f }, .col = { .05f, .2f, .7f } },
+        Vertex{ .pos = { .5f, .5f }, .col = { .65f, .65f, .65f } }
+    };
+
+    static const std::vector<uint16_t> indices{
+        0, 1, 2, 0, 2, 3
     };
 
     class App
@@ -71,6 +73,9 @@ namespace beva_demo
         bv::BufferPtr vertex_buf = nullptr;
         bv::DeviceMemoryPtr vertex_buf_mem = nullptr;
 
+        bv::BufferPtr index_buf = nullptr;
+        bv::DeviceMemoryPtr index_buf_mem = nullptr;
+
         // "per frame" stuff (as in frames in flight)
         std::vector<bv::CommandBufferPtr> cmd_bufs;
         std::vector<bv::SemaphorePtr> semaphs_image_available;
@@ -100,6 +105,7 @@ namespace beva_demo
         void create_framebuffers();
         void create_command_pools();
         void create_vertex_buffer();
+        void create_index_buffer();
         void create_command_buffers();
         void create_sync_objects();
 

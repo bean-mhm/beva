@@ -74,6 +74,7 @@ namespace beva_demo
         create_framebuffers();
         create_command_pools();
         create_vertex_buffer();
+        create_index_buffer();
         create_command_buffers();
         create_sync_objects();
     }
@@ -98,6 +99,9 @@ namespace beva_demo
     void App::cleanup()
     {
         cleanup_swapchain();
+
+        index_buf = nullptr;
+        index_buf_mem = nullptr;
 
         vertex_buf = nullptr;
         vertex_buf_mem = nullptr;
@@ -139,7 +143,7 @@ namespace beva_demo
         window = glfwCreateWindow(
             INITIAL_WIDTH,
             INITIAL_HEIGHT,
-            "pick a physical device within the command line",
+            TITLE,
             nullptr,
             nullptr
         );
@@ -318,6 +322,11 @@ namespace beva_demo
             );
         }
 
+        glfwSetWindowTitle(
+            window,
+            "pick a physical device within the command line"
+        );
+
         int32_t idx;
         while (true)
         {
@@ -337,7 +346,6 @@ namespace beva_demo
                 std::cout << "enter a valid physical device index\n";
             }
         }
-
         physical_device = supported_physical_devices[idx];
 
         glfwSetWindowTitle(window, TITLE);
@@ -807,6 +815,48 @@ namespace beva_demo
             vertex_buf_mem
         );
         copy_buffer(staging_buf, vertex_buf, size);
+
+        staging_buf = nullptr;
+        staging_buf_mem = nullptr;
+    }
+
+    void App::create_index_buffer()
+    {
+        VkDeviceSize size = sizeof(indices[0]) * indices.size();
+
+        bv::BufferPtr staging_buf;
+        bv::DeviceMemoryPtr staging_buf_mem;
+        create_buffer(
+            size,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+            | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+
+            staging_buf,
+            staging_buf_mem
+        );
+
+        auto upload_result = staging_buf_mem->upload(
+            (void*)indices.data(),
+            size
+        );
+        CHECK_BV_RESULT(upload_result, "upload index data");
+
+        create_buffer(
+            size,
+
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT
+            | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            index_buf,
+            index_buf_mem
+        );
+        copy_buffer(staging_buf, index_buf, size);
+
+        staging_buf = nullptr;
+        staging_buf_mem = nullptr;
     }
 
     void App::create_command_buffers()
@@ -1079,6 +1129,13 @@ namespace beva_demo
             offsets
         );
 
+        vkCmdBindIndexBuffer(
+            cmd_buf->handle(),
+            index_buf->handle(),
+            0,
+            VK_INDEX_TYPE_UINT16
+        );
+
         VkViewport viewport{
             .x = 0.f,
             .y = 0.f,
@@ -1095,7 +1152,11 @@ namespace beva_demo
         };
         vkCmdSetScissor(cmd_buf->handle(), 0, 1, &scissor);
 
-        vkCmdDraw(cmd_buf->handle(), (uint32_t)vertices.size(), 1, 0, 0);
+        vkCmdDrawIndexed(
+            cmd_buf->handle(),
+            (uint32_t)(indices.size()),
+            1, 0, 0, 0
+        );
 
         vkCmdEndRenderPass(cmd_buf->handle());
 
