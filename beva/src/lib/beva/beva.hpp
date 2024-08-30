@@ -1787,7 +1787,7 @@ namespace bv
 
 #pragma endregion
 
-#pragma region RAII wrappers and abstract classes
+#pragma region object wrappers (no RAII) and abstract classes
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkAllocationCallbacks.html
     class Allocator
@@ -1976,7 +1976,7 @@ namespace bv
             const SurfacePtr& surface = nullptr
         );
 
-        ~Context();
+        void destroy();
 
     protected:
         ContextConfig _config;
@@ -2035,7 +2035,7 @@ namespace bv
             return _handle;
         }
 
-        ~DebugMessenger();
+        void destroy();
 
     protected:
         ContextPtr _context;
@@ -2083,7 +2083,7 @@ namespace bv
             return _handle;
         }
 
-        ~Surface();
+        void destroy();
 
     protected:
         ContextPtr _context;
@@ -2203,7 +2203,7 @@ namespace bv
 
         Result<> wait_idle();
 
-        ~Device();
+        void destroy();
 
     protected:
         ContextPtr _context;
@@ -2268,7 +2268,7 @@ namespace bv
             VkDeviceSize memory_offset
         );
 
-        ~Image();
+        void destroy();
 
     protected:
         bool _created_externally;
@@ -2343,7 +2343,7 @@ namespace bv
             ApiResult* out_api_result = nullptr
         );
 
-        ~Swapchain();
+        void destroy();
 
     protected:
         DevicePtr _device;
@@ -2398,7 +2398,7 @@ namespace bv
             return _handle;
         }
 
-        ~ImageView();
+        void destroy();
 
     protected:
         DevicePtr _device;
@@ -2439,7 +2439,7 @@ namespace bv
             return _handle;
         }
 
-        ~ShaderModule();
+        void destroy();
 
     protected:
         DevicePtr _device;
@@ -2478,7 +2478,7 @@ namespace bv
             return _handle;
         }
 
-        ~Sampler();
+        void destroy();
 
     protected:
         DevicePtr _device;
@@ -2521,7 +2521,7 @@ namespace bv
             return _handle;
         }
 
-        ~DescriptorSetLayout();
+        void destroy();
 
     protected:
         DevicePtr _device;
@@ -2564,7 +2564,7 @@ namespace bv
             return _handle;
         }
 
-        ~PipelineLayout();
+        void destroy();
 
     protected:
         DevicePtr _device;
@@ -2607,7 +2607,7 @@ namespace bv
             return _handle;
         }
 
-        ~RenderPass();
+        void destroy();
 
     protected:
         DevicePtr _device;
@@ -2651,7 +2651,7 @@ namespace bv
             return _handle;
         }
 
-        ~GraphicsPipeline();
+        void destroy();
 
     protected:
         DevicePtr _device;
@@ -2694,7 +2694,7 @@ namespace bv
             return _handle;
         }
 
-        ~Framebuffer();
+        void destroy();
 
     protected:
         DevicePtr _device;
@@ -2739,7 +2739,7 @@ namespace bv
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEndCommandBuffer.html
         Result<> end();
 
-        ~CommandBuffer();
+        void destroy();
 
     protected:
         CommandPoolWPtr _pool;
@@ -2795,7 +2795,7 @@ namespace bv
             uint32_t count
         );
 
-        ~CommandPool();
+        void destroy();
 
     protected:
         DevicePtr _device;
@@ -2830,7 +2830,7 @@ namespace bv
             return _handle;
         }
 
-        ~Semaphore();
+        void destroy();
 
     protected:
         DevicePtr _device;
@@ -2882,7 +2882,7 @@ namespace bv
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetFenceStatus.html
         Result<bool> is_signaled() const;
 
-        ~Fence();
+        void destroy();
 
     protected:
         DevicePtr _device;
@@ -2931,7 +2931,7 @@ namespace bv
             VkDeviceSize memory_offset
         );
 
-        ~Buffer();
+        void destroy();
 
     protected:
         DevicePtr _device;
@@ -2995,7 +2995,7 @@ namespace bv
         // you should make sure that mapping is possible for this memory.
         Result<> upload(void* data, VkDeviceSize data_size);
 
-        ~DeviceMemory();
+        void destroy();
 
     protected:
         DeviceWPtr _device;
@@ -3037,7 +3037,7 @@ namespace bv
             const std::vector<CopyDescriptorSet>& copies
         );
 
-        ~DescriptorSet();
+        void destroy();
 
     protected:
         DescriptorPoolWPtr _pool;
@@ -3093,7 +3093,7 @@ namespace bv
             const std::vector<DescriptorSetLayoutPtr>& set_layouts
         );
 
-        ~DescriptorPool();
+        void destroy();
 
     protected:
         DevicePtr _device;
@@ -3142,7 +3142,7 @@ namespace bv
             return _handle;
         }
 
-        ~BufferView();
+        void destroy();
 
     protected:
         DevicePtr _device;
@@ -3165,6 +3165,26 @@ namespace bv
 
     bool format_has_depth_component(VkFormat format);
     bool format_has_stencil_component(VkFormat format);
+
+    template<typename T>
+    void destroy_objects(std::vector<T>& vec)
+    {
+        for (const auto& elem : vec)
+        {
+            elem.destroy();
+        }
+        vec.clear();
+    }
+
+    template<typename T>
+    void destroy_objects_ptr(std::vector<T>& vec)
+    {
+        for (const auto& elem : vec)
+        {
+            elem->destroy();
+        }
+        vec.clear();
+    }
 
 #pragma endregion
 

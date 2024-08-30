@@ -231,6 +231,7 @@ namespace beva_demo
         );
 
         void copy_buffer(
+            const bv::CommandBufferPtr& cmd_buf,
             bv::BufferPtr src,
             bv::BufferPtr dst,
             VkDeviceSize size

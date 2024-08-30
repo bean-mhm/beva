@@ -118,41 +118,40 @@ namespace beva_demo
     {
         cleanup_swapchain();
 
-        texture_sampler = nullptr;
-        texture_imgview = nullptr;
-        texture_img = nullptr;
-        texture_img_mem = nullptr;
+        texture_sampler->destroy();
+        texture_imgview->destroy();
+        texture_img->destroy();
+        texture_img_mem->destroy();
 
-        uniform_bufs.clear();
-        uniform_bufs_mem.clear();
+        bv::destroy_objects_ptr(uniform_bufs);
+        bv::destroy_objects_ptr(uniform_bufs_mem);
 
-        descriptor_pool = nullptr;
+        descriptor_pool->destroy();
 
-        descriptor_set_layout = nullptr;
+        descriptor_set_layout->destroy();
 
-        index_buf = nullptr;
-        index_buf_mem = nullptr;
+        index_buf->destroy();
+        index_buf_mem->destroy();
 
-        vertex_buf = nullptr;
-        vertex_buf_mem = nullptr;
+        vertex_buf->destroy();
+        vertex_buf_mem->destroy();
 
-        graphics_pipeline = nullptr;
-        pipeline_layout = nullptr;
+        graphics_pipeline->destroy();
+        pipeline_layout->destroy();
 
-        render_pass = nullptr;
+        render_pass->destroy();
 
-        fences_in_flight.clear();
-        semaphs_render_finished.clear();
-        semaphs_image_available.clear();
+        bv::destroy_objects_ptr(fences_in_flight);
+        bv::destroy_objects_ptr(semaphs_render_finished);
+        bv::destroy_objects_ptr(semaphs_image_available);
 
-        transient_cmd_pool = nullptr;
-        cmd_pool = nullptr;
+        transient_cmd_pool->destroy();
+        cmd_pool->destroy();
 
-        device = nullptr;
-        physical_device = nullptr;
-        surface = nullptr;
-        debug_messenger = nullptr;
-        context = nullptr;
+        device->destroy();
+        surface->destroy();
+        debug_messenger->destroy();
+        context->destroy();
 
         glfwDestroyWindow(window);
         glfwTerminate();
@@ -565,7 +564,7 @@ namespace beva_demo
         swapchain = result.value();
 
         // create swapchain image views
-        swapchain_imgviews.clear();
+        bv::destroy_objects_ptr(swapchain_imgviews);
         for (size_t i = 0; i < swapchain->images().size(); i++)
         {
             swapchain_imgviews.push_back(create_image_view(
@@ -848,6 +847,9 @@ namespace beva_demo
         );
         CHECK_BV_RESULT(graphics_pipeline_result, "create graphics pipeline");
         graphics_pipeline = graphics_pipeline_result.value();
+
+        vert_shader_module->destroy();
+        frag_shader_module->destroy();
     }
 
     void App::create_command_pools()
@@ -905,7 +907,7 @@ namespace beva_demo
 
     void App::create_swapchain_framebuffers()
     {
-        swapchain_framebufs.clear();
+        bv::destroy_objects_ptr(swapchain_framebufs);
         for (size_t i = 0; i < swapchain_imgviews.size(); i++)
         {
             auto result = bv::Framebuffer::create(
@@ -1008,8 +1010,8 @@ namespace beva_demo
         );
         end_single_time_commands(cmd_buf);
 
-        staging_buf = nullptr;
-        staging_buf_mem = nullptr;
+        staging_buf->destroy();
+        staging_buf_mem->destroy();
 
         // create image view
         texture_imgview = create_image_view(
@@ -1085,10 +1087,13 @@ namespace beva_demo
             vertex_buf,
             vertex_buf_mem
         );
-        copy_buffer(staging_buf, vertex_buf, size);
 
-        staging_buf = nullptr;
-        staging_buf_mem = nullptr;
+        auto cmd_buf = begin_single_time_commands(true);
+        copy_buffer(cmd_buf, staging_buf, vertex_buf, size);
+        end_single_time_commands(cmd_buf);
+
+        staging_buf->destroy();
+        staging_buf_mem->destroy();
     }
 
     void App::create_index_buffer()
@@ -1124,18 +1129,25 @@ namespace beva_demo
             index_buf,
             index_buf_mem
         );
-        copy_buffer(staging_buf, index_buf, size);
 
-        staging_buf = nullptr;
-        staging_buf_mem = nullptr;
+        auto cmd_buf = begin_single_time_commands(true);
+        copy_buffer(cmd_buf, staging_buf, index_buf, size);
+        end_single_time_commands(cmd_buf);
+
+        staging_buf->destroy();
+        staging_buf_mem->destroy();
     }
 
     void App::create_uniform_buffers()
     {
         VkDeviceSize size = sizeof(UniformBufferObject);
 
+        bv::destroy_objects_ptr(uniform_bufs);
         uniform_bufs.resize(MAX_FRAMES_IN_FLIGHT);
+
+        bv::destroy_objects_ptr(uniform_bufs_mem);
         uniform_bufs_mem.resize(MAX_FRAMES_IN_FLIGHT);
+
         uniform_bufs_mapped.resize(MAX_FRAMES_IN_FLIGHT);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
@@ -1249,6 +1261,10 @@ namespace beva_demo
 
     void App::create_sync_objects()
     {
+        bv::destroy_objects_ptr(semaphs_image_available);
+        bv::destroy_objects_ptr(semaphs_render_finished);
+        bv::destroy_objects_ptr(fences_in_flight);
+
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
             auto semaph_result = bv::Semaphore::create(device);
@@ -1340,13 +1356,13 @@ namespace beva_demo
 
     void App::cleanup_swapchain()
     {
-        depth_imgview = nullptr;
-        depth_img = nullptr;
-        depth_img_mem = nullptr;
+        depth_imgview->destroy();
+        depth_img->destroy();
+        depth_img_mem->destroy();
 
-        swapchain_framebufs.clear();
-        swapchain_imgviews.clear();
-        swapchain = nullptr;
+        bv::destroy_objects_ptr(swapchain_framebufs);
+        bv::destroy_objects_ptr(swapchain_imgviews);
+        swapchain->destroy();
     }
 
     void App::recreate_swapchain()
@@ -1405,6 +1421,7 @@ namespace beva_demo
             CHECK_BV_RESULT(result, "wait for queue idle");
         }
 
+        cmd_buf->destroy();
         cmd_buf = nullptr;
     }
 
@@ -1695,13 +1712,12 @@ namespace beva_demo
     }
 
     void App::copy_buffer(
+        const bv::CommandBufferPtr& cmd_buf,
         bv::BufferPtr src,
         bv::BufferPtr dst,
         VkDeviceSize size
     )
     {
-        auto cmd_buf = begin_single_time_commands(true);
-
         VkBufferCopy copy_region{
             .srcOffset = 0,
             .dstOffset = 0,
@@ -1714,8 +1730,6 @@ namespace beva_demo
             1,
             &copy_region
         );
-
-        end_single_time_commands(cmd_buf);
     }
 
     void App::record_command_buffer(

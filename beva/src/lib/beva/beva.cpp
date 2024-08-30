@@ -2445,7 +2445,7 @@ namespace bv
         return physical_devices;
     }
 
-    Context::~Context()
+    void Context::destroy()
     {
         vkDestroyInstance(_vk_instance, vk_allocator_ptr());
     }
@@ -2495,7 +2495,7 @@ namespace bv
         return messenger;
     }
 
-    DebugMessenger::~DebugMessenger()
+    void DebugMessenger::destroy()
     {
         DestroyDebugUtilsMessengerEXT(
             context()->vk_instance(),
@@ -2524,7 +2524,7 @@ namespace bv
         return std::make_shared<Surface_public_ctor>(context, handle);
     }
 
-    Surface::~Surface()
+    void Surface::destroy()
     {
         vkDestroySurfaceKHR(
             _context->vk_instance(),
@@ -2781,7 +2781,7 @@ namespace bv
         return Result();
     }
 
-    Device::~Device()
+    void Device::destroy()
     {
         vkDestroyDevice(handle(), context()->vk_allocator_ptr());
     }
@@ -2899,7 +2899,7 @@ namespace bv
         return Result();
     }
 
-    Image::~Image()
+    void Image::destroy()
     {
         if (created_externally())
         {
@@ -3047,7 +3047,7 @@ namespace bv
         return Error("", (ApiResult)vk_result, false);
     }
 
-    Swapchain::~Swapchain()
+    void Swapchain::destroy()
     {
         vkDestroySwapchainKHR(
             device()->handle(),
@@ -3106,7 +3106,7 @@ namespace bv
         return view;
     }
 
-    ImageView::~ImageView()
+    void ImageView::destroy()
     {
         vkDestroyImageView(
             device()->handle(),
@@ -3164,7 +3164,7 @@ namespace bv
         return module;
     }
 
-    ShaderModule::~ShaderModule()
+    void ShaderModule::destroy()
     {
         vkDestroyShaderModule(
             device()->handle(),
@@ -3223,7 +3223,7 @@ namespace bv
         return sampler;
     }
 
-    Sampler::~Sampler()
+    void Sampler::destroy()
     {
         vkDestroySampler(
             device()->handle(),
@@ -3291,7 +3291,7 @@ namespace bv
         return layout;
     }
 
-    DescriptorSetLayout::~DescriptorSetLayout()
+    void DescriptorSetLayout::destroy()
     {
         vkDestroyDescriptorSetLayout(
             device()->handle(),
@@ -3362,7 +3362,7 @@ namespace bv
         return layout;
     }
 
-    PipelineLayout::~PipelineLayout()
+    void PipelineLayout::destroy()
     {
         vkDestroyPipelineLayout(
             device()->handle(),
@@ -3458,7 +3458,7 @@ namespace bv
         return pass;
     }
 
-    RenderPass::~RenderPass()
+    void RenderPass::destroy()
     {
         vkDestroyRenderPass(
             device()->handle(),
@@ -3665,7 +3665,7 @@ namespace bv
         return pipe;
     }
 
-    GraphicsPipeline::~GraphicsPipeline()
+    void GraphicsPipeline::destroy()
     {
         vkDestroyPipeline(
             device()->handle(),
@@ -3724,7 +3724,7 @@ namespace bv
         return buf;
     }
 
-    Framebuffer::~Framebuffer()
+    void Framebuffer::destroy()
     {
         vkDestroyFramebuffer(
             device()->handle(),
@@ -3798,7 +3798,7 @@ namespace bv
         return Result();
     }
 
-    CommandBuffer::~CommandBuffer()
+    void CommandBuffer::destroy()
     {
         if (pool().expired())
         {
@@ -3916,7 +3916,7 @@ namespace bv
         return command_buffers;
     }
 
-    CommandPool::~CommandPool()
+    void CommandPool::destroy()
     {
         vkDestroyCommandPool(
             device()->handle(),
@@ -3955,7 +3955,7 @@ namespace bv
         return sema;
     }
 
-    Semaphore::~Semaphore()
+    void Semaphore::destroy()
     {
         vkDestroySemaphore(
             device()->handle(),
@@ -4072,7 +4072,7 @@ namespace bv
         return Error("", (ApiResult)vk_result, false);
     }
 
-    Fence::~Fence()
+    void Fence::destroy()
     {
         vkDestroyFence(
             device()->handle(),
@@ -4151,7 +4151,7 @@ namespace bv
         return Result();
     }
 
-    Buffer::~Buffer()
+    void Buffer::destroy()
     {
         vkDestroyBuffer(
             device()->handle(),
@@ -4345,7 +4345,7 @@ namespace bv
         return Result();
     }
 
-    DeviceMemory::~DeviceMemory()
+    void DeviceMemory::destroy()
     {
         if (device().expired())
         {
@@ -4436,7 +4436,7 @@ namespace bv
         );
     }
 
-    DescriptorSet::~DescriptorSet()
+    void DescriptorSet::destroy()
     {
         if (pool().expired())
         {
@@ -4542,7 +4542,7 @@ namespace bv
         return sets;
     }
 
-    DescriptorPool::~DescriptorPool()
+    void DescriptorPool::destroy()
     {
         vkDestroyDescriptorPool(
             device()->handle(),
@@ -4593,7 +4593,7 @@ namespace bv
         return view;
     }
 
-    BufferView::~BufferView()
+    void BufferView::destroy()
     {
         vkDestroyBufferView(
             device()->handle(),
