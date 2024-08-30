@@ -62,6 +62,11 @@ namespace beva_demo
         static constexpr bool DEBUG_MODE = true;
         static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
+        // if not negative, this skips asking the user to pick a physical
+        // device. this should only be used in development to make iteration
+        // faster.
+        static constexpr int32_t DEFAULT_PHYSICAL_DEVICE_IDX = 1;
+
         GLFWwindow* window;
         bv::ContextPtr context = nullptr;
         bv::DebugMessengerPtr debug_messenger = nullptr;

@@ -369,33 +369,50 @@ namespace beva_demo
             );
         }
 
-        glfwSetWindowTitle(
-            window,
-            "pick a physical device within the command line"
-        );
-
-        int32_t idx;
-        while (true)
+        if (DEFAULT_PHYSICAL_DEVICE_IDX < 0)
         {
-            std::string s_idx;
-            std::getline(std::cin, s_idx);
-            try
-            {
-                idx = std::stoi(s_idx);
-                if (idx < 0 || idx >= supported_physical_devices.size())
-                {
-                    throw std::exception();
-                }
-                break;
-            }
-            catch (const std::exception&)
-            {
-                std::cout << "enter a valid physical device index\n";
-            }
-        }
-        physical_device = supported_physical_devices[idx];
+            glfwSetWindowTitle(
+                window,
+                "pick a physical device within the command line"
+            );
 
-        glfwSetWindowTitle(window, TITLE);
+            int32_t idx;
+            while (true)
+            {
+                std::string s_idx;
+                std::getline(std::cin, s_idx);
+                try
+                {
+                    idx = std::stoi(s_idx);
+                    if (idx < 0 || idx >= supported_physical_devices.size())
+                    {
+                        throw std::exception();
+                    }
+                    break;
+                }
+                catch (const std::exception&)
+                {
+                    std::cout << "enter a valid physical device index\n";
+                }
+            }
+            physical_device = supported_physical_devices[idx];
+
+            glfwSetWindowTitle(window, TITLE);
+        }
+        else if (DEFAULT_PHYSICAL_DEVICE_IDX >= 0
+            && DEFAULT_PHYSICAL_DEVICE_IDX < supported_physical_devices.size())
+        {
+            physical_device =
+                supported_physical_devices[DEFAULT_PHYSICAL_DEVICE_IDX];
+
+            std::cout
+                << "default physical device was chosen at index "
+                << DEFAULT_PHYSICAL_DEVICE_IDX << '\n';
+        }
+        else
+        {
+            throw std::exception("default physical device index is invalid");
+        }
     }
 
     void App::create_logical_device()
