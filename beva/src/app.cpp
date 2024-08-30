@@ -314,7 +314,7 @@ namespace beva_demo
             }
 
             auto format_props_result = pdev->fetch_image_format_properties(
-                VK_FORMAT_R8G8B8A8_SRGB,
+                VK_FORMAT_R8G8B8A8_UNORM,
                 VK_IMAGE_TYPE_2D,
                 VK_IMAGE_TILING_OPTIMAL,
                 VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -838,11 +838,11 @@ namespace beva_demo
     {
         // load image file
 
-        int tex_width, tex_height, tex_channels;
+        int texture_width, texture_height, tex_channels;
         stbi_uc* pixels = stbi_load(
             "./textures/texture.png",
-            &tex_width,
-            &tex_height,
+            &texture_width,
+            &texture_height,
             &tex_channels,
             STBI_rgb_alpha
         );
@@ -854,7 +854,7 @@ namespace beva_demo
         constexpr uint32_t n_channels = 4;
         constexpr uint32_t n_bytes_per_channel = 1;
         VkDeviceSize size =
-            (uint32_t)tex_width * (uint32_t)tex_height
+            (uint32_t)texture_width * (uint32_t)texture_height
             * n_channels * n_bytes_per_channel;
 
         // upload to staging buffer and free
@@ -879,11 +879,13 @@ namespace beva_demo
         stbi_image_free(pixels);
         CHECK_BV_RESULT(upload_result, "upload texture data");
 
+        constexpr VkFormat texture_format = VK_FORMAT_R8G8B8A8_UNORM;
+
         // create image
         create_image(
-            (uint32_t)tex_width,
-            (uint32_t)tex_height,
-            VK_FORMAT_R8G8B8A8_SRGB,
+            (uint32_t)texture_width,
+            (uint32_t)texture_height,
+            texture_format,
             VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -896,7 +898,7 @@ namespace beva_demo
         transition_image_layout(
             cmd_buf,
             texture_img,
-            VK_FORMAT_R8G8B8A8_SRGB,
+            texture_format,
             VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
         );
@@ -904,13 +906,13 @@ namespace beva_demo
             cmd_buf,
             staging_buf,
             texture_img,
-            (uint32_t)(tex_width),
-            (uint32_t)(tex_height)
+            (uint32_t)(texture_width),
+            (uint32_t)(texture_height)
         );
         transition_image_layout(
             cmd_buf,
             texture_img,
-            VK_FORMAT_R8G8B8A8_SRGB,
+            texture_format,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         );

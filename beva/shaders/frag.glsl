@@ -636,7 +636,7 @@ vec3 flim_transform(vec3 col, float exposure, bool convert_to_srgb)
 
 void main()
 {
-    vec3 col = texture(tex, v_texcoord).rgb;
+    vec3 col = pow(texture(tex, v_texcoord).rgb, vec3(2.2));
     col *= v_col;
 
     col = flim_transform(col, 0., true);
