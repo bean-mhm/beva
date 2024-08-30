@@ -288,6 +288,7 @@ namespace beva_demo
         CHECK_BV_RESULT(physical_devices_result, "fetch physical devices");
         auto all_physical_devices = physical_devices_result.value();
 
+        // make a list of devices we approve of
         std::vector<bv::PhysicalDevicePtr> supported_physical_devices;
         for (const auto& pdev : all_physical_devices)
         {
