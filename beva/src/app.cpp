@@ -1705,14 +1705,14 @@ namespace beva_demo
         );
 
         ubo.view = glm::lookAt(
-            glm::vec3(2.f, 2.f, 2.f),
-            glm::vec3(0.f, 0.f, 0.f),
+            glm::vec3(0.f, -1.5f, 1.f),
+            glm::vec3(0.f, 0.f, -.1f),
             glm::vec3(0.f, 0.f, 1.f)
         );
 
         auto sc_extent = swapchain->config().image_extent;
         ubo.proj = glm::perspective(
-            glm::radians(45.f),
+            glm::radians(60.f),
             (float)sc_extent.width / (float)sc_extent.height,
             .1f,
             10.f
