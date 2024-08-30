@@ -92,6 +92,10 @@ namespace beva_demo
         bv::CommandPoolPtr cmd_pool = nullptr;
         bv::CommandPoolPtr transient_cmd_pool = nullptr;
 
+        bv::ImagePtr depth_img = nullptr;
+        bv::DeviceMemoryPtr depth_img_mem = nullptr;
+        bv::ImageViewPtr depth_imgview = nullptr;
+
         bv::ImagePtr texture_img = nullptr;
         bv::DeviceMemoryPtr texture_img_mem = nullptr;
         bv::ImageViewPtr texture_imgview = nullptr;
@@ -139,8 +143,9 @@ namespace beva_demo
         void create_render_pass();
         void create_descriptor_set_layout();
         void create_graphics_pipeline();
-        void create_framebuffers();
         void create_command_pools();
+        void create_depth_resources();
+        void create_swapchain_framebuffers();
         void create_texture_image();
         void create_texture_sampler();
         void create_vertex_buffer();
@@ -177,6 +182,8 @@ namespace beva_demo
             VkMemoryPropertyFlags required_properties
         );
 
+        VkFormat find_depth_format();
+
         void create_image(
             uint32_t width,
             uint32_t height,
@@ -211,7 +218,8 @@ namespace beva_demo
 
         bv::ImageViewPtr create_image_view(
             const bv::ImagePtr& image,
-            VkFormat format
+            VkFormat format,
+            VkImageAspectFlags aspect_flags
         );
 
         void create_buffer(

@@ -83,8 +83,9 @@ namespace beva_demo
         create_render_pass();
         create_descriptor_set_layout();
         create_graphics_pipeline();
-        create_framebuffers();
         create_command_pools();
+        create_depth_resources();
+        create_swapchain_framebuffers();
         create_texture_image();
         create_texture_sampler();
         create_vertex_buffer();
@@ -569,7 +570,8 @@ namespace beva_demo
         {
             swapchain_imgviews.push_back(create_image_view(
                 swapchain->images()[i],
-                surface_format.format
+                surface_format.format,
+                VK_IMAGE_ASPECT_COLOR_BIT
             ));
         }
     }
@@ -593,23 +595,51 @@ namespace beva_demo
             .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
         };
 
+        bv::Attachment depth_attachment{
+            .flags = 0,
+            .format = find_depth_format(),
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .stencil_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .stencil_store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .final_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+        };
+
+        bv::AttachmentReference depth_attachment_ref{
+            .attachment = 1,
+            .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+        };
+
         bv::Subpass subpass{
             .flags = 0,
             .pipeline_bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS,
             .input_attachments = {},
             .color_attachments = { color_attachment_ref },
             .resolve_attachments = {},
-            .depth_stencil_attachment = std::nullopt,
+            .depth_stencil_attachment = depth_attachment_ref,
             .preserve_attachment_indices = {}
         };
 
         bv::SubpassDependency dependency{
             .src_subpass = VK_SUBPASS_EXTERNAL,
             .dst_subpass = 0,
-            .src_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            .dst_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            .src_access_mask = 0,
-            .dst_access_mask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+
+            .src_stage_mask =
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+            | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+
+            .dst_stage_mask =
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+            | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+
+            .src_access_mask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+
+            .dst_access_mask =
+            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+            | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+
             .dependency_flags = 0
         };
 
@@ -617,7 +647,7 @@ namespace beva_demo
             device,
             {
                 .flags = 0,
-                .attachments = { color_attachment },
+                .attachments = { color_attachment, depth_attachment },
                 .subpasses = { subpass },
                 .dependencies = { dependency }
             }
@@ -746,6 +776,19 @@ namespace beva_demo
             .alpha_to_one_enable = false
         };
 
+        bv::DepthStencilState depth_stencil_state{
+            .flags = 0,
+            .depth_test_enable = true,
+            .depth_write_enable = true,
+            .depth_compare_op = VK_COMPARE_OP_LESS,
+            .depth_bounds_test_enable = false,
+            .stencil_test_enable = false,
+            .front = {},
+            .back = {},
+            .min_depth_bounds = 0.f,
+            .max_depth_bounds = 1.f
+        };
+
         bv::ColorBlendAttachment color_blend_attachment{
             .blend_enable = false,
             .src_color_blend_factor = VK_BLEND_FACTOR_ONE,
@@ -794,7 +837,7 @@ namespace beva_demo
                 .viewport_state = viewport_state,
                 .rasterization_state = rasterization_state,
                 .multisample_state = multisample_state,
-                .depth_stencil_state = std::nullopt,
+                .depth_stencil_state = depth_stencil_state,
                 .color_blend_state = color_blend_state,
                 .dynamic_states = dynamic_states,
                 .layout = pipeline_layout,
@@ -805,27 +848,6 @@ namespace beva_demo
         );
         CHECK_BV_RESULT(graphics_pipeline_result, "create graphics pipeline");
         graphics_pipeline = graphics_pipeline_result.value();
-    }
-
-    void App::create_framebuffers()
-    {
-        swapchain_framebufs.clear();
-        for (size_t i = 0; i < swapchain_imgviews.size(); i++)
-        {
-            auto result = bv::Framebuffer::create(
-                device,
-                {
-                    .flags = 0,
-                    .render_pass = render_pass,
-                    .attachments = { swapchain_imgviews[i] },
-                    .width = swapchain->config().image_extent.width,
-                    .height = swapchain->config().image_extent.height,
-                    .layers = 1
-                }
-            );
-            CHECK_BV_RESULT(result, "create swapchain framebuffer");
-            swapchain_framebufs.push_back(result.value());
-        }
     }
 
     void App::create_command_pools()
@@ -849,6 +871,57 @@ namespace beva_demo
         );
         CHECK_BV_RESULT(transient_pool_result, "create transient command pool");
         transient_cmd_pool = transient_pool_result.value();
+    }
+
+    void App::create_depth_resources()
+    {
+        VkFormat depth_format = find_depth_format();
+        create_image(
+            swapchain->config().image_extent.width,
+            swapchain->config().image_extent.height,
+            depth_format,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            depth_img,
+            depth_img_mem
+        );
+        depth_imgview = create_image_view(
+            depth_img,
+            depth_format,
+            VK_IMAGE_ASPECT_DEPTH_BIT
+        );
+
+        auto cmd_buf = begin_single_time_commands(true);
+        transition_image_layout(
+            cmd_buf,
+            depth_img,
+            depth_format,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+        );
+        end_single_time_commands(cmd_buf);
+    }
+
+    void App::create_swapchain_framebuffers()
+    {
+        swapchain_framebufs.clear();
+        for (size_t i = 0; i < swapchain_imgviews.size(); i++)
+        {
+            auto result = bv::Framebuffer::create(
+                device,
+                {
+                    .flags = 0,
+                    .render_pass = render_pass,
+                    .attachments = { swapchain_imgviews[i], depth_imgview },
+                    .width = swapchain->config().image_extent.width,
+                    .height = swapchain->config().image_extent.height,
+                    .layers = 1
+                }
+            );
+            CHECK_BV_RESULT(result, "create swapchain framebuffer");
+            swapchain_framebufs.push_back(result.value());
+        }
     }
 
     void App::create_texture_image()
@@ -941,7 +1014,8 @@ namespace beva_demo
         // create image view
         texture_imgview = create_image_view(
             texture_img,
-            texture_img->config().format
+            texture_img->config().format,
+            VK_IMAGE_ASPECT_COLOR_BIT
         );
     }
 
@@ -1266,6 +1340,10 @@ namespace beva_demo
 
     void App::cleanup_swapchain()
     {
+        depth_imgview = nullptr;
+        depth_img = nullptr;
+        depth_img_mem = nullptr;
+
         swapchain_framebufs.clear();
         swapchain_imgviews.clear();
         swapchain = nullptr;
@@ -1285,8 +1363,10 @@ namespace beva_demo
         CHECK_BV_RESULT(result, "wait for device idle");
 
         cleanup_swapchain();
+
         create_swapchain();
-        create_framebuffers();
+        create_depth_resources();
+        create_swapchain_framebuffers();
     }
 
     bv::CommandBufferPtr App::begin_single_time_commands(
@@ -1339,12 +1419,28 @@ namespace beva_demo
             bool has_required_properties =
                 (required_properties & mem_props.memory_types[i].property_flags)
                 == required_properties;
+
             if ((supported_type_bits & (1 << i)) && has_required_properties)
             {
                 return i;
             }
         }
         throw std::runtime_error("failed to find a suitable memory type");
+    }
+
+    VkFormat App::find_depth_format()
+    {
+        auto find_format_result = physical_device->find_supported_image_format(
+            {
+                VK_FORMAT_D32_SFLOAT,
+                VK_FORMAT_D32_SFLOAT_S8_UINT,
+                VK_FORMAT_D24_UNORM_S8_UINT
+            },
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+        );
+        CHECK_BV_RESULT(find_format_result, "find a supported depth format");
+        return find_format_result.value();
     }
 
     void App::create_image(
@@ -1439,9 +1535,30 @@ namespace beva_demo
                 ? VK_PIPELINE_STAGE_VERTEX_SHADER_BIT
                 : VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
         }
+        else if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED
+            && new_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+        {
+            src_access_mask = 0;
+            dst_access_mask =
+                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+                | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+            src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            dst_stage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        }
         else
         {
-            throw std::invalid_argument("unsupported layout transition");
+            throw std::invalid_argument("unsupported image layout transition");
+        }
+
+        VkImageAspectFlags subresource_aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;
+        if (new_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+        {
+            subresource_aspect_mask = VK_IMAGE_ASPECT_DEPTH_BIT;
+            if (bv::format_has_stencil_component(format))
+            {
+                subresource_aspect_mask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+            }
         }
 
         VkImageMemoryBarrier image_barrier{
@@ -1455,7 +1572,7 @@ namespace beva_demo
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .image = image->handle(),
             .subresourceRange = VkImageSubresourceRange{
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .aspectMask = subresource_aspect_mask,
                 .baseMipLevel = 0,
                 .levelCount = 1,
                 .baseArrayLayer = 0,
@@ -1508,11 +1625,12 @@ namespace beva_demo
 
     bv::ImageViewPtr App::create_image_view(
         const bv::ImagePtr& image,
-        VkFormat format
+        VkFormat format,
+        VkImageAspectFlags aspect_flags
     )
     {
         bv::ImageSubresourceRange subresource_range{
-            .aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .aspect_mask = aspect_flags,
             .base_mip_level = 0,
             .level_count = 1,
             .base_array_layer = 0,
@@ -1608,7 +1726,10 @@ namespace beva_demo
         auto begin_result = cmd_buf->begin(0);
         CHECK_BV_RESULT(begin_result, "begin recording command buffer");
 
-        VkClearValue clear_val{ { { .15f, .16f, .2f, 1.f } } };
+        std::array<VkClearValue, 2> clear_vals{};
+        clear_vals[0].color = { { .15f, .16f, .2f, 1.f } };
+        clear_vals[1].depthStencil = { 1.f, 0 };
+
         VkRenderPassBeginInfo render_pass_info{
             .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
             .pNext = nullptr,
@@ -1618,8 +1739,8 @@ namespace beva_demo
                 .offset = { 0, 0 },
                 .extent = bv::Extent2d_to_vk(swapchain->config().image_extent)
         },
-            .clearValueCount = 1,
-            .pClearValues = &clear_val
+            .clearValueCount = (uint32_t)clear_vals.size(),
+            .pClearValues = clear_vals.data()
         };
         vkCmdBeginRenderPass(
             cmd_buf->handle(),
