@@ -1,6 +1,9 @@
 #version 450
 
+layout(binding = 1) uniform sampler2D tex;
+
 layout(location = 0) in vec3 v_col;
+layout(location = 1) in vec2 v_texcoord;
 
 layout(location = 0) out vec4 out_col;
 
@@ -633,6 +636,9 @@ vec3 flim_transform(vec3 col, float exposure, bool convert_to_srgb)
 
 void main()
 {
-    vec3 col = flim_transform(v_col, 0., true);
+    vec3 col = texture(tex, v_texcoord).rgb;
+    col *= v_col;
+
+    col = flim_transform(col, 0., true);
     out_col = vec4(col, 1);
 }

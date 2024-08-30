@@ -30,6 +30,7 @@ namespace beva_demo
     {
         glm::vec2 pos;
         glm::vec3 col;
+        glm::vec2 texcoord;
 
         static const bv::VertexInputBindingDescription binding_description;
         static const std::vector<bv::VertexInputAttributeDescription>
@@ -37,10 +38,10 @@ namespace beva_demo
     };
 
     static const std::vector<Vertex> vertices{
-        Vertex{ .pos = { -.5f, .5f }, .col = { .6f, .4f, .05f } },
-        Vertex{ .pos = { -.5f, -.5f }, .col = { .1f, .1f, .1f } },
-        Vertex{ .pos = { .5f, -.5f }, .col = { .05f, .2f, .7f } },
-        Vertex{ .pos = { .5f, .5f }, .col = { .65f, .65f, .65f } }
+        Vertex{ { -.5f, .5f }, { 1.f, 1.f, 1.f }, { 0.f, 1.f } },
+        Vertex{ { -.5f, -.5f }, { 1.f, 1.f, 1.f }, { 0.f, 0.f } },
+        Vertex{ { .5f, -.5f }, { 1.f, 1.f, 1.f }, { 1.f, 0.f } },
+        Vertex{ { .5f, .5f }, { 1.f, 1.f, 1.f }, { 1.f, 1.f } }
     };
 
     static const std::vector<uint16_t> indices{

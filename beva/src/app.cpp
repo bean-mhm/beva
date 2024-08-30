@@ -53,6 +53,12 @@ namespace beva_demo
             .binding = 0,
             .format = VK_FORMAT_R32G32B32_SFLOAT,
             .offset = offsetof(Vertex, col)
+    },
+        bv::VertexInputAttributeDescription{
+            .location = 2,
+            .binding = 0,
+            .format = VK_FORMAT_R32G32_SFLOAT,
+            .offset = offsetof(Vertex, texcoord)
     }
     };
 
@@ -414,7 +420,7 @@ namespace beva_demo
                 .priorities = { 1.f }
                 });
         }
-        
+
         bv::PhysicalDeviceFeatures enabled_features{};
         enabled_features.sampler_anisotropy = true;
 
@@ -604,7 +610,7 @@ namespace beva_demo
 
     void App::create_descriptor_set_layout()
     {
-        bv::DescriptorSetLayoutBinding binding{
+        bv::DescriptorSetLayoutBinding ubo_layout_binding{
             .binding = 0,
             .descriptor_type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             .descriptor_count = 1,
@@ -612,11 +618,19 @@ namespace beva_demo
             .immutable_samplers = {}
         };
 
+        bv::DescriptorSetLayoutBinding sampler_layout_binding{
+            .binding = 1,
+            .descriptor_type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptor_count = 1,
+            .stage_flags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .immutable_samplers = {}
+        };
+
         auto result = bv::DescriptorSetLayout::create(
             device,
             {
                 .flags = 0,
-                .bindings = { binding }
+                .bindings = { ubo_layout_binding, sampler_layout_binding }
             }
         );
         CHECK_BV_RESULT(result, "create descriptor set layout");
@@ -1051,17 +1065,22 @@ namespace beva_demo
 
     void App::create_descriptor_pool()
     {
-        bv::DescriptorPoolSize pool_size{
+        std::vector<bv::DescriptorPoolSize> pool_sizes;
+        pool_sizes.push_back({
             .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             .descriptor_count = MAX_FRAMES_IN_FLIGHT
-        };
+            });
+        pool_sizes.push_back({
+            .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptor_count = MAX_FRAMES_IN_FLIGHT
+            });
 
         auto result = bv::DescriptorPool::create(
             device,
             {
                 .flags = 0,
                 .max_sets = MAX_FRAMES_IN_FLIGHT,
-                .pool_sizes = { pool_size }
+                .pool_sizes = pool_sizes
             }
         );
         CHECK_BV_RESULT(result, "create descriptor pool");
@@ -1083,24 +1102,43 @@ namespace beva_demo
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
-            bv::DescriptorBufferInfo buffer_info{
+            bv::DescriptorBufferInfo uniform_buffer_info{
                 .buffer = uniform_bufs[i],
                 .offset = 0,
                 .range = sizeof(UniformBufferObject)
             };
 
-            bv::WriteDescriptorSet descriptor_write{
+            bv::DescriptorImageInfo sampler_image_info{
+                .sampler = texture_sampler,
+                .image_view = texture_imgview,
+                .image_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            };
+
+            std::vector<bv::WriteDescriptorSet> descriptor_writes;
+
+            descriptor_writes.push_back({
                 .dst_set = descriptor_sets[i],
                 .dst_binding = 0,
                 .dst_array_element = 0,
                 .descriptor_count = 1,
                 .descriptor_type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                 .image_infos = {},
-                .buffer_infos = { buffer_info },
+                .buffer_infos = { uniform_buffer_info },
                 .texel_buffer_views = {}
-            };
+                });
 
-            bv::DescriptorSet::update_sets(device, { descriptor_write }, {});
+            descriptor_writes.push_back({
+                .dst_set = descriptor_sets[i],
+                .dst_binding = 1,
+                .dst_array_element = 0,
+                .descriptor_count = 1,
+                .descriptor_type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                .image_infos = { sampler_image_info },
+                .buffer_infos = {},
+                .texel_buffer_views = {}
+                });
+
+            bv::DescriptorSet::update_sets(device, descriptor_writes, {});
         }
     }
 
@@ -1642,7 +1680,7 @@ namespace beva_demo
 
         ubo.model = glm::rotate(
             glm::mat4(1.f),
-            elapsed * glm::radians(90.f),
+            elapsed * glm::radians(45.f),
             glm::vec3(0.f, 0.f, 1.f)
         );
 
