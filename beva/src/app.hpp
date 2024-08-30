@@ -13,8 +13,8 @@
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
 
 namespace beva_demo
 {
@@ -76,8 +76,12 @@ namespace beva_demo
         bv::PipelineLayoutPtr pipeline_layout = nullptr;
         bv::GraphicsPipelinePtr graphics_pipeline = nullptr;
         std::vector<bv::FramebufferPtr> swapchain_framebufs;
+
         bv::CommandPoolPtr cmd_pool = nullptr;
-        bv::CommandPoolPtr transfer_cmd_pool = nullptr;
+        bv::CommandPoolPtr transient_cmd_pool = nullptr;
+
+        bv::ImagePtr texture_img = nullptr;
+        bv::DeviceMemoryPtr texture_img_mem = nullptr;
 
         bv::BufferPtr vertex_buf = nullptr;
         bv::DeviceMemoryPtr vertex_buf_mem = nullptr;
@@ -123,6 +127,7 @@ namespace beva_demo
         void create_graphics_pipeline();
         void create_framebuffers();
         void create_command_pools();
+        void create_texture_image();
         void create_vertex_buffer();
         void create_index_buffer();
         void create_uniform_buffers();
@@ -136,15 +141,63 @@ namespace beva_demo
         void cleanup_swapchain();
         void recreate_swapchain();
 
+        // if use_transfer_pool is true, the command buffer will be allocated
+        // from transfer_cmd_pool instead of cmd_pool. transfer_cmd_pool has the
+        // VK_COMMAND_POOL_CREATE_TRANSIENT_BIT flag enabled which might be of
+        // interest.
+        bv::CommandBufferPtr begin_single_time_commands(
+            bool use_transient_pool
+        );
+
+        // if no fence is provided, Queue::wait_idle() will be used. if a fence
+        // is provided you'll be in charge of synchronization (like waiting on
+        // the fence).
+        void end_single_time_commands(
+            bv::CommandBufferPtr& cmd_buf,
+            const bv::FencePtr fence = nullptr
+        );
+
         uint32_t find_memory_type_idx(
             uint32_t supported_type_bits,
             VkMemoryPropertyFlags required_properties
         );
 
+        void create_image(
+            uint32_t width,
+            uint32_t height,
+            VkFormat format,
+            VkImageTiling tiling,
+            VkImageUsageFlags usage,
+            VkMemoryPropertyFlags memory_properties,
+            bv::ImagePtr& out_image,
+            bv::DeviceMemoryPtr& out_image_memory
+        );
+
+        // when new_layout is VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, the
+        // vertex_shader argument defines whether dstStageMask should be set to
+        // VK_PIPELINE_STAGE_VERTEX_SHADER_BIT or
+        // VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, otherwise it's ignored.
+        void transition_image_layout(
+            const bv::CommandBufferPtr& cmd_buf,
+            const bv::ImagePtr& image,
+            VkFormat format,
+            VkImageLayout old_layout,
+            VkImageLayout new_layout,
+            bool vertex_shader = false
+        );
+
+        void copy_buffer_to_image(
+            const bv::CommandBufferPtr& cmd_buf,
+            const bv::BufferPtr& buffer,
+            const bv::ImagePtr& image,
+            uint32_t width,
+            uint32_t height
+        );
+
         void create_buffer(
             VkDeviceSize size,
             VkBufferUsageFlags usage,
-            VkMemoryPropertyFlags properties,
+            VkMemoryPropertyFlags memory_properties,
             bv::BufferPtr& out_buffer,
             bv::DeviceMemoryPtr& out_buffer_memory
         );

@@ -9,6 +9,9 @@
 #include <stdexcept>
 #include <cstdlib>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image/stb_image.h"
+
 #define CHECK_BV_RESULT(result, operation_name) \
     if (!result.ok())                           \
     {                                           \
@@ -76,6 +79,7 @@ namespace beva_demo
         create_graphics_pipeline();
         create_framebuffers();
         create_command_pools();
+        create_texture_image();
         create_vertex_buffer();
         create_index_buffer();
         create_uniform_buffers();
@@ -106,6 +110,9 @@ namespace beva_demo
     {
         cleanup_swapchain();
 
+        texture_img = nullptr;
+        texture_img_mem = nullptr;
+
         uniform_bufs.clear();
         uniform_bufs_mem.clear();
 
@@ -128,7 +135,7 @@ namespace beva_demo
         semaphs_render_finished.clear();
         semaphs_image_available.clear();
 
-        transfer_cmd_pool = nullptr;
+        transient_cmd_pool = nullptr;
         cmd_pool = nullptr;
 
         device = nullptr;
@@ -292,6 +299,18 @@ namespace beva_demo
             const auto& swapchain_support = pdev->swapchain_support().value();
             if (swapchain_support.present_modes.empty()
                 || swapchain_support.surface_formats.empty())
+            {
+                continue;
+            }
+
+            auto format_props_result = pdev->fetch_image_format_properties(
+                VK_FORMAT_R8G8B8A8_SRGB,
+                VK_IMAGE_TYPE_2D,
+                VK_IMAGE_TILING_OPTIMAL,
+                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                0
+            );
+            if (!format_props_result.ok())
             {
                 continue;
             }
@@ -808,15 +827,101 @@ namespace beva_demo
         CHECK_BV_RESULT(pool_result, "create command pool");
         cmd_pool = pool_result.value();
 
-        auto transfer_pool_result = bv::CommandPool::create(
+        auto transient_pool_result = bv::CommandPool::create(
             device,
             {
                 .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
                 .queue_family_index = graphics_family_idx
             }
         );
-        CHECK_BV_RESULT(transfer_pool_result, "create transfer command pool");
-        transfer_cmd_pool = transfer_pool_result.value();
+        CHECK_BV_RESULT(transient_pool_result, "create transient command pool");
+        transient_cmd_pool = transient_pool_result.value();
+    }
+
+    void App::create_texture_image()
+    {
+        // load image file
+
+        int tex_width, tex_height, tex_channels;
+        stbi_uc* pixels = stbi_load(
+            "./textures/texture.png",
+            &tex_width,
+            &tex_height,
+            &tex_channels,
+            STBI_rgb_alpha
+        );
+        if (!pixels)
+        {
+            throw std::runtime_error("failed to load texture image");
+        }
+
+        constexpr uint32_t n_channels = 4;
+        constexpr uint32_t n_bytes_per_channel = 1;
+        VkDeviceSize size =
+            (uint32_t)tex_width * (uint32_t)tex_height
+            * n_channels * n_bytes_per_channel;
+
+        // upload to staging buffer and free
+
+        bv::BufferPtr staging_buf;
+        bv::DeviceMemoryPtr staging_buf_mem;
+        create_buffer(
+            size,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+            | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+
+            staging_buf,
+            staging_buf_mem
+        );
+
+        auto upload_result = staging_buf_mem->upload(
+            (void*)pixels,
+            size
+        );
+        stbi_image_free(pixels);
+        CHECK_BV_RESULT(upload_result, "upload texture data");
+
+        // create image
+        create_image(
+            (uint32_t)tex_width,
+            (uint32_t)tex_height,
+            VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            texture_img,
+            texture_img_mem
+        );
+
+        // copy from staging buffer to image
+        auto cmd_buf = begin_single_time_commands(true);
+        transition_image_layout(
+            cmd_buf,
+            texture_img,
+            VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+        );
+        copy_buffer_to_image(
+            cmd_buf,
+            staging_buf,
+            texture_img,
+            (uint32_t)(tex_width),
+            (uint32_t)(tex_height)
+        );
+        transition_image_layout(
+            cmd_buf,
+            texture_img,
+            VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        );
+        end_single_time_commands(cmd_buf);
+
+        staging_buf = nullptr;
+        staging_buf_mem = nullptr;
     }
 
     void App::create_vertex_buffer()
@@ -1106,6 +1211,45 @@ namespace beva_demo
         create_framebuffers();
     }
 
+    bv::CommandBufferPtr App::begin_single_time_commands(
+        bool use_transient_pool
+    )
+    {
+        auto allocate_result = bv::CommandPool::allocate_buffer(
+            use_transient_pool ? transient_cmd_pool : cmd_pool,
+            VK_COMMAND_BUFFER_LEVEL_PRIMARY
+        );
+        CHECK_BV_RESULT(allocate_result, "allocate command buffer");
+        auto cmd_buf = allocate_result.value();
+
+        auto begin_result = cmd_buf->begin(
+            VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+        );
+        CHECK_BV_RESULT(begin_result, "begin command buffer");
+
+        return cmd_buf;
+    }
+
+    void App::end_single_time_commands(
+        bv::CommandBufferPtr& cmd_buf,
+        const bv::FencePtr fence
+    )
+    {
+        auto result = cmd_buf->end();
+        CHECK_BV_RESULT(result, "end command buffer");
+
+        result = graphics_queue->submit({}, {}, { cmd_buf }, {}, fence);
+        CHECK_BV_RESULT(result, "submit command buffer");
+
+        if (fence == nullptr)
+        {
+            result = graphics_queue->wait_idle();
+            CHECK_BV_RESULT(result, "wait for queue idle");
+        }
+
+        cmd_buf = nullptr;
+    }
+
     uint32_t App::find_memory_type_idx(
         uint32_t supported_type_bits,
         VkMemoryPropertyFlags required_properties
@@ -1125,10 +1269,169 @@ namespace beva_demo
         throw std::runtime_error("failed to find a suitable memory type");
     }
 
+    void App::create_image(
+        uint32_t width,
+        uint32_t height,
+        VkFormat format,
+        VkImageTiling tiling,
+        VkImageUsageFlags usage,
+        VkMemoryPropertyFlags memory_properties,
+        bv::ImagePtr& out_image,
+        bv::DeviceMemoryPtr& out_image_memory
+    )
+    {
+        // create image
+        bv::Extent3d extent{
+            .width = width,
+            .height = height,
+            .depth = 1
+        };
+        auto img_result = bv::Image::create(
+            device,
+            {
+                .flags = 0,
+                .image_type = VK_IMAGE_TYPE_2D,
+                .format = format,
+                .extent = extent,
+                .mip_levels = 1,
+                .array_layers = 1,
+                .samples = VK_SAMPLE_COUNT_1_BIT,
+                .tiling = tiling,
+                .usage = usage,
+                .sharing_mode = VK_SHARING_MODE_EXCLUSIVE,
+                .queue_family_indices = {},
+                .initial_layout = VK_IMAGE_LAYOUT_UNDEFINED
+            }
+        );
+        CHECK_BV_RESULT(img_result, "create image");
+        out_image = img_result.value();
+
+        // create memory
+        uint32_t memory_type_idx = find_memory_type_idx(
+            out_image->memory_requirements().memory_type_bits,
+            memory_properties
+        );
+        auto img_mem_result = bv::DeviceMemory::allocate(
+            device,
+            {
+                .allocation_size = out_image->memory_requirements().size,
+                .memory_type_index = memory_type_idx
+            }
+        );
+        CHECK_BV_RESULT(img_mem_result, "allocate image memory");
+        out_image_memory = img_mem_result.value();
+
+        // bind memory
+        auto bind_result = out_image->bind_memory(out_image_memory, 0);
+        CHECK_BV_RESULT(bind_result, "bind image memory");
+    }
+
+    void App::transition_image_layout(
+        const bv::CommandBufferPtr& cmd_buf,
+        const bv::ImagePtr& image,
+        VkFormat format,
+        VkImageLayout old_layout,
+        VkImageLayout new_layout,
+        bool vertex_shader
+    )
+    {
+        VkAccessFlags src_access_mask = 0;
+        VkAccessFlags dst_access_mask = 0;
+        VkPipelineStageFlags src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        VkPipelineStageFlags dst_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
+        if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED
+            && new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+        {
+            src_access_mask = 0;
+            dst_access_mask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+            src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        }
+        else if (old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+            && new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        {
+            src_access_mask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            dst_access_mask = VK_ACCESS_SHADER_READ_BIT;
+
+            src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            dst_stage =
+                vertex_shader
+                ? VK_PIPELINE_STAGE_VERTEX_SHADER_BIT
+                : VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        }
+        else
+        {
+            throw std::invalid_argument("unsupported layout transition");
+        }
+
+        VkImageMemoryBarrier image_barrier{
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .pNext = nullptr,
+            .srcAccessMask = src_access_mask,
+            .dstAccessMask = dst_access_mask,
+            .oldLayout = old_layout,
+            .newLayout = new_layout,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = image->handle(),
+            .subresourceRange = VkImageSubresourceRange{
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1
+        }
+        };
+
+        vkCmdPipelineBarrier(
+            cmd_buf->handle(),
+            src_stage,
+            dst_stage,
+            0,
+            0, nullptr,
+            0, nullptr,
+            1, &image_barrier
+        );
+    }
+
+    void App::copy_buffer_to_image(
+        const bv::CommandBufferPtr& cmd_buf,
+        const bv::BufferPtr& buffer,
+        const bv::ImagePtr& image,
+        uint32_t width,
+        uint32_t height
+    )
+    {
+        VkBufferImageCopy region{
+            .bufferOffset = 0,
+            .bufferRowLength = 0,
+            .bufferImageHeight = 0,
+            .imageSubresource = VkImageSubresourceLayers{
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .mipLevel = 0,
+                .baseArrayLayer = 0,
+                .layerCount = 1
+        },
+            .imageOffset = { 0, 0, 0 },
+            .imageExtent = { width, height, 1 }
+        };
+
+        vkCmdCopyBufferToImage(
+            cmd_buf->handle(),
+            buffer->handle(),
+            image->handle(),
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            1,
+            &region
+        );
+    }
+
     void App::create_buffer(
         VkDeviceSize size,
         VkBufferUsageFlags usage,
-        VkMemoryPropertyFlags properties,
+        VkMemoryPropertyFlags memory_properties,
         bv::BufferPtr& out_buffer,
         bv::DeviceMemoryPtr& out_buffer_memory
     )
@@ -1150,7 +1453,7 @@ namespace beva_demo
         // create memory
         uint32_t memory_type_idx = find_memory_type_idx(
             out_buffer->memory_requirements().memory_type_bits,
-            properties
+            memory_properties
         );
         auto buf_mem_result = bv::DeviceMemory::allocate(
             device,
@@ -1173,17 +1476,7 @@ namespace beva_demo
         VkDeviceSize size
     )
     {
-        auto transfer_cmd_buf_result = bv::CommandPool::allocate_buffer(
-            transfer_cmd_pool,
-            VK_COMMAND_BUFFER_LEVEL_PRIMARY
-        );
-        CHECK_BV_RESULT(transfer_cmd_buf_result, "allocate command buffer");
-        auto transfer_cmd_buf = transfer_cmd_buf_result.value();
-
-        auto result = transfer_cmd_buf->begin(
-            VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
-        );
-        CHECK_BV_RESULT(result, "begin command buffer");
+        auto cmd_buf = begin_single_time_commands(true);
 
         VkBufferCopy copy_region{
             .srcOffset = 0,
@@ -1191,21 +1484,14 @@ namespace beva_demo
             .size = size
         };
         vkCmdCopyBuffer(
-            transfer_cmd_buf->handle(),
+            cmd_buf->handle(),
             src->handle(),
             dst->handle(),
             1,
             &copy_region
         );
 
-        result = transfer_cmd_buf->end();
-        CHECK_BV_RESULT(result, "end command buffer");
-
-        result = graphics_queue->submit({}, {}, { transfer_cmd_buf }, {});
-        CHECK_BV_RESULT(result, "submit command buffer");
-
-        result = graphics_queue->wait_idle();
-        CHECK_BV_RESULT(result, "wait for queue idle");
+        end_single_time_commands(cmd_buf);
     }
 
     void App::record_command_buffer(

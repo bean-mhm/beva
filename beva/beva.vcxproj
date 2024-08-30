@@ -69,7 +69,9 @@
       <AdditionalDependencies>vulkan-1.lib;glfw3.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>XCOPY "$(ProjectDir)licenses/" "$(OutDir)licenses/" /S /Y
+      <Command>XCOPY "$(ProjectDir)licenses\" "$(OutDir)licenses\" /S /Y
+
+XCOPY "$(ProjectDir)textures\" "$(OutDir)textures\" /S /Y
 
 set VS_PROJ_DIR=$(ProjectDir)
 set VS_OUT_DIR=$(OutDir)
@@ -100,6 +102,8 @@ $(ProjectDir)shaders/compile.bat
     </Link>
     <PostBuildEvent>
       <Command>XCOPY "$(ProjectDir)licenses\" "$(OutDir)licenses\" /S /Y
+
+XCOPY "$(ProjectDir)textures\" "$(OutDir)textures\" /S /Y
 
 set VS_PROJ_DIR=$(ProjectDir)
 set VS_OUT_DIR=$(OutDir)
@@ -407,6 +411,7 @@ $(ProjectDir)shaders/compile.bat
     <ClInclude Include="src\lib\glm\vec3.hpp" />
     <ClInclude Include="src\lib\glm\vec4.hpp" />
     <ClInclude Include="src\lib\glm\vector_relational.hpp" />
+    <ClInclude Include="src\lib\stb_image\stb_image.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\lib\glm\detail\func_common.inl" />

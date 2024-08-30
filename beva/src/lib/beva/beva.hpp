@@ -943,6 +943,23 @@ namespace bv
         PhysicalDeviceFeatures enabled_features;
     };
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageCreateInfo.html
+    struct ImageConfig
+    {
+        VkImageCreateFlags flags;
+        VkImageType image_type;
+        VkFormat format;
+        Extent3d extent;
+        uint32_t mip_levels;
+        uint32_t array_layers;
+        VkSampleCountFlagBits samples;
+        VkImageTiling tiling;
+        VkImageUsageFlags usage;
+        VkSharingMode sharing_mode;
+        std::vector<uint32_t> queue_family_indices;
+        VkImageLayout initial_layout;
+    };
+
     // provided by VK_KHR_swapchain
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSwapchainCreateInfoKHR.html
     struct SwapchainConfig
@@ -1597,6 +1614,32 @@ namespace bv
         VkDeviceSize range;
     };
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFormatProperties.html
+    struct FormatProperties
+    {
+        VkFormatFeatureFlags linear_tiling_features;
+        VkFormatFeatureFlags optimal_tiling_features;
+        VkFormatFeatureFlags buffer_features;
+    };
+
+    FormatProperties FormatProperties_from_vk(
+        const VkFormatProperties& properties
+    );
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkImageFormatProperties.html
+    struct ImageFormatProperties
+    {
+        Extent3d max_extent;
+        uint32_t max_mip_levels;
+        uint32_t max_array_layers;
+        VkSampleCountFlags sample_counts;
+        VkDeviceSize max_resource_size;
+    };
+
+    ImageFormatProperties ImageFormatProperties_from_vk(
+        const VkImageFormatProperties& properties
+    );
+
 #pragma endregion
 
 #pragma region error handling
@@ -1734,12 +1777,14 @@ namespace bv
     class Allocator
     {
     public:
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/PFN_vkAllocationFunction.html
         virtual void* allocate(
             size_t size,
             size_t alignment,
             VkSystemAllocationScope allocation_scope
         ) = 0;
 
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/PFN_vkReallocationFunction.html
         virtual void* reallocate(
             void* original,
             size_t size,
@@ -1747,14 +1792,17 @@ namespace bv
             VkSystemAllocationScope allocation_scope
         ) = 0;
 
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/PFN_vkFreeFunction.html
         virtual void free(void* memory) = 0;
 
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/PFN_vkInternalAllocationNotification.html
         virtual void internal_allocation_notification(
             size_t size,
             VkInternalAllocationType allocation_type,
             VkSystemAllocationScope allocation_scope
         ) = 0;
 
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/PFN_vkInternalFreeNotification.html
         virtual void internal_free_notification(
             size_t size,
             VkInternalAllocationType allocation_type,
@@ -1808,12 +1856,26 @@ namespace bv
             return _swapchain_support;
         }
 
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumerateDeviceExtensionProperties.html
         Result<std::vector<ExtensionProperties>> fetch_available_extensions(
             const std::string& layer_name = ""
         );
 
         Result<> update_swapchain_support(
             const SurfacePtr& surface
+        );
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceFormatProperties.html
+        FormatProperties fetch_format_properties(VkFormat format);
+
+        // might return error with ApiResult::ErrorFormatNotSupported
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceImageFormatProperties.html
+        Result<ImageFormatProperties> fetch_image_format_properties(
+            VkFormat format,
+            VkImageType type,
+            VkImageTiling tiling,
+            VkImageUsageFlags usage,
+            VkImageCreateFlags flags
         );
 
     protected:
@@ -2142,15 +2204,65 @@ namespace bv
         Image(const Image& other) = delete;
         Image(Image&& other) = default;
 
+        static Result<ImagePtr> create(
+            const DevicePtr& device,
+            const ImageConfig& config
+        );
+
+        // if true, then device(), config(), and memory_requirements() will
+        // have useless default values (nullptr and zeros) and you shouldn't
+        // use bind_memory() either, or anything other than handle(). this is
+        // for swapchain images which aren't created by the user, so we have no
+        // information about them but their handle.
+        constexpr bool created_externally() const
+        {
+            return _created_externally;
+        }
+
+        constexpr const DevicePtr& device() const
+        {
+            return _device;
+        }
+
+        constexpr const ImageConfig& config() const
+        {
+            return _config;
+        }
+
+        constexpr const MemoryRequirements& memory_requirements() const
+        {
+            return _memory_requirements;
+        }
+
         constexpr VkImage handle() const
         {
             return _handle;
         }
 
+        Result<> bind_memory(
+            const DeviceMemoryPtr& memory,
+            VkDeviceSize memory_offset
+        );
+
+        ~Image();
+
     protected:
+        bool _created_externally;
+
+        DevicePtr _device;
+        ImageConfig _config;
+
+        MemoryRequirements _memory_requirements{};
+
         VkImage _handle;
 
-        Image(VkImage handle);
+        Image(
+            const DevicePtr& device,
+            const ImageConfig& config
+        );
+
+        // this should only be used by Swapchain when retrieving its images
+        Image(VkImage handle_created_externally);
 
     };
 

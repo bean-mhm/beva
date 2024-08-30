@@ -1774,6 +1774,30 @@ namespace bv
         };
     }
 
+    FormatProperties FormatProperties_from_vk(
+        const VkFormatProperties& properties
+    )
+    {
+        return FormatProperties{
+            .linear_tiling_features = properties.linearTilingFeatures,
+            .optimal_tiling_features = properties.optimalTilingFeatures,
+            .buffer_features = properties.bufferFeatures
+        };
+    }
+
+    ImageFormatProperties ImageFormatProperties_from_vk(
+        const VkImageFormatProperties& properties
+    )
+    {
+        return ImageFormatProperties{
+            .max_extent = Extent3d_from_vk(properties.maxExtent),
+            .max_mip_levels = properties.maxMipLevels,
+            .max_array_layers = properties.maxArrayLayers,
+            .sample_counts = properties.sampleCounts,
+            .max_resource_size = properties.maxResourceSize
+        };
+    }
+
     Error::Error()
         : _message("no error information provided"),
         _api_result(std::nullopt),
@@ -1953,6 +1977,42 @@ namespace bv
         };
 
         return Result();
+    }
+
+    FormatProperties PhysicalDevice::fetch_format_properties(VkFormat format)
+    {
+        VkFormatProperties vk_properties;
+        vkGetPhysicalDeviceFormatProperties(
+            handle(),
+            format,
+            &vk_properties
+        );
+        return FormatProperties_from_vk(vk_properties);
+    }
+
+    Result<ImageFormatProperties> PhysicalDevice::fetch_image_format_properties(
+        VkFormat format,
+        VkImageType type,
+        VkImageTiling tiling,
+        VkImageUsageFlags usage,
+        VkImageCreateFlags flags
+    )
+    {
+        VkImageFormatProperties vk_properties;
+        VkResult vk_result = vkGetPhysicalDeviceImageFormatProperties(
+            handle(),
+            format,
+            type,
+            tiling,
+            usage,
+            flags,
+            &vk_properties
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error("", (ApiResult)vk_result, false);
+        }
+        return ImageFormatProperties_from_vk(vk_properties);
     }
 
     PhysicalDevice::PhysicalDevice(
@@ -2695,8 +2755,106 @@ namespace bv
         _config(config)
     {}
 
-    Image::Image(VkImage handle)
-        : _handle(handle)
+    Result<ImagePtr> Image::create(
+        const DevicePtr& device,
+        const ImageConfig& config
+    )
+    {
+        ImagePtr img = std::make_shared<Image_public_ctor>(
+            device,
+            config
+        );
+
+        VkImageCreateInfo create_info{
+            .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = img->config().flags,
+            .imageType = img->config().image_type,
+            .format = img->config().format,
+            .extent = Extent3d_to_vk(img->config().extent),
+            .mipLevels = img->config().mip_levels,
+            .arrayLayers = img->config().array_layers,
+            .samples = img->config().samples,
+            .tiling = img->config().tiling,
+            .usage = img->config().usage,
+            .sharingMode = img->config().sharing_mode,
+
+            .queueFamilyIndexCount =
+            (uint32_t)img->config().queue_family_indices.size(),
+
+            .pQueueFamilyIndices = img->config().queue_family_indices.data(),
+            .initialLayout = img->config().initial_layout
+        };
+
+        VkResult vk_result = vkCreateImage(
+            img->device()->handle(),
+            &create_info,
+            img->device()->context()->vk_allocator_ptr(),
+            &img->_handle
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error("", (ApiResult)vk_result, false);
+        }
+
+        VkMemoryRequirements vk_mem_requirements;
+        vkGetImageMemoryRequirements(
+            img->device()->handle(),
+            img->handle(),
+            &vk_mem_requirements
+        );
+        img->_memory_requirements = MemoryRequirements_from_vk(
+            vk_mem_requirements
+        );
+
+        return img;
+    }
+
+    Result<> Image::bind_memory(
+        const DeviceMemoryPtr& memory,
+        VkDeviceSize memory_offset
+    )
+    {
+        VkResult vk_result = vkBindImageMemory(
+            device()->handle(),
+            handle(),
+            memory->handle(),
+            memory_offset
+        );
+        if (vk_result != VK_SUCCESS)
+        {
+            return Error("", (ApiResult)vk_result, false);
+        }
+        return Result();
+    }
+
+    Image::~Image()
+    {
+        if (created_externally())
+        {
+            return;
+        }
+        vkDestroyImage(
+            device()->handle(),
+            handle(),
+            device()->context()->vk_allocator_ptr()
+        );
+    }
+
+    Image::Image(const DevicePtr& device, const ImageConfig& config)
+        : _created_externally(false),
+        _device(device),
+        _config(config),
+        _memory_requirements({}),
+        _handle(nullptr)
+    {}
+
+    Image::Image(VkImage handle_created_externally)
+        : _created_externally(true),
+        _device(nullptr),
+        _config({}),
+        _memory_requirements({}),
+        _handle(handle_created_externally)
     {}
 
     Result<SwapchainPtr> Swapchain::create(
