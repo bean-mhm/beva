@@ -1382,6 +1382,19 @@ namespace bv
         };
     }
 
+    VkStencilOpState StencilOpState_to_vk(const StencilOpState& state)
+    {
+        return VkStencilOpState{
+            .failOp = state.fail_op,
+            .passOp = state.pass_op,
+            .depthFailOp = state.depth_fail_op,
+            .compareOp = state.compare_op,
+            .compareMask = state.compare_mask,
+            .writeMask = state.write_mask,
+            .reference = state.reference
+        };
+    }
+
     VkPipelineDepthStencilStateCreateInfo DepthStencilState_to_vk(
         const DepthStencilState& state
     )
@@ -1395,8 +1408,8 @@ namespace bv
             .depthCompareOp = state.depth_compare_op,
             .depthBoundsTestEnable = state.depth_bounds_test_enable,
             .stencilTestEnable = state.stencil_test_enable,
-            .front = state.front,
-            .back = state.back,
+            .front = StencilOpState_to_vk(state.front),
+            .back = StencilOpState_to_vk(state.back),
             .minDepthBounds = state.min_depth_bounds,
             .maxDepthBounds = state.max_depth_bounds
         };
@@ -1988,6 +2001,34 @@ namespace bv
             &vk_properties
         );
         return FormatProperties_from_vk(vk_properties);
+    }
+
+    Result<VkFormat> PhysicalDevice::find_supported_image_format(
+        const std::vector<VkFormat>& candidates,
+        VkImageTiling tiling,
+        VkFormatFeatureFlags features
+    )
+    {
+        for (VkFormat format : candidates)
+        {
+            auto props = fetch_format_properties(format);
+            if (tiling == VK_IMAGE_TILING_LINEAR
+                && (props.linear_tiling_features & features) == features)
+            {
+                return format;
+            }
+            else if (tiling == VK_IMAGE_TILING_OPTIMAL
+                && (props.optimal_tiling_features & features) == features)
+            {
+                return format;
+            }
+        }
+        return Error(
+            "none of the provided candidates for an image format are supported "
+            "with the provided tiling and required features.",
+            std::nullopt,
+            false
+        );
     }
 
     Result<ImageFormatProperties> PhysicalDevice::fetch_image_format_properties(
@@ -4570,6 +4611,26 @@ namespace bv
         _buffer(buffer),
         _config(config)
     {}
+
+    bool format_has_depth_component(VkFormat format)
+    {
+        return
+            format == VK_FORMAT_D16_UNORM
+            || format == VK_FORMAT_X8_D24_UNORM_PACK32
+            || format == VK_FORMAT_D32_SFLOAT
+            || format == VK_FORMAT_D16_UNORM_S8_UINT
+            || format == VK_FORMAT_D24_UNORM_S8_UINT
+            || format == VK_FORMAT_D32_SFLOAT_S8_UINT;
+    }
+
+    bool format_has_stencil_component(VkFormat format)
+    {
+        return
+            format == VK_FORMAT_S8_UINT
+            || format == VK_FORMAT_D16_UNORM_S8_UINT
+            || format == VK_FORMAT_D24_UNORM_S8_UINT
+            || format == VK_FORMAT_D32_SFLOAT_S8_UINT;
+    }
 
 #pragma region Vulkan callbacks
 

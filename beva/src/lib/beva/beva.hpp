@@ -1219,6 +1219,20 @@ namespace bv
         std::vector<VkSampleMask>& waste_sample_mask
     );
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkStencilOpState.html
+    struct StencilOpState
+    {
+        VkStencilOp fail_op;
+        VkStencilOp pass_op;
+        VkStencilOp depth_fail_op;
+        VkCompareOp compare_op;
+        uint32_t compare_mask;
+        uint32_t write_mask;
+        uint32_t reference;
+    };
+
+    VkStencilOpState StencilOpState_to_vk(const StencilOpState& state);
+
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineDepthStencilStateCreateInfo.html
     struct DepthStencilState
     {
@@ -1228,8 +1242,8 @@ namespace bv
         VkCompareOp depth_compare_op;
         bool depth_bounds_test_enable;
         bool stencil_test_enable;
-        VkStencilOpState front;
-        VkStencilOpState back;
+        StencilOpState front;
+        StencilOpState back;
         float min_depth_bounds;
         float max_depth_bounds;
     };
@@ -1773,6 +1787,8 @@ namespace bv
 
 #pragma endregion
 
+#pragma region RAII wrappers and abstract classes
+
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkAllocationCallbacks.html
     class Allocator
     {
@@ -1867,6 +1883,14 @@ namespace bv
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceFormatProperties.html
         FormatProperties fetch_format_properties(VkFormat format);
+
+        // find the first image format in the candidates that is supported with
+        // the provided tiling and required features.
+        Result<VkFormat> find_supported_image_format(
+            const std::vector<VkFormat>& candidates,
+            VkImageTiling tiling,
+            VkFormatFeatureFlags features
+        );
 
         // might return error with ApiResult::ErrorFormatNotSupported
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceImageFormatProperties.html
@@ -3134,5 +3158,15 @@ namespace bv
         );
 
     };
+
+#pragma endregion
+
+#pragma region helper functions
+
+    bool format_has_depth_component(VkFormat format);
+    bool format_has_stencil_component(VkFormat format);
+
+#pragma endregion
+
 
 }
