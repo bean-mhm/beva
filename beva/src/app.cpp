@@ -80,6 +80,7 @@ namespace beva_demo
         create_framebuffers();
         create_command_pools();
         create_texture_image();
+        create_texture_sampler();
         create_vertex_buffer();
         create_index_buffer();
         create_uniform_buffers();
@@ -110,6 +111,8 @@ namespace beva_demo
     {
         cleanup_swapchain();
 
+        texture_sampler = nullptr;
+        texture_imgview = nullptr;
         texture_img = nullptr;
         texture_img_mem = nullptr;
 
@@ -214,9 +217,9 @@ namespace beva_demo
             .extensions = extensions
         };
 
-        auto context_result = bv::Context::create(config);
-        CHECK_BV_RESULT(context_result, "create context");
-        context = context_result.value();
+        auto result = bv::Context::create(config);
+        CHECK_BV_RESULT(result, "create context");
+        context = result.value();
     }
 
     void App::setup_debug_messenger()
@@ -236,7 +239,7 @@ namespace beva_demo
             | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT
             | VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT;
 
-        auto messenger_result = bv::DebugMessenger::create(
+        auto result = bv::DebugMessenger::create(
             context,
             severity_filter,
             tpye_filter,
@@ -249,8 +252,8 @@ namespace beva_demo
                 std::cout << message_data.message << '\n';
             }
         );
-        CHECK_BV_RESULT(messenger_result, "create debug messenger");
-        debug_messenger = messenger_result.value();
+        CHECK_BV_RESULT(result, "create debug messenger");
+        debug_messenger = result.value();
     }
 
     void App::create_surface()
@@ -311,6 +314,11 @@ namespace beva_demo
                 0
             );
             if (!format_props_result.ok())
+            {
+                continue;
+            }
+
+            if (!pdev->features().sampler_anisotropy)
             {
                 continue;
             }
@@ -406,20 +414,23 @@ namespace beva_demo
                 .priorities = { 1.f }
                 });
         }
+        
+        bv::PhysicalDeviceFeatures enabled_features{};
+        enabled_features.sampler_anisotropy = true;
 
         bv::DeviceConfig config{
             .queue_requests = queue_requests,
             .extensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME },
-            .enabled_features = bv::PhysicalDeviceFeatures{}
+            .enabled_features = enabled_features
         };
 
-        auto device_result = bv::Device::create(
+        auto result = bv::Device::create(
             context,
             physical_device,
             config
         );
-        CHECK_BV_RESULT(device_result, "create device");
-        device = device_result.value();
+        CHECK_BV_RESULT(result, "create device");
+        device = result.value();
 
         graphics_queue =
             bv::Device::retrieve_queue(device, graphics_family_idx, 0);
@@ -430,8 +441,8 @@ namespace beva_demo
 
     void App::create_swapchain()
     {
-        auto result = physical_device->update_swapchain_support(surface);
-        CHECK_BV_RESULT(result, "update swapchain support details");
+        auto support_result = physical_device->update_swapchain_support(surface);
+        CHECK_BV_RESULT(support_result, "update swapchain support details");
 
         if (!physical_device->swapchain_support().has_value())
         {
@@ -523,42 +534,19 @@ namespace beva_demo
             .clipped = true
         };
 
-        auto swapchain_result = bv::Swapchain::create(device, surface, config);
-        CHECK_BV_RESULT(swapchain_result, "create swapchain");
-        swapchain = swapchain_result.value();
+        // create swapchain
+        auto result = bv::Swapchain::create(device, surface, config);
+        CHECK_BV_RESULT(result, "create swapchain");
+        swapchain = result.value();
 
+        // create swapchain image views
         swapchain_imgviews.clear();
         for (size_t i = 0; i < swapchain->images().size(); i++)
         {
-            bv::ImageViewConfig config{
-                .flags = {},
-                .view_type = VK_IMAGE_VIEW_TYPE_2D,
-                .format = surface_format.format,
-                .components = {},
-                .subresource_range = bv::ImageSubresourceRange{
-                    .aspect_mask = { VK_IMAGE_ASPECT_COLOR_BIT },
-                    .base_mip_level = 0,
-                    .level_count = 1,
-                    .base_array_layer = 0,
-                    .layer_count = 1
-            }
-            };
-
-            auto image_view_result = bv::ImageView::create(
-                device,
+            swapchain_imgviews.push_back(create_image_view(
                 swapchain->images()[i],
-                config
-            );
-            if (!image_view_result.ok())
-            {
-                throw std::runtime_error(std::format(
-                    "failed to create image view for swapchain image at index "
-                    "{}: {}",
-                    i,
-                    image_view_result.error().to_string()
-                ).c_str());
-            }
-            swapchain_imgviews.push_back(image_view_result.value());
+                surface_format.format
+            ));
         }
     }
 
@@ -601,7 +589,7 @@ namespace beva_demo
             .dependency_flags = 0
         };
 
-        auto render_pass_result = bv::RenderPass::create(
+        auto result = bv::RenderPass::create(
             device,
             {
                 .flags = 0,
@@ -610,8 +598,8 @@ namespace beva_demo
                 .dependencies = { dependency }
             }
         );
-        CHECK_BV_RESULT(render_pass_result, "create render pass");
-        render_pass = render_pass_result.value();
+        CHECK_BV_RESULT(result, "create render pass");
+        render_pass = result.value();
     }
 
     void App::create_descriptor_set_layout()
@@ -624,15 +612,15 @@ namespace beva_demo
             .immutable_samplers = {}
         };
 
-        auto layout_result = bv::DescriptorSetLayout::create(
+        auto result = bv::DescriptorSetLayout::create(
             device,
             {
                 .flags = 0,
                 .bindings = { binding }
             }
         );
-        CHECK_BV_RESULT(layout_result, "create descriptor set layout");
-        descriptor_set_layout = layout_result.value();
+        CHECK_BV_RESULT(result, "create descriptor set layout");
+        descriptor_set_layout = result.value();
     }
 
     void App::create_graphics_pipeline()
@@ -792,7 +780,7 @@ namespace beva_demo
         swapchain_framebufs.clear();
         for (size_t i = 0; i < swapchain_imgviews.size(); i++)
         {
-            auto framebuf_result = bv::Framebuffer::create(
+            auto result = bv::Framebuffer::create(
                 device,
                 {
                     .flags = 0,
@@ -803,15 +791,8 @@ namespace beva_demo
                     .layers = 1
                 }
             );
-            if (!framebuf_result.ok())
-            {
-                throw std::runtime_error(std::format(
-                    "failed to create swapchain framebuffer at index {}: {}",
-                    i,
-                    framebuf_result.error().to_string()
-                ).c_str());
-            }
-            swapchain_framebufs.push_back(framebuf_result.value());
+            CHECK_BV_RESULT(result, "create swapchain framebuffer");
+            swapchain_framebufs.push_back(result.value());
         }
     }
 
@@ -922,6 +903,45 @@ namespace beva_demo
 
         staging_buf = nullptr;
         staging_buf_mem = nullptr;
+
+        // create image view
+        texture_imgview = create_image_view(
+            texture_img,
+            texture_img->config().format
+        );
+    }
+
+    void App::create_texture_sampler()
+    {
+        float max_anisotropy = std::clamp(
+            physical_device->properties().limits.max_sampler_anisotropy,
+            1.f,
+            8.f
+        );
+
+        auto result = bv::Sampler::create(
+            device,
+            {
+                .flags = 0,
+                .mag_filter = VK_FILTER_LINEAR,
+                .min_filter = VK_FILTER_LINEAR,
+                .mipmap_mode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+                .address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                .address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                .mip_lod_bias = 0.f,
+                .anisotropy_enable = true,
+                .max_anisotropy = max_anisotropy,
+                .compare_enable = false,
+                .compare_op = VK_COMPARE_OP_ALWAYS,
+                .min_lod = 0.f,
+                .max_lod = 0.f,
+                .border_color = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+                .unnormalized_coordinates = false
+            }
+        );
+        CHECK_BV_RESULT(result, "create sampler");
+        texture_sampler = result.value();
     }
 
     void App::create_vertex_buffer()
@@ -1036,7 +1056,7 @@ namespace beva_demo
             .descriptor_count = MAX_FRAMES_IN_FLIGHT
         };
 
-        auto pool_result = bv::DescriptorPool::create(
+        auto result = bv::DescriptorPool::create(
             device,
             {
                 .flags = 0,
@@ -1044,13 +1064,13 @@ namespace beva_demo
                 .pool_sizes = { pool_size }
             }
         );
-        CHECK_BV_RESULT(pool_result, "create descriptor pool");
-        descriptor_pool = pool_result.value();
+        CHECK_BV_RESULT(result, "create descriptor pool");
+        descriptor_pool = result.value();
     }
 
     void App::create_descriptor_sets()
     {
-        auto sets_result = bv::DescriptorPool::allocate_sets(
+        auto result = bv::DescriptorPool::allocate_sets(
             descriptor_pool,
             MAX_FRAMES_IN_FLIGHT,
             std::vector<bv::DescriptorSetLayoutPtr>(
@@ -1058,8 +1078,8 @@ namespace beva_demo
                 descriptor_set_layout
             )
         );
-        CHECK_BV_RESULT(sets_result, "allocate descriptor sets");
-        descriptor_sets = sets_result.value();
+        CHECK_BV_RESULT(result, "allocate descriptor sets");
+        descriptor_sets = result.value();
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
@@ -1086,13 +1106,13 @@ namespace beva_demo
 
     void App::create_command_buffers()
     {
-        auto cmd_bufs_result = bv::CommandPool::allocate_buffers(
+        auto result = bv::CommandPool::allocate_buffers(
             cmd_pool,
             VK_COMMAND_BUFFER_LEVEL_PRIMARY,
             MAX_FRAMES_IN_FLIGHT
         );
-        CHECK_BV_RESULT(cmd_bufs_result, "allocate command buffers");
-        cmd_bufs = cmd_bufs_result.value();
+        CHECK_BV_RESULT(result, "allocate command buffers");
+        cmd_bufs = result.value();
     }
 
     void App::create_sync_objects()
@@ -1426,6 +1446,34 @@ namespace beva_demo
             1,
             &region
         );
+    }
+
+    bv::ImageViewPtr App::create_image_view(
+        const bv::ImagePtr& image,
+        VkFormat format
+    )
+    {
+        bv::ImageSubresourceRange subresource_range{
+            .aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .base_mip_level = 0,
+            .level_count = 1,
+            .base_array_layer = 0,
+            .layer_count = 1
+        };
+
+        auto result = bv::ImageView::create(
+            device,
+            image,
+            {
+                .flags = 0,
+                .view_type = VK_IMAGE_VIEW_TYPE_2D,
+                .format = format,
+                .components = {},
+                .subresource_range = subresource_range
+            }
+        );
+        CHECK_BV_RESULT(result, "create image view");
+        return result.value();
     }
 
     void App::create_buffer(

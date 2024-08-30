@@ -82,6 +82,8 @@ namespace beva_demo
 
         bv::ImagePtr texture_img = nullptr;
         bv::DeviceMemoryPtr texture_img_mem = nullptr;
+        bv::ImageViewPtr texture_imgview = nullptr;
+        bv::SamplerPtr texture_sampler = nullptr;
 
         bv::BufferPtr vertex_buf = nullptr;
         bv::DeviceMemoryPtr vertex_buf_mem = nullptr;
@@ -128,6 +130,7 @@ namespace beva_demo
         void create_framebuffers();
         void create_command_pools();
         void create_texture_image();
+        void create_texture_sampler();
         void create_vertex_buffer();
         void create_index_buffer();
         void create_uniform_buffers();
@@ -192,6 +195,11 @@ namespace beva_demo
             const bv::ImagePtr& image,
             uint32_t width,
             uint32_t height
+        );
+
+        bv::ImageViewPtr create_image_view(
+            const bv::ImagePtr& image,
+            VkFormat format
         );
 
         void create_buffer(
