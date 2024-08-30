@@ -28,7 +28,7 @@ namespace beva_demo
 
     struct Vertex
     {
-        glm::vec2 pos;
+        glm::vec3 pos;
         glm::vec3 col;
         glm::vec2 texcoord;
 
@@ -38,14 +38,20 @@ namespace beva_demo
     };
 
     static const std::vector<Vertex> vertices{
-        Vertex{ { -.5f, .5f }, { 1.f, 1.f, 1.f }, { 0.f, 1.f } },
-        Vertex{ { -.5f, -.5f }, { 1.f, 1.f, 1.f }, { 0.f, 0.f } },
-        Vertex{ { .5f, -.5f }, { 1.f, 1.f, 1.f }, { 1.f, 0.f } },
-        Vertex{ { .5f, .5f }, { 1.f, 1.f, 1.f }, { 1.f, 1.f } }
+        Vertex{ { -.5f, .5f, 0.f }, { 1.f, 1.f, 1.f }, { 0.f, 1.f } },
+        Vertex{ { -.5f, -.5f, 0.f }, { 1.f, 1.f, 1.f }, { 0.f, 0.f } },
+        Vertex{ { .5f, -.5f, 0.f }, { 1.f, 1.f, 1.f }, { 1.f, 0.f } },
+        Vertex{ { .5f, .5f, 0.f }, { 1.f, 1.f, 1.f }, { 1.f, 1.f } },
+
+        Vertex{ { -.5f, .5f, -.35f }, { 1.f, 1.f, 1.f }, { 0.f, 1.f } },
+        Vertex{ { -.5f, -.5f, -.35f }, { 1.f, 1.f, 1.f }, { 0.f, 0.f } },
+        Vertex{ { .5f, -.5f, -.35f }, { 1.f, 1.f, 1.f }, { 1.f, 0.f } },
+        Vertex{ { .5f, .5f, -.35f }, { 1.f, 1.f, 1.f }, { 1.f, 1.f } }
     };
 
     static const std::vector<uint16_t> indices{
-        0, 1, 2, 0, 2, 3
+        0, 1, 2, 0, 2, 3,
+        4, 5, 6, 4, 6, 7
     };
 
     class App

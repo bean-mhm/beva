@@ -45,7 +45,7 @@ namespace beva_demo
         bv::VertexInputAttributeDescription{
             .location = 0,
             .binding = 0,
-            .format = VK_FORMAT_R32G32_SFLOAT,
+            .format = VK_FORMAT_R32G32B32_SFLOAT,
             .offset = offsetof(Vertex, pos)
     },
         bv::VertexInputAttributeDescription{
@@ -1706,7 +1706,7 @@ namespace beva_demo
 
         ubo.view = glm::lookAt(
             glm::vec3(0.f, -1.5f, 1.f),
-            glm::vec3(0.f, 0.f, -.1f),
+            glm::vec3(0.f, 0.f, -.3f),
             glm::vec3(0.f, 0.f, 1.f)
         );
 
