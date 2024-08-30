@@ -3,19 +3,6 @@
 namespace bv
 {
 
-    template<size_t size, typename T>
-    static std::array<T, size> raw_arr_to_std(const T* raw_arr)
-    {
-        std::array<T, size> arr;
-        std::copy(raw_arr, raw_arr + size, arr.data());
-        return arr;
-    }
-
-    static std::string cstr_to_std(const char* cstr)
-    {
-        return (cstr == nullptr) ? std::string() : std::string(cstr);
-    }
-
     // define a derived class named ClassName_public_ctor that lets us use the
     // previously private constructors (actually protected, just go with it) as
     // public ones so that they can be used in std::make_shared() or whatever
@@ -54,6 +41,19 @@ namespace bv
     BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DescriptorSet);
     BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DescriptorPool);
     BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(BufferView);
+
+    template<size_t size, typename T>
+    static std::array<T, size> raw_arr_to_std(const T* raw_arr)
+    {
+        std::array<T, size> arr;
+        std::copy(raw_arr, raw_arr + size, arr.data());
+        return arr;
+    }
+
+    static std::string cstr_to_std(const char* cstr)
+    {
+        return (cstr == nullptr) ? std::string() : std::string(cstr);
+    }
 
 #pragma region forward declarations
 
@@ -2760,6 +2760,36 @@ namespace bv
         const ImageConfig& config
     )
     {
+        auto img_format_props_result =
+            device->physical_device()->fetch_image_format_properties(
+                config.format,
+                config.image_type,
+                config.tiling,
+                config.usage,
+                config.flags
+            );
+        if (!img_format_props_result.ok()
+            && img_format_props_result.error().api_result().has_value()
+            && img_format_props_result.error().api_result().value()
+            == ApiResult::ErrorFormatNotSupported)
+        {
+            return Error(
+                "image format not supported with the provided parameters",
+                img_format_props_result.error().api_result(),
+                true
+            );
+        }
+        else if (!img_format_props_result.ok())
+        {
+            return Error(
+                "failed to fetch image format properties: "
+                + img_format_props_result.error().to_string(),
+
+                img_format_props_result.error().api_result(),
+                true
+            );
+        }
+
         ImagePtr img = std::make_shared<Image_public_ctor>(
             device,
             config
