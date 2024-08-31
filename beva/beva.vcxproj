@@ -73,6 +73,8 @@
 
 XCOPY "$(ProjectDir)textures\" "$(OutDir)textures\" /S /Y
 
+XCOPY "$(ProjectDir)models\" "$(OutDir)models\" /S /Y
+
 set VS_PROJ_DIR=$(ProjectDir)
 set VS_OUT_DIR=$(OutDir)
 $(ProjectDir)shaders/compile.bat
@@ -104,6 +106,8 @@ $(ProjectDir)shaders/compile.bat
       <Command>XCOPY "$(ProjectDir)licenses\" "$(OutDir)licenses\" /S /Y
 
 XCOPY "$(ProjectDir)textures\" "$(OutDir)textures\" /S /Y
+
+XCOPY "$(ProjectDir)models\" "$(OutDir)models\" /S /Y
 
 set VS_PROJ_DIR=$(ProjectDir)
 set VS_OUT_DIR=$(OutDir)
@@ -412,6 +416,7 @@ $(ProjectDir)shaders/compile.bat
     <ClInclude Include="src\lib\glm\vec4.hpp" />
     <ClInclude Include="src\lib\glm\vector_relational.hpp" />
     <ClInclude Include="src\lib\stb_image\stb_image.h" />
+    <ClInclude Include="src\lib\tiny_obj_loader\tiny_obj_loader.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\lib\glm\detail\func_common.inl" />

@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <array>
+#include <unordered_map>
 #include <chrono>
 #include <cstdint>
 
@@ -13,8 +14,10 @@
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_ENABLE_EXPERIMENTAL
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
+#include <glm/gtx/hash.hpp>
 
 namespace beva_demo
 {
@@ -35,24 +38,25 @@ namespace beva_demo
         static const bv::VertexInputBindingDescription binding_description;
         static const std::vector<bv::VertexInputAttributeDescription>
             attribute_descriptions;
+
+        bool operator==(const Vertex& other) const;
     };
 
-    static const std::vector<Vertex> vertices{
-        Vertex{ { -.5f, .5f, 0.f }, { 1.f, 1.f, 1.f }, { 0.f, 1.f } },
-        Vertex{ { -.5f, -.5f, 0.f }, { 1.f, 1.f, 1.f }, { 0.f, 0.f } },
-        Vertex{ { .5f, -.5f, 0.f }, { 1.f, 1.f, 1.f }, { 1.f, 0.f } },
-        Vertex{ { .5f, .5f, 0.f }, { 1.f, 1.f, 1.f }, { 1.f, 1.f } },
+}
 
-        Vertex{ { -.5f, .5f, -.35f }, { 1.f, 1.f, 1.f }, { 0.f, 1.f } },
-        Vertex{ { -.5f, -.5f, -.35f }, { 1.f, 1.f, 1.f }, { 0.f, 0.f } },
-        Vertex{ { .5f, -.5f, -.35f }, { 1.f, 1.f, 1.f }, { 1.f, 0.f } },
-        Vertex{ { .5f, .5f, -.35f }, { 1.f, 1.f, 1.f }, { 1.f, 1.f } }
-    };
+template<>
+struct std::hash<beva_demo::Vertex>
+{
+    size_t operator()(const beva_demo::Vertex& v) const
+    {
+        return ((std::hash<glm::vec3>()(v.pos) ^
+            (std::hash<glm::vec3>()(v.col) << 1)) >> 1) ^
+            (std::hash<glm::vec2>()(v.texcoord) << 1);
+    }
+};
 
-    static const std::vector<uint16_t> indices{
-        0, 1, 2, 0, 2, 3,
-        4, 5, 6, 4, 6, 7
-    };
+namespace beva_demo
+{
 
     class App
     {
@@ -72,6 +76,11 @@ namespace beva_demo
         // device. this should only be used in development to make iteration
         // faster.
         static constexpr int32_t DEFAULT_PHYSICAL_DEVICE_IDX = 1;
+
+        static constexpr const char* MODEL_PATH =
+            "./models/korean_public_payphone_01.obj";
+        static constexpr const char* TEXTURE_PATH
+            = "./textures/korean_public_payphone_01_baked.png";
 
         GLFWwindow* window;
         bv::ContextPtr context = nullptr;
@@ -100,6 +109,9 @@ namespace beva_demo
         bv::DeviceMemoryPtr texture_img_mem = nullptr;
         bv::ImageViewPtr texture_imgview = nullptr;
         bv::SamplerPtr texture_sampler = nullptr;
+
+        std::vector<Vertex> vertices;
+        std::vector<uint32_t> indices;
 
         bv::BufferPtr vertex_buf = nullptr;
         bv::DeviceMemoryPtr vertex_buf_mem = nullptr;
@@ -148,6 +160,7 @@ namespace beva_demo
         void create_swapchain_framebuffers();
         void create_texture_image();
         void create_texture_sampler();
+        void load_model();
         void create_vertex_buffer();
         void create_index_buffer();
         void create_uniform_buffers();

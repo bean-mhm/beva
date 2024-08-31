@@ -12,6 +12,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image/stb_image.h"
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader/tiny_obj_loader.h"
+
 #define CHECK_BV_RESULT(result, operation_name) \
     if (!result.ok())                           \
     {                                           \
@@ -62,6 +65,14 @@ namespace beva_demo
     }
     };
 
+    bool Vertex::operator==(const Vertex& other) const
+    {
+        return
+            pos == other.pos
+            && col == other.col
+            && texcoord == other.texcoord;
+    }
+
     void App::run()
     {
         init();
@@ -88,6 +99,7 @@ namespace beva_demo
         create_swapchain_framebuffers();
         create_texture_image();
         create_texture_sampler();
+        load_model();
         create_vertex_buffer();
         create_index_buffer();
         create_uniform_buffers();
@@ -932,7 +944,7 @@ namespace beva_demo
 
         int texture_width, texture_height, tex_channels;
         stbi_uc* pixels = stbi_load(
-            "./textures/texture.png",
+            TEXTURE_PATH,
             &texture_width,
             &texture_height,
             &tex_channels,
@@ -1052,6 +1064,65 @@ namespace beva_demo
         );
         CHECK_BV_RESULT(result, "create sampler");
         texture_sampler = result.value();
+    }
+
+    void App::load_model()
+    {
+        tinyobj::attrib_t attrib;
+        std::vector<tinyobj::shape_t> shapes;
+        std::vector<tinyobj::material_t> materials;
+        std::string err;
+        if (!tinyobj::LoadObj(
+            &attrib,
+            &shapes,
+            &materials,
+            &err,
+            MODEL_PATH
+        ))
+        {
+            throw std::runtime_error(("failed to load model: " + err).c_str());
+        }
+
+        vertices.clear();
+        indices.clear();
+        std::unordered_map<Vertex, uint32_t> unique_vertices{};
+        for (const auto& shape : shapes)
+        {
+            for (const auto& index : shape.mesh.indices)
+            {
+                Vertex vert{};
+
+                vert.pos = {
+                    attrib.vertices[3 * index.vertex_index + 0],
+                    attrib.vertices[3 * index.vertex_index + 1],
+                    attrib.vertices[3 * index.vertex_index + 2]
+                };
+
+                vert.col = { 1.f, 1.f, 1.f };
+
+                vert.texcoord = {
+                    attrib.texcoords[2 * index.texcoord_index + 0],
+                    1.f - attrib.texcoords[2 * index.texcoord_index + 1]
+                };
+
+                if (unique_vertices.count(vert) == 0)
+                {
+                    unique_vertices[vert] = (uint32_t)(vertices.size());
+                    indices.push_back((uint32_t)(vertices.size()));
+                    vertices.push_back(vert);
+                }
+                else
+                {
+                    indices.push_back(unique_vertices[vert]);
+                }
+            }
+        }
+
+        std::cout << std::format(
+            "loaded model: {} vertices, {} indices\n",
+            vertices.size(),
+            indices.size()
+        );
     }
 
     void App::create_vertex_buffer()
@@ -1782,7 +1853,7 @@ namespace beva_demo
             cmd_buf->handle(),
             index_buf->handle(),
             0,
-            VK_INDEX_TYPE_UINT16
+            VK_INDEX_TYPE_UINT32
         );
 
         VkViewport viewport{
@@ -1840,8 +1911,8 @@ namespace beva_demo
         );
 
         ubo.view = glm::lookAt(
-            glm::vec3(0.f, -1.5f, 1.f),
-            glm::vec3(0.f, 0.f, -.3f),
+            glm::vec3(0.f, -.9f, .8f),
+            glm::vec3(0.f, 0.f, .35f),
             glm::vec3(0.f, 0.f, 1.f)
         );
 
