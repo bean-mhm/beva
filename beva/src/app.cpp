@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <cstdlib>
+#include <cmath>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image/stb_image.h"
@@ -326,7 +327,7 @@ namespace beva_demo
             }
 
             auto format_props_result = pdev->fetch_image_format_properties(
-                VK_FORMAT_R8G8B8A8_UNORM,
+                VK_FORMAT_R8G8B8A8_SRGB,
                 VK_IMAGE_TYPE_2D,
                 VK_IMAGE_TILING_OPTIMAL,
                 VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -582,7 +583,8 @@ namespace beva_demo
             swapchain_imgviews.push_back(create_image_view(
                 swapchain->images()[i],
                 surface_format.format,
-                VK_IMAGE_ASPECT_COLOR_BIT
+                VK_IMAGE_ASPECT_COLOR_BIT,
+                1
             ));
         }
     }
@@ -893,6 +895,7 @@ namespace beva_demo
         create_image(
             swapchain->config().image_extent.width,
             swapchain->config().image_extent.height,
+            1,
             depth_format,
             VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
@@ -903,16 +906,17 @@ namespace beva_demo
         depth_imgview = create_image_view(
             depth_img,
             depth_format,
-            VK_IMAGE_ASPECT_DEPTH_BIT
+            VK_IMAGE_ASPECT_DEPTH_BIT,
+            1
         );
 
         auto cmd_buf = begin_single_time_commands(true);
         transition_image_layout(
             cmd_buf,
             depth_img,
-            depth_format,
             VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            1
         );
         end_single_time_commands(cmd_buf);
     }
@@ -955,6 +959,10 @@ namespace beva_demo
             throw std::runtime_error("failed to load texture image");
         }
 
+        texture_mip_levels = (uint32_t)(std::floor(
+            std::log2((double)std::max(texture_width, texture_height))
+        )) + 1;
+
         constexpr uint32_t n_channels = 4;
         constexpr uint32_t n_bytes_per_channel = 1;
         VkDeviceSize size =
@@ -983,43 +991,53 @@ namespace beva_demo
         stbi_image_free(pixels);
         CHECK_BV_RESULT(upload_result, "upload texture data");
 
-        constexpr VkFormat texture_format = VK_FORMAT_R8G8B8A8_UNORM;
+        constexpr VkFormat texture_format = VK_FORMAT_R8G8B8A8_SRGB;
 
         // create image
         create_image(
             (uint32_t)texture_width,
             (uint32_t)texture_height,
+            texture_mip_levels,
             texture_format,
             VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+
+            VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
+            | VK_IMAGE_USAGE_SAMPLED_BIT,
+
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             texture_img,
             texture_img_mem
         );
 
-        // copy from staging buffer to image
         auto cmd_buf = begin_single_time_commands(true);
-        transition_image_layout(
-            cmd_buf,
-            texture_img,
-            texture_format,
-            VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
-        );
-        copy_buffer_to_image(
-            cmd_buf,
-            staging_buf,
-            texture_img,
-            (uint32_t)(texture_width),
-            (uint32_t)(texture_height)
-        );
-        transition_image_layout(
-            cmd_buf,
-            texture_img,
-            texture_format,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-        );
+        {
+            // copy from staging buffer to image after transitioning to
+            // VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL.
+            transition_image_layout(
+                cmd_buf,
+                texture_img,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                texture_mip_levels
+            );
+            copy_buffer_to_image(
+                cmd_buf,
+                staging_buf,
+                texture_img,
+                (uint32_t)(texture_width),
+                (uint32_t)(texture_height)
+            );
+
+            // generate mipmaps which will transition the image to
+            // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
+            generate_mipmaps(
+                cmd_buf,
+                texture_img,
+                (int32_t)texture_width,
+                (int32_t)texture_height,
+                texture_mip_levels
+            );
+        }
         end_single_time_commands(cmd_buf);
 
         staging_buf->destroy();
@@ -1029,13 +1047,14 @@ namespace beva_demo
         texture_imgview = create_image_view(
             texture_img,
             texture_img->config().format,
-            VK_IMAGE_ASPECT_COLOR_BIT
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            texture_mip_levels
         );
     }
 
     void App::create_texture_sampler()
     {
-        float max_anisotropy = std::clamp(
+        const float max_anisotropy = std::clamp(
             physical_device->properties().limits.max_sampler_anisotropy,
             1.f,
             8.f
@@ -1047,7 +1066,7 @@ namespace beva_demo
                 .flags = 0,
                 .mag_filter = VK_FILTER_LINEAR,
                 .min_filter = VK_FILTER_LINEAR,
-                .mipmap_mode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+                .mipmap_mode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
                 .address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
                 .address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
                 .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
@@ -1056,8 +1075,8 @@ namespace beva_demo
                 .max_anisotropy = max_anisotropy,
                 .compare_enable = false,
                 .compare_op = VK_COMPARE_OP_ALWAYS,
-                .min_lod = 0.f,
-                .max_lod = 0.f,
+                .min_lod = 0.,
+                .max_lod = VK_LOD_CLAMP_NONE,
                 .border_color = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
                 .unnormalized_coordinates = false
             }
@@ -1534,6 +1553,7 @@ namespace beva_demo
     void App::create_image(
         uint32_t width,
         uint32_t height,
+        uint32_t mip_levels,
         VkFormat format,
         VkImageTiling tiling,
         VkImageUsageFlags usage,
@@ -1555,7 +1575,7 @@ namespace beva_demo
                 .image_type = VK_IMAGE_TYPE_2D,
                 .format = format,
                 .extent = extent,
-                .mip_levels = 1,
+                .mip_levels = mip_levels,
                 .array_layers = 1,
                 .samples = VK_SAMPLE_COUNT_1_BIT,
                 .tiling = tiling,
@@ -1591,9 +1611,9 @@ namespace beva_demo
     void App::transition_image_layout(
         const bv::CommandBufferPtr& cmd_buf,
         const bv::ImagePtr& image,
-        VkFormat format,
         VkImageLayout old_layout,
         VkImageLayout new_layout,
+        uint32_t mip_levels,
         bool vertex_shader
     )
     {
@@ -1643,13 +1663,13 @@ namespace beva_demo
         if (new_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
         {
             subresource_aspect_mask = VK_IMAGE_ASPECT_DEPTH_BIT;
-            if (bv::format_has_stencil_component(format))
+            if (bv::format_has_stencil_component(image->config().format))
             {
                 subresource_aspect_mask |= VK_IMAGE_ASPECT_STENCIL_BIT;
             }
         }
 
-        VkImageMemoryBarrier image_barrier{
+        VkImageMemoryBarrier barrier{
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
             .pNext = nullptr,
             .srcAccessMask = src_access_mask,
@@ -1662,7 +1682,7 @@ namespace beva_demo
             .subresourceRange = VkImageSubresourceRange{
                 .aspectMask = subresource_aspect_mask,
                 .baseMipLevel = 0,
-                .levelCount = 1,
+                .levelCount = mip_levels,
                 .baseArrayLayer = 0,
                 .layerCount = 1
         }
@@ -1675,7 +1695,7 @@ namespace beva_demo
             0,
             0, nullptr,
             0, nullptr,
-            1, &image_barrier
+            1, &barrier
         );
     }
 
@@ -1711,16 +1731,147 @@ namespace beva_demo
         );
     }
 
+    void App::generate_mipmaps(
+        const bv::CommandBufferPtr& cmd_buf,
+        const bv::ImagePtr& image,
+        int32_t width,
+        int32_t height,
+        uint32_t mip_levels,
+        bool vertex_shader
+    )
+    {
+        // check if the image format supports linear blitting
+        auto format_props =
+            physical_device->fetch_format_properties(image->config().format);
+        if (!(format_props.optimal_tiling_features
+            & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT))
+        {
+            throw std::runtime_error(
+                "image format does not support linear blitting"
+            );
+        }
+
+        VkImageMemoryBarrier barrier{
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .pNext = nullptr,
+            .srcAccessMask = 0, // will be changed below
+            .dstAccessMask = 0, // will be changed below
+            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED, // will be changed below
+            .newLayout = VK_IMAGE_LAYOUT_UNDEFINED, // will be changed below
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = image->handle(),
+            .subresourceRange = VkImageSubresourceRange{
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel = 0, // will be changed below
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1
+        }
+        };
+
+        int32_t mip_width = width;
+        int32_t mip_height = height;
+
+        for (uint32_t i = 1; i < mip_levels; i++)
+        {
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            barrier.subresourceRange.baseMipLevel = i - 1;
+            vkCmdPipelineBarrier(
+                cmd_buf->handle(),
+                VK_PIPELINE_STAGE_TRANSFER_BIT,
+                VK_PIPELINE_STAGE_TRANSFER_BIT,
+                0,
+                0, nullptr,
+                0, nullptr,
+                1, &barrier
+            );
+
+            VkImageBlit blit{};
+            blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            blit.srcSubresource.mipLevel = i - 1;
+            blit.srcSubresource.baseArrayLayer = 0;
+            blit.srcSubresource.layerCount = 1;
+            blit.srcOffsets[0] = { 0, 0, 0 };
+            blit.srcOffsets[1] = { mip_width, mip_height, 1 };
+            blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            blit.dstSubresource.mipLevel = i;
+            blit.dstSubresource.baseArrayLayer = 0;
+            blit.dstSubresource.layerCount = 1;
+            blit.dstOffsets[0] = { 0, 0, 0 };
+            blit.dstOffsets[1] = {
+                mip_width > 1 ? mip_width / 2 : 1,
+                mip_height > 1 ? mip_height / 2 : 1,
+                1
+            };
+            vkCmdBlitImage(
+                cmd_buf->handle(),
+                image->handle(),
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                image->handle(),
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                1,
+                &blit,
+                VK_FILTER_LINEAR
+            );
+
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.subresourceRange.baseMipLevel = i - 1;
+            vkCmdPipelineBarrier(
+                cmd_buf->handle(),
+                VK_PIPELINE_STAGE_TRANSFER_BIT,
+
+                vertex_shader
+                ? VK_PIPELINE_STAGE_VERTEX_SHADER_BIT
+                : VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+
+                0,
+                0, nullptr,
+                0, nullptr,
+                1, &barrier
+            );
+
+            if (mip_width > 1) mip_width /= 2;
+            if (mip_height > 1) mip_height /= 2;
+        }
+
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barrier.subresourceRange.baseMipLevel = mip_levels - 1;
+        vkCmdPipelineBarrier(
+            cmd_buf->handle(),
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+
+            vertex_shader
+            ? VK_PIPELINE_STAGE_VERTEX_SHADER_BIT
+            : VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+
+            0,
+            0, nullptr,
+            0, nullptr,
+            1, &barrier
+        );
+    }
+
     bv::ImageViewPtr App::create_image_view(
         const bv::ImagePtr& image,
         VkFormat format,
-        VkImageAspectFlags aspect_flags
+        VkImageAspectFlags aspect_flags,
+        uint32_t mip_levels
     )
     {
         bv::ImageSubresourceRange subresource_range{
             .aspect_mask = aspect_flags,
             .base_mip_level = 0,
-            .level_count = 1,
+            .level_count = mip_levels,
             .base_array_layer = 0,
             .layer_count = 1
         };

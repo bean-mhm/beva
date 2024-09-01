@@ -105,6 +105,7 @@ namespace beva_demo
         bv::DeviceMemoryPtr depth_img_mem = nullptr;
         bv::ImageViewPtr depth_imgview = nullptr;
 
+        uint32_t texture_mip_levels = 1;
         bv::ImagePtr texture_img = nullptr;
         bv::DeviceMemoryPtr texture_img_mem = nullptr;
         bv::ImageViewPtr texture_imgview = nullptr;
@@ -200,6 +201,7 @@ namespace beva_demo
         void create_image(
             uint32_t width,
             uint32_t height,
+            uint32_t mip_levels,
             VkFormat format,
             VkImageTiling tiling,
             VkImageUsageFlags usage,
@@ -215,9 +217,9 @@ namespace beva_demo
         void transition_image_layout(
             const bv::CommandBufferPtr& cmd_buf,
             const bv::ImagePtr& image,
-            VkFormat format,
             VkImageLayout old_layout,
             VkImageLayout new_layout,
+            uint32_t mip_levels,
             bool vertex_shader = false
         );
 
@@ -229,10 +231,25 @@ namespace beva_demo
             uint32_t height
         );
 
+        // if vertex_shader == true then dstStageMask will be set to
+        // VK_PIPELINE_STAGE_VERTEX_SHADER_BIT instead of
+        // VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT in vkCmdPipelineBarrier().
+        // this means that the vertex shader will wait for the image to be ready
+        // because the image will be used in the vertex shader.
+        void generate_mipmaps(
+            const bv::CommandBufferPtr& cmd_buf,
+            const bv::ImagePtr& image,
+            int32_t width,
+            int32_t height,
+            uint32_t mip_levels,
+            bool vertex_shader = false
+        );
+
         bv::ImageViewPtr create_image_view(
             const bv::ImagePtr& image,
             VkFormat format,
-            VkImageAspectFlags aspect_flags
+            VkImageAspectFlags aspect_flags,
+            uint32_t mip_levels
         );
 
         void create_buffer(

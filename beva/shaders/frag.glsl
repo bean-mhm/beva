@@ -20,7 +20,7 @@ vec3 view_transform(vec3 col)
 
 void main()
 {
-    vec3 col = pow(texture(tex, v_texcoord).rgb, vec3(2.2));
+    vec3 col = texture(tex, v_texcoord).rgb;
     col *= v_col;
 
     out_col = vec4(view_transform(col), 1);
