@@ -7,7 +7,7 @@ namespace bv
     // previously private constructors (actually protected, just go with it) as
     // public ones so that they can be used in std::make_shared() or whatever
     // else.
-#define BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(ClassName) \
+#define _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(ClassName) \
     class ClassName##_public_ctor : public ClassName \
     { \
     public: \
@@ -16,44 +16,38 @@ namespace bv
         {} \
     };
 
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(PhysicalDevice);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Context);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DebugMessenger);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Surface);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Queue);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Device);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Image);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Swapchain);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(ImageView);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(ShaderModule);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Sampler);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DescriptorSetLayout);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(PipelineLayout);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(RenderPass);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(GraphicsPipeline);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Framebuffer);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(CommandBuffer);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(CommandPool);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Semaphore);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Fence);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Buffer);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DeviceMemory);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DescriptorSet);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DescriptorPool);
-    BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(BufferView);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(PhysicalDevice);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Context);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DebugMessenger);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Surface);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Queue);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Device);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Image);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Swapchain);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(ImageView);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(ShaderModule);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Sampler);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DescriptorSetLayout);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(PipelineLayout);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(RenderPass);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(GraphicsPipeline);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Framebuffer);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(CommandBuffer);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(CommandPool);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Semaphore);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Fence);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Buffer);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DeviceMemory);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DescriptorSet);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DescriptorPool);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(BufferView);
 
-    template<size_t size, typename T>
-    static std::array<T, size> raw_arr_to_std(const T* raw_arr)
-    {
-        std::array<T, size> arr;
-        std::copy(raw_arr, raw_arr + size, arr.data());
-        return arr;
-    }
-
-    static std::string cstr_to_std(const char* cstr)
-    {
-        return (cstr == nullptr) ? std::string() : std::string(cstr);
-    }
+#define _BV_LOCK_WPTR_OR_RETURN(wptr, locked_name) \
+    if (wptr.expired()) \
+    { \
+        return; \
+    } \
+    auto locked_name = wptr.lock();
 
 #pragma region forward declarations
 
@@ -1131,14 +1125,11 @@ namespace bv
 
     VkPipelineShaderStageCreateInfo ShaderStage_to_vk(
         const ShaderStage& stage,
-        ShaderModulePtr& waste_module,
         VkSpecializationInfo& waste_vk_specialization_info,
         std::vector<VkSpecializationMapEntry>& waste_vk_map_entries,
         std::vector<uint8_t>& waste_data
     )
     {
-        waste_module = stage.module;
-
         if (stage.specialization_info.has_value())
         {
             waste_vk_specialization_info = SpecializationInfo_to_vk(
@@ -1153,11 +1144,10 @@ namespace bv
             .pNext = nullptr,
             .flags = stage.flags,
             .stage = stage.stage,
-            .module = waste_module->handle(),
+            .module = lock_wptr(stage.module)->handle(),
             .pName = stage.entry_point.c_str(),
 
-            .pSpecializationInfo =
-            stage.specialization_info.has_value()
+            .pSpecializationInfo = stage.specialization_info.has_value()
             ? &waste_vk_specialization_info
             : nullptr
         };
@@ -1468,16 +1458,14 @@ namespace bv
 
     VkDescriptorSetLayoutBinding DescriptorSetLayoutBinding_to_vk(
         const DescriptorSetLayoutBinding& binding,
-        std::vector<SamplerPtr>& waste_immutable_samplers,
         std::vector<VkSampler>& waste_vk_immutable_samplers
     )
     {
-        waste_immutable_samplers = binding.immutable_samplers;
         waste_vk_immutable_samplers.resize(binding.immutable_samplers.size());
         for (size_t i = 0; i < binding.immutable_samplers.size(); i++)
         {
             waste_vk_immutable_samplers[i] =
-                binding.immutable_samplers[i]->handle();
+                lock_wptr(binding.immutable_samplers[i])->handle();
         }
 
         return VkDescriptorSetLayoutBinding{
@@ -1669,29 +1657,26 @@ namespace bv
     }
 
     VkDescriptorImageInfo DescriptorImageInfo_to_vk(
-        const DescriptorImageInfo& info,
-        SamplerPtr& waste_sampler,
-        ImageViewPtr& waste_image_view
+        const DescriptorImageInfo& info
     )
     {
-        waste_sampler = info.sampler;
-        waste_image_view = info.image_view;
-
         return VkDescriptorImageInfo{
-            .sampler = waste_sampler->handle(),
-            .imageView = waste_image_view->handle(),
+            .sampler = lock_wptr(info.sampler)->handle(),
+
+            .imageView = info.image_view.has_value()
+            ? lock_wptr(info.image_view.value())->handle()
+            : nullptr,
+
             .imageLayout = info.image_layout
         };
     }
 
     VkDescriptorBufferInfo DescriptorBufferInfo_to_vk(
-        const DescriptorBufferInfo& info,
-        BufferPtr& waste_buffer
+        const DescriptorBufferInfo& info
     )
     {
-        waste_buffer = info.buffer;
         return VkDescriptorBufferInfo{
-            .buffer = waste_buffer->handle(),
+            .buffer = lock_wptr(info.buffer)->handle(),
             .offset = info.offset,
             .range = info.range
         };
@@ -1699,56 +1684,38 @@ namespace bv
 
     VkWriteDescriptorSet WriteDescriptorSet_to_vk(
         const WriteDescriptorSet& write,
-        DescriptorSetPtr& waste_dst_set,
-
         std::vector<VkDescriptorImageInfo>& waste_vk_image_infos,
-        std::vector<SamplerPtr>& waste_image_infos_sampler,
-        std::vector<ImageViewPtr>& waste_image_infos_image_view,
-
         std::vector<VkDescriptorBufferInfo>& waste_vk_buffer_infos,
-        std::vector<BufferPtr>& waste_buffer_infos_buffer,
-
-        std::vector<BufferViewPtr>& waste_texel_buffer_views,
         std::vector<VkBufferView>& waste_vk_texel_buffer_views
     )
     {
-        waste_dst_set = write.dst_set;
-
         waste_vk_image_infos.resize(write.image_infos.size());
-        waste_image_infos_sampler.resize(write.image_infos.size());
-        waste_image_infos_image_view.resize(write.image_infos.size());
         for (size_t i = 0; i < write.image_infos.size(); i++)
         {
             waste_vk_image_infos[i] = DescriptorImageInfo_to_vk(
-                write.image_infos[i],
-                waste_image_infos_sampler[i],
-                waste_image_infos_image_view[i]
+                write.image_infos[i]
             );
         }
 
         waste_vk_buffer_infos.resize(write.buffer_infos.size());
-        waste_buffer_infos_buffer.resize(write.buffer_infos.size());
         for (size_t i = 0; i < write.buffer_infos.size(); i++)
         {
             waste_vk_buffer_infos[i] = DescriptorBufferInfo_to_vk(
-                write.buffer_infos[i],
-                waste_buffer_infos_buffer[i]
+                write.buffer_infos[i]
             );
         }
 
-        waste_texel_buffer_views.resize(write.texel_buffer_views.size());
         waste_vk_texel_buffer_views.resize(write.texel_buffer_views.size());
         for (size_t i = 0; i < write.texel_buffer_views.size(); i++)
         {
-            waste_texel_buffer_views[i] = write.texel_buffer_views[i];
             waste_vk_texel_buffer_views[i] =
-                write.texel_buffer_views[i]->handle();
+                lock_wptr(write.texel_buffer_views[i])->handle();
         }
 
         return VkWriteDescriptorSet{
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .pNext = nullptr,
-            .dstSet = waste_dst_set->handle(),
+            .dstSet = lock_wptr(write.dst_set)->handle(),
             .dstBinding = write.dst_binding,
             .dstArrayElement = write.dst_array_element,
             .descriptorCount = write.descriptor_count,
@@ -1765,22 +1732,15 @@ namespace bv
         };
     }
 
-    VkCopyDescriptorSet CopyDescriptorSet_to_vk(
-        const CopyDescriptorSet& copy,
-        DescriptorSetPtr& waste_src_set,
-        DescriptorSetPtr& waste_dst_set
-    )
+    VkCopyDescriptorSet CopyDescriptorSet_to_vk(const CopyDescriptorSet& copy)
     {
-        waste_src_set = copy.src_set;
-        waste_dst_set = copy.dst_set;
-
         return VkCopyDescriptorSet{
             .sType = VK_STRUCTURE_TYPE_COPY_DESCRIPTOR_SET,
             .pNext = nullptr,
-            .srcSet = waste_src_set->handle(),
+            .srcSet = lock_wptr(copy.src_set)->handle(),
             .srcBinding = copy.src_binding,
             .srcArrayElement = copy.src_array_element,
-            .dstSet = waste_dst_set->handle(),
+            .dstSet = lock_wptr(copy.dst_set)->handle(),
             .dstBinding = copy.dst_binding,
             .dstArrayElement = copy.dst_array_element,
             .descriptorCount = copy.descriptor_count
@@ -1844,7 +1804,7 @@ namespace bv
     Result<std::vector<ExtensionProperties>>
         PhysicalDevice::fetch_available_extensions(
             const std::string& layer_name
-        )
+        ) const
     {
         const char* layer_name_cstr = nullptr;
         if (!layer_name.empty())
@@ -1992,7 +1952,9 @@ namespace bv
         return Result();
     }
 
-    FormatProperties PhysicalDevice::fetch_format_properties(VkFormat format)
+    FormatProperties PhysicalDevice::fetch_format_properties(
+        VkFormat format
+    ) const
     {
         VkFormatProperties vk_properties;
         vkGetPhysicalDeviceFormatProperties(
@@ -2007,7 +1969,7 @@ namespace bv
         const std::vector<VkFormat>& candidates,
         VkImageTiling tiling,
         VkFormatFeatureFlags features
-    )
+    ) const
     {
         for (VkFormat format : candidates)
         {
@@ -2037,7 +1999,7 @@ namespace bv
         VkImageTiling tiling,
         VkImageUsageFlags usage,
         VkImageCreateFlags flags
-    )
+    ) const
     {
         VkImageFormatProperties vk_properties;
         VkResult vk_result = vkGetPhysicalDeviceImageFormatProperties(
@@ -2260,9 +2222,9 @@ namespace bv
         return &_vk_allocator;
     }
 
-    Result<std::vector<PhysicalDevicePtr>> Context::fetch_physical_devices(
+    Result<std::vector<PhysicalDevice>> Context::fetch_physical_devices(
         const SurfacePtr& surface
-    )
+    ) const
     {
         uint32_t count = 0;
         vkEnumeratePhysicalDevices(_vk_instance, &count, nullptr);
@@ -2278,7 +2240,7 @@ namespace bv
             return Error("", (ApiResult)vk_result, false);
         }
 
-        std::vector<PhysicalDevicePtr> physical_devices;
+        std::vector<PhysicalDevice> physical_devices;
         physical_devices.reserve(vk_physical_devices.size());
         for (const auto& vk_physical_device : vk_physical_devices)
         {
@@ -2416,19 +2378,17 @@ namespace bv
                 queue_families.push_back(queue_family);
             }
 
-            physical_devices.push_back(
-                std::make_shared<PhysicalDevice_public_ctor>(
-                    vk_physical_device,
-                    properties,
-                    features,
-                    memory_properties,
-                    queue_families,
-                    queue_family_indices
-                )
-            );
+            physical_devices.push_back(PhysicalDevice(
+                vk_physical_device,
+                properties,
+                features,
+                memory_properties,
+                queue_families,
+                queue_family_indices
+            ));
 
             auto update_swapchain_support_result =
-                physical_devices.back()->update_swapchain_support(surface);
+                physical_devices.back().update_swapchain_support(surface);
             if (!update_swapchain_support_result.ok())
             {
                 auto err = update_swapchain_support_result.error();
@@ -2445,7 +2405,7 @@ namespace bv
         return physical_devices;
     }
 
-    void Context::destroy()
+    Context::~Context()
     {
         vkDestroyInstance(_vk_instance, vk_allocator_ptr());
     }
@@ -2483,9 +2443,9 @@ namespace bv
         };
 
         VkResult vk_result = CreateDebugUtilsMessengerEXT(
-            messenger->context()->vk_instance(),
+            context->vk_instance(),
             &create_info,
-            messenger->context()->vk_allocator_ptr(),
+            context->vk_allocator_ptr(),
             &messenger->_handle
         );
         if (vk_result != VK_SUCCESS)
@@ -2495,12 +2455,13 @@ namespace bv
         return messenger;
     }
 
-    void DebugMessenger::destroy()
+    DebugMessenger::~DebugMessenger()
     {
+        _BV_LOCK_WPTR_OR_RETURN(context(), context_locked);
         DestroyDebugUtilsMessengerEXT(
-            context()->vk_instance(),
+            context_locked->vk_instance(),
             handle(),
-            context()->vk_allocator_ptr()
+            context_locked->vk_allocator_ptr()
         );
     }
 
@@ -2524,12 +2485,13 @@ namespace bv
         return std::make_shared<Surface_public_ctor>(context, handle);
     }
 
-    void Surface::destroy()
+    Surface::~Surface()
     {
+        _BV_LOCK_WPTR_OR_RETURN(context(), context_locked);
         vkDestroySurfaceKHR(
-            _context->vk_instance(),
+            context_locked->vk_instance(),
             _handle,
-            _context->vk_allocator_ptr()
+            context_locked->vk_allocator_ptr()
         );
     }
 
@@ -2660,7 +2622,7 @@ namespace bv
 
     Result<DevicePtr>Device::create(
         const ContextPtr& context,
-        const PhysicalDevicePtr& physical_device,
+        const PhysicalDevice& physical_device,
         const DeviceConfig& config
     )
     {
@@ -2700,9 +2662,10 @@ namespace bv
         std::vector<const char*> layers_cstr;
         {
             layers_cstr.reserve(
-                device->context()->config().layers.size()
+                context->config().layers.size()
             );
-            for (const auto& layer : device->context()->config().layers)
+            for (const auto& layer
+                : context->config().layers)
             {
                 layers_cstr.push_back(layer.c_str());
             }
@@ -2738,9 +2701,9 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateDevice(
-            device->physical_device()->handle(),
+            device->physical_device().handle(),
             &create_info,
-            device->context()->vk_allocator_ptr(),
+            context->vk_allocator_ptr(),
             &device->_handle
         );
         if (vk_result != VK_SUCCESS)
@@ -2764,7 +2727,7 @@ namespace bv
             &vk_queue
         );
         return std::make_shared<Queue_public_ctor>(
-            (DeviceWPtr)device,
+            device,
             queue_family_index,
             queue_index,
             vk_queue
@@ -2781,14 +2744,15 @@ namespace bv
         return Result();
     }
 
-    void Device::destroy()
+    Device::~Device()
     {
-        vkDestroyDevice(handle(), context()->vk_allocator_ptr());
+        _BV_LOCK_WPTR_OR_RETURN(context(), context_locked);
+        vkDestroyDevice(handle(), context_locked->vk_allocator_ptr());
     }
 
     Device::Device(
         const ContextPtr& context,
-        const PhysicalDevicePtr& physical_device,
+        const PhysicalDevice& physical_device,
         const DeviceConfig& config
     )
         : _context(context),
@@ -2802,7 +2766,7 @@ namespace bv
     )
     {
         auto img_format_props_result =
-            device->physical_device()->fetch_image_format_properties(
+            device->physical_device().fetch_image_format_properties(
                 config.format,
                 config.image_type,
                 config.tiling,
@@ -2858,9 +2822,9 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateImage(
-            img->device()->handle(),
+            device->handle(),
             &create_info,
-            img->device()->context()->vk_allocator_ptr(),
+            lock_wptr(device->context())->vk_allocator_ptr(),
             &img->_handle
         );
         if (vk_result != VK_SUCCESS)
@@ -2870,7 +2834,7 @@ namespace bv
 
         VkMemoryRequirements vk_mem_requirements;
         vkGetImageMemoryRequirements(
-            img->device()->handle(),
+            device->handle(),
             img->handle(),
             &vk_mem_requirements
         );
@@ -2887,7 +2851,7 @@ namespace bv
     )
     {
         VkResult vk_result = vkBindImageMemory(
-            device()->handle(),
+            lock_wptr(device())->handle(),
             handle(),
             memory->handle(),
             memory_offset
@@ -2899,16 +2863,23 @@ namespace bv
         return Result();
     }
 
-    void Image::destroy()
+    Image::~Image()
     {
         if (created_externally())
         {
             return;
         }
+
+        _BV_LOCK_WPTR_OR_RETURN(device(), device_locked);
+        _BV_LOCK_WPTR_OR_RETURN(
+            device_locked->context(),
+            context_locked
+        );
+
         vkDestroyImage(
-            device()->handle(),
+            device_locked->handle(),
             handle(),
-            device()->context()->vk_allocator_ptr()
+            context_locked->vk_allocator_ptr()
         );
     }
 
@@ -2922,7 +2893,7 @@ namespace bv
 
     Image::Image(VkImage handle_created_externally)
         : _created_externally(true),
-        _device(nullptr),
+        _device({}),
         _config({}),
         _memory_requirements({}),
         _handle(handle_created_externally)
@@ -2943,16 +2914,16 @@ namespace bv
         );
 
         VkSwapchainKHR vk_old_swapchain = nullptr;
-        if (sc->old_swapchain() != nullptr)
+        if (old_swapchain != nullptr)
         {
-            vk_old_swapchain = sc->old_swapchain()->handle();
+            vk_old_swapchain = old_swapchain->handle();
         }
 
         VkSwapchainCreateInfoKHR create_info{
             .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
             .pNext = nullptr,
             .flags = sc->config().flags,
-            .surface = sc->surface()->handle(),
+            .surface = surface->handle(),
             .minImageCount = sc->config().min_image_count,
             .imageFormat = sc->config().image_format,
             .imageColorSpace = sc->config().image_color_space,
@@ -2973,9 +2944,9 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateSwapchainKHR(
-            sc->device()->handle(),
+            device->handle(),
             &create_info,
-            sc->device()->context()->vk_allocator_ptr(),
+            lock_wptr(device->context())->vk_allocator_ptr(),
             &sc->_handle
         );
         if (vk_result != VK_SUCCESS)
@@ -2985,7 +2956,7 @@ namespace bv
 
         uint32_t actual_image_count;
         vkGetSwapchainImagesKHR(
-            sc->device()->handle(),
+            device->handle(),
             sc->handle(),
             &actual_image_count,
             nullptr
@@ -2993,7 +2964,7 @@ namespace bv
 
         std::vector<VkImage> vk_images(actual_image_count);
         vk_result = vkGetSwapchainImagesKHR(
-            sc->device()->handle(),
+            device->handle(),
             sc->handle(),
             &actual_image_count,
             vk_images.data()
@@ -3027,7 +2998,7 @@ namespace bv
     {
         uint32_t image_index;
         VkResult vk_result = vkAcquireNextImageKHR(
-            device()->handle(),
+            lock_wptr(device())->handle(),
             handle(),
             timeout,
             semaphore == nullptr ? nullptr : semaphore->handle(),
@@ -3047,12 +3018,18 @@ namespace bv
         return Error("", (ApiResult)vk_result, false);
     }
 
-    void Swapchain::destroy()
+    Swapchain::~Swapchain()
     {
+        _BV_LOCK_WPTR_OR_RETURN(device(), device_locked);
+        _BV_LOCK_WPTR_OR_RETURN(
+            device_locked->context(),
+            context_locked
+        );
+
         vkDestroySwapchainKHR(
-            device()->handle(),
+            device_locked->handle(),
             handle(),
-            device()->context()->vk_allocator_ptr()
+            context_locked->vk_allocator_ptr()
         );
     }
 
@@ -3065,8 +3042,13 @@ namespace bv
         : _device(device),
         _surface(surface),
         _config(config),
-        _old_swapchain(old_swapchain)
-    {}
+        _old_swapchain(std::nullopt)
+    {
+        if (old_swapchain != nullptr)
+        {
+            _old_swapchain = old_swapchain;
+        }
+    }
 
     Result<ImageViewPtr> ImageView::create(
         const DevicePtr& device,
@@ -3084,7 +3066,7 @@ namespace bv
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
             .pNext = nullptr,
             .flags = view->config().flags,
-            .image = view->image()->handle(),
+            .image = lock_wptr(view->image())->handle(),
             .viewType = view->config().view_type,
             .format = view->config().format,
             .components = ComponentMapping_to_vk(view->config().components),
@@ -3094,9 +3076,9 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateImageView(
-            view->device()->handle(),
+            device->handle(),
             &create_info,
-            view->device()->context()->vk_allocator_ptr(),
+            lock_wptr(device->context())->vk_allocator_ptr(),
             &view->_handle
         );
         if (vk_result != VK_SUCCESS)
@@ -3106,12 +3088,18 @@ namespace bv
         return view;
     }
 
-    void ImageView::destroy()
+    ImageView::~ImageView()
     {
+        _BV_LOCK_WPTR_OR_RETURN(device(), device_locked);
+        _BV_LOCK_WPTR_OR_RETURN(
+            device_locked->context(),
+            context_locked
+        );
+
         vkDestroyImageView(
-            device()->handle(),
+            device_locked->handle(),
             handle(),
-            device()->context()->vk_allocator_ptr()
+            context_locked->vk_allocator_ptr()
         );
     }
 
@@ -3152,9 +3140,9 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateShaderModule(
-            module->device()->handle(),
+            device->handle(),
             &create_info,
-            module->device()->context()->vk_allocator_ptr(),
+            lock_wptr(device->context())->vk_allocator_ptr(),
             &module->_handle
         );
         if (vk_result != VK_SUCCESS)
@@ -3164,12 +3152,18 @@ namespace bv
         return module;
     }
 
-    void ShaderModule::destroy()
+    ShaderModule::~ShaderModule()
     {
+        _BV_LOCK_WPTR_OR_RETURN(device(), device_locked);
+        _BV_LOCK_WPTR_OR_RETURN(
+            device_locked->context(),
+            context_locked
+        );
+
         vkDestroyShaderModule(
-            device()->handle(),
+            device_locked->handle(),
             handle(),
-            device()->context()->vk_allocator_ptr()
+            context_locked->vk_allocator_ptr()
         );
     }
 
@@ -3211,9 +3205,9 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateSampler(
-            sampler->device()->handle(),
+            device->handle(),
             &create_info,
-            sampler->device()->context()->vk_allocator_ptr(),
+            lock_wptr(device->context())->vk_allocator_ptr(),
             &sampler->_handle
         );
         if (vk_result != VK_SUCCESS)
@@ -3223,12 +3217,18 @@ namespace bv
         return sampler;
     }
 
-    void Sampler::destroy()
+    Sampler::~Sampler()
     {
+        _BV_LOCK_WPTR_OR_RETURN(device(), device_locked);
+        _BV_LOCK_WPTR_OR_RETURN(
+            device_locked->context(),
+            context_locked
+        );
+
         vkDestroySampler(
-            device()->handle(),
+            device_locked->handle(),
             handle(),
-            device()->context()->vk_allocator_ptr()
+            context_locked->vk_allocator_ptr()
         );
     }
 
@@ -3254,10 +3254,6 @@ namespace bv
         std::vector<VkDescriptorSetLayoutBinding> vk_bindings(
             layout->config().bindings.size()
         );
-        std::vector<std::vector<SamplerPtr>>
-            wastes_immutable_samplers(
-                layout->config().bindings.size()
-            );
         std::vector<std::vector<VkSampler>> wastes_vk_immutable_samplers(
             layout->config().bindings.size()
         );
@@ -3265,7 +3261,6 @@ namespace bv
         {
             vk_bindings[i] = DescriptorSetLayoutBinding_to_vk(
                 layout->config().bindings[i],
-                wastes_immutable_samplers[i],
                 wastes_vk_immutable_samplers[i]
             );
         }
@@ -3279,9 +3274,9 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateDescriptorSetLayout(
-            layout->device()->handle(),
+            device->handle(),
             &create_info,
-            layout->device()->context()->vk_allocator_ptr(),
+            lock_wptr(device->context())->vk_allocator_ptr(),
             &layout->_handle
         );
         if (vk_result != VK_SUCCESS)
@@ -3291,12 +3286,18 @@ namespace bv
         return layout;
     }
 
-    void DescriptorSetLayout::destroy()
+    DescriptorSetLayout::~DescriptorSetLayout()
     {
+        _BV_LOCK_WPTR_OR_RETURN(device(), device_locked);
+        _BV_LOCK_WPTR_OR_RETURN(
+            device_locked->context(),
+            context_locked
+        );
+
         vkDestroyDescriptorSetLayout(
-            device()->handle(),
+            device_locked->handle(),
             handle(),
-            device()->context()->vk_allocator_ptr()
+            context_locked->vk_allocator_ptr()
         );
     }
 
@@ -3324,7 +3325,8 @@ namespace bv
         );
         for (size_t i = 0; i < layout->config().set_layouts.size(); i++)
         {
-            vk_set_layouts[i] = layout->config().set_layouts[i]->handle();
+            vk_set_layouts[i] =
+                lock_wptr(layout->config().set_layouts[i])->handle();
         }
 
         std::vector<VkPushConstantRange> vk_push_constant_ranges(
@@ -3350,9 +3352,9 @@ namespace bv
         };
 
         VkResult vk_result = vkCreatePipelineLayout(
-            layout->device()->handle(),
+            device->handle(),
             &create_info,
-            layout->device()->context()->vk_allocator_ptr(),
+            lock_wptr(device->context())->vk_allocator_ptr(),
             &layout->_handle
         );
         if (vk_result != VK_SUCCESS)
@@ -3362,12 +3364,18 @@ namespace bv
         return layout;
     }
 
-    void PipelineLayout::destroy()
+    PipelineLayout::~PipelineLayout()
     {
+        _BV_LOCK_WPTR_OR_RETURN(device(), device_locked);
+        _BV_LOCK_WPTR_OR_RETURN(
+            device_locked->context(),
+            context_locked
+        );
+
         vkDestroyPipelineLayout(
-            device()->handle(),
+            device_locked->handle(),
             handle(),
-            device()->context()->vk_allocator_ptr()
+            context_locked->vk_allocator_ptr()
         );
     }
 
@@ -3446,9 +3454,9 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateRenderPass(
-            pass->device()->handle(),
+            device->handle(),
             &create_info,
-            pass->device()->context()->vk_allocator_ptr(),
+            lock_wptr(device->context())->vk_allocator_ptr(),
             &pass->_handle
         );
         if (vk_result != VK_SUCCESS)
@@ -3458,12 +3466,18 @@ namespace bv
         return pass;
     }
 
-    void RenderPass::destroy()
+    RenderPass::~RenderPass()
     {
+        _BV_LOCK_WPTR_OR_RETURN(device(), device_locked);
+        _BV_LOCK_WPTR_OR_RETURN(
+            device_locked->context(),
+            context_locked
+        );
+
         vkDestroyRenderPass(
-            device()->handle(),
+            device_locked->handle(),
             handle(),
-            device()->context()->vk_allocator_ptr()
+            context_locked->vk_allocator_ptr()
         );
     }
 
@@ -3488,9 +3502,6 @@ namespace bv
         std::vector<VkPipelineShaderStageCreateInfo> vk_stages(
             pipe->config().stages.size()
         );
-        std::vector<ShaderModulePtr> wastes_module(
-            pipe->config().stages.size()
-        );
         std::vector<VkSpecializationInfo> wastes_vk_specialization_info(
             pipe->config().stages.size()
         );
@@ -3503,7 +3514,6 @@ namespace bv
         {
             vk_stages[i] = ShaderStage_to_vk(
                 pipe->config().stages[i],
-                wastes_module[i],
                 wastes_vk_specialization_info[i],
                 wastes_vk_map_entries[i],
                 wastes_data[i]
@@ -3639,23 +3649,24 @@ namespace bv
             pipe->config().dynamic_states.empty()
             ? nullptr : &vk_dynamic_states,
 
-            .layout = pipe->config().layout->handle(),
-            .renderPass = pipe->config().render_pass->handle(),
+            .layout = lock_wptr(pipe->config().layout)->handle(),
+            .renderPass = lock_wptr(pipe->config().render_pass)->handle(),
             .subpass = pipe->config().subpass_index,
 
             .basePipelineHandle =
-            pipe->config().base_pipeline == nullptr
-            ? nullptr : pipe->config().base_pipeline->handle(),
+            pipe->config().base_pipeline.has_value()
+            ? lock_wptr(pipe->config().base_pipeline.value())->handle()
+            : nullptr,
 
             .basePipelineIndex = -1
         };
 
         VkResult vk_result = vkCreateGraphicsPipelines(
-            pipe->device()->handle(),
+            device->handle(),
             nullptr,
             1,
             &create_info,
-            pipe->device()->context()->vk_allocator_ptr(),
+            lock_wptr(device->context())->vk_allocator_ptr(),
             &pipe->_handle
         );
         if (vk_result != VK_SUCCESS)
@@ -3665,12 +3676,18 @@ namespace bv
         return pipe;
     }
 
-    void GraphicsPipeline::destroy()
+    GraphicsPipeline::~GraphicsPipeline()
     {
+        _BV_LOCK_WPTR_OR_RETURN(device(), device_locked);
+        _BV_LOCK_WPTR_OR_RETURN(
+            device_locked->context(),
+            context_locked
+        );
+
         vkDestroyPipeline(
-            device()->handle(),
+            device_locked->handle(),
             handle(),
-            device()->context()->vk_allocator_ptr()
+            context_locked->vk_allocator_ptr()
         );
     }
 
@@ -3696,14 +3713,15 @@ namespace bv
         );
         for (size_t i = 0; i < buf->config().attachments.size(); i++)
         {
-            vk_attachments[i] = buf->config().attachments[i]->handle();
+            vk_attachments[i] =
+                lock_wptr(buf->config().attachments[i])->handle();
         }
 
         VkFramebufferCreateInfo create_info{
             .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
             .pNext = nullptr,
             .flags = buf->config().flags,
-            .renderPass = buf->config().render_pass->handle(),
+            .renderPass = lock_wptr(buf->config().render_pass)->handle(),
             .attachmentCount = (uint32_t)vk_attachments.size(),
             .pAttachments = vk_attachments.data(),
             .width = buf->config().width,
@@ -3712,9 +3730,9 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateFramebuffer(
-            buf->device()->handle(),
+            device->handle(),
             &create_info,
-            buf->device()->context()->vk_allocator_ptr(),
+            lock_wptr(device->context())->vk_allocator_ptr(),
             &buf->_handle
         );
         if (vk_result != VK_SUCCESS)
@@ -3724,12 +3742,18 @@ namespace bv
         return buf;
     }
 
-    void Framebuffer::destroy()
+    Framebuffer::~Framebuffer()
     {
+        _BV_LOCK_WPTR_OR_RETURN(device(), device_locked);
+        _BV_LOCK_WPTR_OR_RETURN(
+            device_locked->context(),
+            context_locked
+        );
+
         vkDestroyFramebuffer(
-            device()->handle(),
+            device_locked->handle(),
             handle(),
-            device()->context()->vk_allocator_ptr()
+            context_locked->vk_allocator_ptr()
         );
     }
 
@@ -3761,9 +3785,16 @@ namespace bv
             vk_inheritance = VkCommandBufferInheritanceInfo{
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
                 .pNext = nullptr,
-                .renderPass = inheritance.value().render_pass->handle(),
+
+                .renderPass =
+                lock_wptr(inheritance.value().render_pass)->handle(),
+
                 .subpass = inheritance.value().subpass_index,
-                .framebuffer = inheritance.value().framebuffer->handle(),
+
+                .framebuffer =
+                inheritance.value().framebuffer.has_value()
+                ? lock_wptr(inheritance.value().framebuffer.value())->handle()
+                : nullptr,
 
                 .occlusionQueryEnable =
                 inheritance.value().occlusion_query_enable,
@@ -3798,15 +3829,16 @@ namespace bv
         return Result();
     }
 
-    void CommandBuffer::destroy()
+    CommandBuffer::~CommandBuffer()
     {
-        if (pool().expired())
-        {
-            return;
-        }
-        auto pool_locked = pool().lock();
+        _BV_LOCK_WPTR_OR_RETURN(pool(), pool_locked);
+        _BV_LOCK_WPTR_OR_RETURN(
+            pool_locked->device(),
+            device_locked
+        );
+
         vkFreeCommandBuffers(
-            pool_locked->device()->handle(),
+            device_locked->handle(),
             pool_locked->handle(),
             1,
             &_handle
@@ -3839,9 +3871,9 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateCommandPool(
-            pool->device()->handle(),
+            device->handle(),
             &create_info,
-            pool->device()->context()->vk_allocator_ptr(),
+            lock_wptr(device->context())->vk_allocator_ptr(),
             &pool->_handle
         );
         if (vk_result != VK_SUCCESS)
@@ -3866,7 +3898,7 @@ namespace bv
 
         VkCommandBuffer vk_command_buffer;
         VkResult vk_result = vkAllocateCommandBuffers(
-            pool->device()->handle(),
+            lock_wptr(pool->device())->handle(),
             &alloc_info,
             &vk_command_buffer
         );
@@ -3875,7 +3907,7 @@ namespace bv
             return Error("", (ApiResult)vk_result, false);
         }
         return (CommandBufferPtr)std::make_shared<CommandBuffer_public_ctor>(
-            (CommandPoolWPtr)pool,
+            pool,
             vk_command_buffer
         );
     }
@@ -3896,7 +3928,7 @@ namespace bv
 
         std::vector<VkCommandBuffer> vk_command_buffers(count);
         VkResult vk_result = vkAllocateCommandBuffers(
-            pool->device()->handle(),
+            lock_wptr(pool->device())->handle(),
             &alloc_info,
             vk_command_buffers.data()
         );
@@ -3909,19 +3941,25 @@ namespace bv
         for (size_t i = 0; i < count; i++)
         {
             command_buffers[i] = std::make_shared<CommandBuffer_public_ctor>(
-                (CommandPoolWPtr)pool,
+                pool,
                 vk_command_buffers[i]
             );
         }
         return command_buffers;
     }
 
-    void CommandPool::destroy()
+    CommandPool::~CommandPool()
     {
+        _BV_LOCK_WPTR_OR_RETURN(device(), device_locked);
+        _BV_LOCK_WPTR_OR_RETURN(
+            device_locked->context(),
+            context_locked
+        );
+
         vkDestroyCommandPool(
-            device()->handle(),
+            device_locked->handle(),
             handle(),
-            device()->context()->vk_allocator_ptr()
+            context_locked->vk_allocator_ptr()
         );
     }
 
@@ -3943,9 +3981,9 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateSemaphore(
-            sema->device()->handle(),
+            device->handle(),
             &create_info,
-            sema->device()->context()->vk_allocator_ptr(),
+            lock_wptr(device->context())->vk_allocator_ptr(),
             &sema->_handle
         );
         if (vk_result != VK_SUCCESS)
@@ -3955,12 +3993,18 @@ namespace bv
         return sema;
     }
 
-    void Semaphore::destroy()
+    Semaphore::~Semaphore()
     {
+        _BV_LOCK_WPTR_OR_RETURN(device(), device_locked);
+        _BV_LOCK_WPTR_OR_RETURN(
+            device_locked->context(),
+            context_locked
+        );
+
         vkDestroySemaphore(
-            device()->handle(),
+            device_locked->handle(),
             handle(),
-            device()->context()->vk_allocator_ptr()
+            context_locked->vk_allocator_ptr()
         );
     }
 
@@ -3982,9 +4026,9 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateFence(
-            fence->device()->handle(),
+            device->handle(),
             &create_info,
-            fence->device()->context()->vk_allocator_ptr(),
+            lock_wptr(device->context())->vk_allocator_ptr(),
             &fence->_handle
         );
         if (vk_result != VK_SUCCESS)
@@ -3997,7 +4041,7 @@ namespace bv
     Result<> Fence::wait(uint64_t timeout)
     {
         VkResult vk_result = vkWaitForFences(
-            device()->handle(),
+            lock_wptr(device())->handle(),
             1,
             &_handle,
             VK_TRUE,
@@ -4028,7 +4072,7 @@ namespace bv
         }
 
         VkResult vk_result = vkWaitForFences(
-            fences[0]->device()->handle(),
+            lock_wptr(fences[0]->device())->handle(),
             vk_fences.size(),
             vk_fences.data(),
             wait_all,
@@ -4044,7 +4088,7 @@ namespace bv
     Result<> Fence::reset()
     {
         VkResult vk_result = vkResetFences(
-            device()->handle(),
+            lock_wptr(device())->handle(),
             1,
             &_handle
         );
@@ -4058,7 +4102,7 @@ namespace bv
     Result<bool> Fence::is_signaled() const
     {
         VkResult vk_result = vkGetFenceStatus(
-            device()->handle(),
+            lock_wptr(device())->handle(),
             handle()
         );
         if (vk_result == VK_SUCCESS)
@@ -4072,12 +4116,18 @@ namespace bv
         return Error("", (ApiResult)vk_result, false);
     }
 
-    void Fence::destroy()
+    Fence::~Fence()
     {
+        _BV_LOCK_WPTR_OR_RETURN(device(), device_locked);
+        _BV_LOCK_WPTR_OR_RETURN(
+            device_locked->context(),
+            context_locked
+        );
+
         vkDestroyFence(
-            device()->handle(),
+            device_locked->handle(),
             handle(),
-            device()->context()->vk_allocator_ptr()
+            context_locked->vk_allocator_ptr()
         );
     }
 
@@ -4110,9 +4160,9 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateBuffer(
-            buf->device()->handle(),
+            device->handle(),
             &create_info,
-            buf->device()->context()->vk_allocator_ptr(),
+            lock_wptr(device->context())->vk_allocator_ptr(),
             &buf->_handle
         );
         if (vk_result != VK_SUCCESS)
@@ -4122,7 +4172,7 @@ namespace bv
 
         VkMemoryRequirements vk_mem_requirements;
         vkGetBufferMemoryRequirements(
-            buf->device()->handle(),
+            device->handle(),
             buf->handle(),
             &vk_mem_requirements
         );
@@ -4139,7 +4189,7 @@ namespace bv
     )
     {
         VkResult vk_result = vkBindBufferMemory(
-            device()->handle(),
+            lock_wptr(device())->handle(),
             handle(),
             memory->handle(),
             memory_offset
@@ -4151,12 +4201,18 @@ namespace bv
         return Result();
     }
 
-    void Buffer::destroy()
+    Buffer::~Buffer()
     {
+        _BV_LOCK_WPTR_OR_RETURN(device(), device_locked);
+        _BV_LOCK_WPTR_OR_RETURN(
+            device_locked->context(),
+            context_locked
+        );
+
         vkDestroyBuffer(
-            device()->handle(),
+            device_locked->handle(),
             handle(),
-            device()->context()->vk_allocator_ptr()
+            context_locked->vk_allocator_ptr()
         );
     }
 
@@ -4184,7 +4240,7 @@ namespace bv
         VkResult vk_result = vkAllocateMemory(
             device->handle(),
             &allocate_info,
-            device->context()->vk_allocator_ptr(),
+            lock_wptr(device->context())->vk_allocator_ptr(),
             &mem->_handle
         );
         if (vk_result != VK_SUCCESS)
@@ -4196,19 +4252,9 @@ namespace bv
 
     Result<void*> DeviceMemory::map(VkDeviceSize offset, VkDeviceSize size)
     {
-        if (device().expired())
-        {
-            return Error(
-                "device shared pointer has expired",
-                std::nullopt,
-                false
-            );
-        }
-        auto device_locked = device().lock();
-
         void* p;
         VkResult vk_result = vkMapMemory(
-            device_locked->handle(),
+            lock_wptr(device())->handle(),
             handle(),
             offset,
             size,
@@ -4229,8 +4275,7 @@ namespace bv
         {
             return;
         }
-        auto device_locked = device().lock();
-        vkUnmapMemory(device_locked->handle(), handle());
+        vkUnmapMemory(device().lock()->handle(), handle());
     }
 
     Result<> DeviceMemory::flush_mapped_range(
@@ -4238,16 +4283,6 @@ namespace bv
         VkDeviceSize size
     )
     {
-        if (device().expired())
-        {
-            return Error(
-                "device shared pointer has expired",
-                std::nullopt,
-                false
-            );
-        }
-        auto device_locked = device().lock();
-
         VkMappedMemoryRange vk_mapped_range{
             .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
             .pNext = nullptr,
@@ -4257,7 +4292,7 @@ namespace bv
         };
 
         VkResult vk_result = vkFlushMappedMemoryRanges(
-            device_locked->handle(),
+            lock_wptr(device())->handle(),
             1,
             &vk_mapped_range
         );
@@ -4273,16 +4308,6 @@ namespace bv
         VkDeviceSize size
     )
     {
-        if (device().expired())
-        {
-            return Error(
-                "device shared pointer has expired",
-                std::nullopt,
-                false
-            );
-        }
-        auto device_locked = device().lock();
-
         VkMappedMemoryRange vk_mapped_range{
             .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
             .pNext = nullptr,
@@ -4292,7 +4317,7 @@ namespace bv
         };
 
         VkResult vk_result = vkInvalidateMappedMemoryRanges(
-            device_locked->handle(),
+            lock_wptr(device())->handle(),
             1,
             &vk_mapped_range
         );
@@ -4345,22 +4370,23 @@ namespace bv
         return Result();
     }
 
-    void DeviceMemory::destroy()
+    DeviceMemory::~DeviceMemory()
     {
-        if (device().expired())
-        {
-            return;
-        }
-        auto device_locked = device().lock();
+        _BV_LOCK_WPTR_OR_RETURN(device(), device_locked);
+        _BV_LOCK_WPTR_OR_RETURN(
+            device_locked->context(),
+            context_locked
+        );
+
         vkFreeMemory(
             device_locked->handle(),
             handle(),
-            device_locked->context()->vk_allocator_ptr()
+            context_locked->vk_allocator_ptr()
         );
     }
 
     DeviceMemory::DeviceMemory(
-        const DeviceWPtr& device,
+        const DevicePtr& device,
         const DeviceMemoryConfig& config
     )
         : _device(device), _config(config)
@@ -4378,23 +4404,10 @@ namespace bv
         }
 
         std::vector<VkWriteDescriptorSet> vk_writes(writes.size());
-        std::vector<DescriptorSetPtr> wastes_dst_set(writes.size());
         std::vector<std::vector<VkDescriptorImageInfo>> wastes_vk_image_infos(
             writes.size()
         );
-        std::vector<std::vector<SamplerPtr>> wastes_image_infos_sampler(
-            writes.size()
-        );
-        std::vector<std::vector<ImageViewPtr>> wastes_image_infos_image_view(
-            writes.size()
-        );
         std::vector<std::vector<VkDescriptorBufferInfo>> wastes_vk_buffer_infos(
-            writes.size()
-        );
-        std::vector<std::vector<BufferPtr>> wastes_buffer_infos_buffer(
-            writes.size()
-        );
-        std::vector<std::vector<BufferViewPtr>> wastes_texel_buffer_views(
             writes.size()
         );
         std::vector<std::vector<VkBufferView>> wastes_vk_texel_buffer_views(
@@ -4404,27 +4417,16 @@ namespace bv
         {
             vk_writes[i] = WriteDescriptorSet_to_vk(
                 writes[i],
-                wastes_dst_set[i],
                 wastes_vk_image_infos[i],
-                wastes_image_infos_sampler[i],
-                wastes_image_infos_image_view[i],
                 wastes_vk_buffer_infos[i],
-                wastes_buffer_infos_buffer[i],
-                wastes_texel_buffer_views[i],
                 wastes_vk_texel_buffer_views[i]
             );
         }
 
         std::vector<VkCopyDescriptorSet> vk_copies(copies.size());
-        std::vector<DescriptorSetPtr> wastes_src_set(copies.size());
-        std::vector<DescriptorSetPtr> wastes_dst_set2(copies.size());
         for (size_t i = 0; i < copies.size(); i++)
         {
-            vk_copies[i] = CopyDescriptorSet_to_vk(
-                copies[i],
-                wastes_src_set[i],
-                wastes_dst_set2[i]
-            );
+            vk_copies[i] = CopyDescriptorSet_to_vk(copies[i]);
         }
 
         vkUpdateDescriptorSets(
@@ -4436,15 +4438,16 @@ namespace bv
         );
     }
 
-    void DescriptorSet::destroy()
+    DescriptorSet::~DescriptorSet()
     {
-        if (pool().expired())
-        {
-            return;
-        }
-        auto pool_locked = pool().lock();
+        _BV_LOCK_WPTR_OR_RETURN(pool(), pool_locked);
+        _BV_LOCK_WPTR_OR_RETURN(
+            pool_locked->device(),
+            device_locked
+        );
+
         vkFreeDescriptorSets(
-            pool_locked->device()->handle(),
+            device_locked->handle(),
             pool_locked->handle(),
             1,
             &_handle
@@ -4452,7 +4455,7 @@ namespace bv
     }
 
     DescriptorSet::DescriptorSet(
-        const DescriptorPoolWPtr& pool,
+        const DescriptorPoolPtr& pool,
         VkDescriptorSet handle
     )
         : _pool(pool), _handle(handle)
@@ -4488,9 +4491,9 @@ namespace bv
         };
 
         VkResult vk_result = vkCreateDescriptorPool(
-            pool->device()->handle(),
+            device->handle(),
             &create_info,
-            pool->device()->context()->vk_allocator_ptr(),
+            lock_wptr(device->context())->vk_allocator_ptr(),
             &pool->_handle
         );
         if (vk_result != VK_SUCCESS)
@@ -4498,6 +4501,19 @@ namespace bv
             return Error("", (ApiResult)vk_result, false);
         }
         return pool;
+    }
+
+    Result<DescriptorSetPtr> DescriptorPool::allocate_set(
+        const DescriptorPoolPtr& pool,
+        const DescriptorSetLayoutPtr& set_layout
+    )
+    {
+        auto result = DescriptorPool::allocate_sets(pool, 1, { set_layout });
+        if (!result.ok())
+        {
+            return result.error();
+        }
+        return result.value()[0];
     }
 
     Result<std::vector<DescriptorSetPtr>> DescriptorPool::allocate_sets(
@@ -4522,7 +4538,7 @@ namespace bv
 
         std::vector<VkDescriptorSet> vk_sets(count);
         VkResult vk_result = vkAllocateDescriptorSets(
-            pool->device()->handle(),
+            lock_wptr(pool->device())->handle(),
             &alloc_info,
             vk_sets.data()
         );
@@ -4535,19 +4551,25 @@ namespace bv
         for (auto vk_set : vk_sets)
         {
             sets.push_back(std::make_shared<DescriptorSet_public_ctor>(
-                (DescriptorPoolWPtr)pool,
+                pool,
                 vk_set
             ));
         }
         return sets;
     }
 
-    void DescriptorPool::destroy()
+    DescriptorPool::~DescriptorPool()
     {
+        _BV_LOCK_WPTR_OR_RETURN(device(), device_locked);
+        _BV_LOCK_WPTR_OR_RETURN(
+            device_locked->context(),
+            context_locked
+        );
+
         vkDestroyDescriptorPool(
-            device()->handle(),
+            device_locked->handle(),
             handle(),
-            device()->context()->vk_allocator_ptr()
+            context_locked->vk_allocator_ptr()
         );
     }
 
@@ -4574,16 +4596,16 @@ namespace bv
             .sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO,
             .pNext = nullptr,
             .flags = 0,
-            .buffer = view->buffer()->handle(),
+            .buffer = lock_wptr(view->buffer())->handle(),
             .format = view->config().format,
             .offset = view->config().offset,
             .range = view->config().range
         };
 
         VkResult vk_result = vkCreateBufferView(
-            view->device()->handle(),
+            device->handle(),
             &create_info,
-            view->device()->context()->vk_allocator_ptr(),
+            lock_wptr(device->context())->vk_allocator_ptr(),
             &view->_handle
         );
         if (vk_result != VK_SUCCESS)
@@ -4593,12 +4615,18 @@ namespace bv
         return view;
     }
 
-    void BufferView::destroy()
+    BufferView::~BufferView()
     {
+        _BV_LOCK_WPTR_OR_RETURN(device(), device_locked);
+        _BV_LOCK_WPTR_OR_RETURN(
+            device_locked->context(),
+            context_locked
+        );
+
         vkDestroyBufferView(
-            device()->handle(),
+            device_locked->handle(),
             handle(),
-            device()->context()->vk_allocator_ptr()
+            context_locked->vk_allocator_ptr()
         );
     }
 
@@ -4611,6 +4639,11 @@ namespace bv
         _buffer(buffer),
         _config(config)
     {}
+
+    std::string cstr_to_std(const char* cstr)
+    {
+        return (cstr == nullptr) ? std::string() : std::string(cstr);
+    }
 
     bool format_has_depth_component(VkFormat format)
     {
