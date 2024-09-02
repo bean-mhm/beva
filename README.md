@@ -10,8 +10,8 @@ constructors to be able to return errors. Upon success, this function returns a
 shared pointer of the associated type. The destructor will try to delete
 the underlying Vulkan object if possible.
 
-- beva provides comments containing links to the Khronos manual on top of every
-wrapper struct, class, or function.
+- beva provides comments containing links to the Khronos manual on top of
+wrapper structs, classes, and functions.
 
 - beva provides `Context` for instance management.
 

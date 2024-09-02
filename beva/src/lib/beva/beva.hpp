@@ -1863,6 +1863,9 @@ namespace bv
             const std::string& layer_name = ""
         ) const;
 
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceCapabilitiesKHR.html
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceFormatsKHR.html
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfacePresentModesKHR.html
         Result<> update_swapchain_support(
             const SurfacePtr& surface
         );
@@ -1872,6 +1875,7 @@ namespace bv
 
         // find the first image format in the candidates that is supported with
         // the provided tiling and required features.
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceFormatProperties.html
         Result<VkFormat> find_supported_image_format(
             const std::vector<VkFormat>& candidates,
             VkImageTiling tiling,
@@ -1929,8 +1933,10 @@ namespace bv
             const AllocatorPtr& allocator = nullptr
         );
 
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumerateInstanceLayerProperties.html
         static Result<std::vector<LayerProperties>> fetch_available_layers();
 
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumerateInstanceExtensionProperties.html
         static Result<std::vector<ExtensionProperties>>
             fetch_available_extensions(
                 const std::string& layer_name = ""
@@ -1960,6 +1966,12 @@ namespace bv
 
         const VkAllocationCallbacks* vk_allocator_ptr() const;
 
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumeratePhysicalDevices.html
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceProperties.html
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceFeatures.html
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceMemoryProperties.html
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceQueueFamilyProperties.html
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceSupportKHR.html
         Result<std::vector<PhysicalDevice>> fetch_physical_devices(
             const SurfacePtr& surface = nullptr
         ) const;
@@ -2097,10 +2109,12 @@ namespace bv
         {
             return _device;
         }
+
         constexpr uint32_t queue_family_index() const
         {
             return _queue_family_index;
         }
+
         constexpr uint32_t queue_index() const
         {
             return _queue_index;
@@ -2183,12 +2197,14 @@ namespace bv
             return _handle;
         }
 
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetDeviceQueue.html
         static QueuePtr retrieve_queue(
             const DevicePtr& device,
             uint32_t queue_family_index,
             uint32_t queue_index
         );
 
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDeviceWaitIdle.html
         Result<> wait_idle();
 
         ~Device();
@@ -2216,6 +2232,12 @@ namespace bv
         Image(const Image& other) = delete;
         Image(Image&& other) = default;
 
+        // this will make sure the requested format is supported with the
+        // provided parameters. it will also fetch and store the memory
+        // requirements.
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceImageFormatProperties.html
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateImage.html
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetImageMemoryRequirements.html
         static Result<ImagePtr> create(
             const DevicePtr& device,
             const ImageConfig& config
@@ -2251,6 +2273,7 @@ namespace bv
             return _handle;
         }
 
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkBindImageMemory.html
         Result<> bind_memory(
             const DeviceMemoryPtr& memory,
             VkDeviceSize memory_offset
@@ -2287,6 +2310,9 @@ namespace bv
         Swapchain(const Swapchain& other) = delete;
         Swapchain(Swapchain&& other) = default;
 
+        // this will fetch and store the swapchain images automatically
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateSwapchainKHR.html
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetSwapchainImagesKHR.html
         static Result<SwapchainPtr> create(
             const DevicePtr& device,
             const SurfacePtr& surface,
@@ -2324,6 +2350,7 @@ namespace bv
             return _handle;
         }
 
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAcquireNextImageKHR.html
         Result<uint32_t> acquire_next_image(
             const SemaphorePtr& semaphore = nullptr,
             const FencePtr& fence = nullptr,
@@ -2889,6 +2916,9 @@ namespace bv
         Buffer(const Buffer& other) = delete;
         Buffer(Buffer&& other) = default;
 
+        // this will automatically fetch and store the memory requirements
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateBuffer.html
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetBufferMemoryRequirements.html
         static Result<BufferPtr> create(
             const DevicePtr& device,
             const BufferConfig& config
@@ -2914,6 +2944,7 @@ namespace bv
             return _handle;
         }
 
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkBindBufferMemory.html
         Result<> bind_memory(
             const DeviceMemoryPtr& memory,
             VkDeviceSize memory_offset
@@ -2980,7 +3011,7 @@ namespace bv
         );
 
         // map the whole memory, copy the provided data, flush, and unmap.
-        // you should make sure that mapping is possible for this memory.
+        // you should make sure that mapping is allowed for this memory.
         Result<> upload(void* data, VkDeviceSize data_size);
 
         ~DeviceMemory();
