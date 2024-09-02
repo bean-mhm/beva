@@ -1770,7 +1770,7 @@ namespace bv
 
 #pragma endregion
 
-#pragma region object wrappers (no RAII) and abstract classes
+#pragma region object wrappers and abstract classes
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkAllocationCallbacks.html
     class Allocator
