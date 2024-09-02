@@ -5,6 +5,11 @@ little functionality from the original API and keeps the low-level design.
 
 Here's what beva does and doesn't do:
 
+- beva uses RAII. Object wrappers have a static `create()` function instead of
+constructors to be able to return errors. Upon success, this function returns a
+shared pointer of the associated type. The destructor will try to delete
+the underlying Vulkan object if possible.
+
 - beva provides comments containing links to the Khronos manual on top of every
 wrapper struct, class, or function.
 
@@ -20,7 +25,8 @@ was provided.
 - beva provides `Result<T>` and `Error` for error handling. `Error` can be
 constructed from a message and an optional `VkResult` and provides a
 `to_string()` function with descriptions for every `VkResult` based on the
-Vulkan specification.
+Vulkan specification. The only case where beva might throw an exception is if
+there's an attempt to lock an expired weak pointer.
 
 - beva provides tiny wrappers for Vulkan structs that use STD containers and
 types like `std::vector`, `std::array`, `std::string`, and `std::optional`
@@ -39,11 +45,6 @@ created and destroyed within that `Device`.
 needed for traditional rasterized rendering. You can call `handle()` on an
 object wrapper to get its raw handle and directly use the Vulkan API to
 implement what beva doesn't cover.
-
-- beva does __not__ use RAII. I did initially implement RAII but it wasn't
-working _too_ well given how the Vulkan API is designed, so I switched to
-explicit `destroy()` functions on object wrappers and some helper functions to
-destroy all objects in a vector.
 
 - beva will __not__ try and catch invalid input. It's totally possible to get
 undefined behavior and crashes with beva if used incorrectly. To avoid these
