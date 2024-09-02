@@ -86,7 +86,7 @@ namespace beva_demo
         bv::ContextPtr context = nullptr;
         bv::DebugMessengerPtr debug_messenger = nullptr;
         bv::SurfacePtr surface = nullptr;
-        bv::PhysicalDevicePtr physical_device = nullptr;
+        std::optional<bv::PhysicalDevice> physical_device;
         bv::DevicePtr device = nullptr;
         bv::QueuePtr graphics_queue = nullptr;
         bv::QueuePtr presentation_queue = nullptr;

@@ -131,40 +131,40 @@ namespace beva_demo
     {
         cleanup_swapchain();
 
-        texture_sampler->destroy();
-        texture_imgview->destroy();
-        texture_img->destroy();
-        texture_img_mem->destroy();
+        texture_sampler = nullptr;
+        texture_imgview = nullptr;
+        texture_img = nullptr;
+        texture_img_mem = nullptr;
 
-        bv::destroy_objects_ptr(uniform_bufs);
-        bv::destroy_objects_ptr(uniform_bufs_mem);
+        uniform_bufs.clear();
+        uniform_bufs_mem.clear();
 
-        descriptor_pool->destroy();
+        descriptor_pool = nullptr;
 
-        descriptor_set_layout->destroy();
+        descriptor_set_layout = nullptr;
 
-        index_buf->destroy();
-        index_buf_mem->destroy();
+        index_buf = nullptr;
+        index_buf_mem = nullptr;
 
-        vertex_buf->destroy();
-        vertex_buf_mem->destroy();
+        vertex_buf = nullptr;
+        vertex_buf_mem = nullptr;
 
-        graphics_pipeline->destroy();
-        pipeline_layout->destroy();
+        graphics_pipeline = nullptr;
+        pipeline_layout = nullptr;
 
-        render_pass->destroy();
+        render_pass = nullptr;
 
-        bv::destroy_objects_ptr(fences_in_flight);
-        bv::destroy_objects_ptr(semaphs_render_finished);
-        bv::destroy_objects_ptr(semaphs_image_available);
+        fences_in_flight.clear();
+        semaphs_render_finished.clear();
+        semaphs_image_available.clear();
 
-        transient_cmd_pool->destroy();
-        cmd_pool->destroy();
+        transient_cmd_pool = nullptr;
+        cmd_pool = nullptr;
 
-        device->destroy();
-        surface->destroy();
-        debug_messenger->destroy();
-        context->destroy();
+        device = nullptr;
+        surface = nullptr;
+        debug_messenger = nullptr;
+        context = nullptr;
 
         glfwDestroyWindow(window);
         glfwTerminate();
@@ -302,31 +302,31 @@ namespace beva_demo
         auto all_physical_devices = physical_devices_result.value();
 
         // make a list of devices we approve of
-        std::vector<bv::PhysicalDevicePtr> supported_physical_devices;
+        std::vector<bv::PhysicalDevice> supported_physical_devices;
         for (const auto& pdev : all_physical_devices)
         {
-            if (!pdev->queue_family_indices().graphics.has_value())
+            if (!pdev.queue_family_indices().graphics.has_value())
             {
                 continue;
             }
-            if (!pdev->queue_family_indices().presentation.has_value())
-            {
-                continue;
-            }
-
-            if (!pdev->swapchain_support().has_value())
+            if (!pdev.queue_family_indices().presentation.has_value())
             {
                 continue;
             }
 
-            const auto& swapchain_support = pdev->swapchain_support().value();
+            if (!pdev.swapchain_support().has_value())
+            {
+                continue;
+            }
+
+            const auto& swapchain_support = pdev.swapchain_support().value();
             if (swapchain_support.present_modes.empty()
                 || swapchain_support.surface_formats.empty())
             {
                 continue;
             }
 
-            auto format_props_result = pdev->fetch_image_format_properties(
+            auto format_props_result = pdev.fetch_image_format_properties(
                 VK_FORMAT_R8G8B8A8_SRGB,
                 VK_IMAGE_TYPE_2D,
                 VK_IMAGE_TILING_OPTIMAL,
@@ -338,7 +338,7 @@ namespace beva_demo
                 continue;
             }
 
-            if (!pdev->features().sampler_anisotropy)
+            if (!pdev.features().sampler_anisotropy)
             {
                 continue;
             }
@@ -356,7 +356,7 @@ namespace beva_demo
             const auto& pdev = supported_physical_devices[i];
 
             std::string s_device_type = "unknown device type";
-            switch (pdev->properties().device_type)
+            switch (pdev.properties().device_type)
             {
             case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
                 s_device_type = "integrated GPU";
@@ -377,7 +377,7 @@ namespace beva_demo
             std::cout << std::format(
                 "{}: {} ({})\n",
                 i,
-                pdev->properties().device_name,
+                pdev.properties().device_name,
                 s_device_type
             );
         }
@@ -463,7 +463,7 @@ namespace beva_demo
 
         auto result = bv::Device::create(
             context,
-            physical_device,
+            physical_device.value(),
             config
         );
         CHECK_BV_RESULT(result, "create device");
@@ -577,7 +577,7 @@ namespace beva_demo
         swapchain = result.value();
 
         // create swapchain image views
-        bv::destroy_objects_ptr(swapchain_imgviews);
+        swapchain_imgviews.clear();
         for (size_t i = 0; i < swapchain->images().size(); i++)
         {
             swapchain_imgviews.push_back(create_image_view(
@@ -856,14 +856,14 @@ namespace beva_demo
                 .layout = pipeline_layout,
                 .render_pass = render_pass,
                 .subpass_index = 0,
-                .base_pipeline = nullptr
+                .base_pipeline = std::nullopt
             }
         );
         CHECK_BV_RESULT(graphics_pipeline_result, "create graphics pipeline");
         graphics_pipeline = graphics_pipeline_result.value();
 
-        vert_shader_module->destroy();
-        frag_shader_module->destroy();
+        vert_shader_module = nullptr;
+        frag_shader_module = nullptr;
     }
 
     void App::create_command_pools()
@@ -923,7 +923,7 @@ namespace beva_demo
 
     void App::create_swapchain_framebuffers()
     {
-        bv::destroy_objects_ptr(swapchain_framebufs);
+        swapchain_framebufs.clear();
         for (size_t i = 0; i < swapchain_imgviews.size(); i++)
         {
             auto result = bv::Framebuffer::create(
@@ -1040,8 +1040,8 @@ namespace beva_demo
         }
         end_single_time_commands(cmd_buf);
 
-        staging_buf->destroy();
-        staging_buf_mem->destroy();
+        staging_buf = nullptr;
+        staging_buf_mem = nullptr;
 
         // create image view
         texture_imgview = create_image_view(
@@ -1182,8 +1182,8 @@ namespace beva_demo
         copy_buffer(cmd_buf, staging_buf, vertex_buf, size);
         end_single_time_commands(cmd_buf);
 
-        staging_buf->destroy();
-        staging_buf_mem->destroy();
+        staging_buf = nullptr;
+        staging_buf_mem = nullptr;
     }
 
     void App::create_index_buffer()
@@ -1224,18 +1224,18 @@ namespace beva_demo
         copy_buffer(cmd_buf, staging_buf, index_buf, size);
         end_single_time_commands(cmd_buf);
 
-        staging_buf->destroy();
-        staging_buf_mem->destroy();
+        staging_buf = nullptr;
+        staging_buf_mem = nullptr;
     }
 
     void App::create_uniform_buffers()
     {
         VkDeviceSize size = sizeof(UniformBufferObject);
 
-        bv::destroy_objects_ptr(uniform_bufs);
+        uniform_bufs.clear();
         uniform_bufs.resize(MAX_FRAMES_IN_FLIGHT);
 
-        bv::destroy_objects_ptr(uniform_bufs_mem);
+        uniform_bufs_mem.clear();
         uniform_bufs_mem.resize(MAX_FRAMES_IN_FLIGHT);
 
         uniform_bufs_mapped.resize(MAX_FRAMES_IN_FLIGHT);
@@ -1351,9 +1351,9 @@ namespace beva_demo
 
     void App::create_sync_objects()
     {
-        bv::destroy_objects_ptr(semaphs_image_available);
-        bv::destroy_objects_ptr(semaphs_render_finished);
-        bv::destroy_objects_ptr(fences_in_flight);
+        semaphs_image_available.clear();
+        semaphs_render_finished.clear();
+        fences_in_flight.clear();
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
@@ -1446,13 +1446,13 @@ namespace beva_demo
 
     void App::cleanup_swapchain()
     {
-        depth_imgview->destroy();
-        depth_img->destroy();
-        depth_img_mem->destroy();
+        depth_imgview = nullptr;
+        depth_img = nullptr;
+        depth_img_mem = nullptr;
 
-        bv::destroy_objects_ptr(swapchain_framebufs);
-        bv::destroy_objects_ptr(swapchain_imgviews);
-        swapchain->destroy();
+        swapchain_framebufs.clear();
+        swapchain_imgviews.clear();
+        swapchain = nullptr;
     }
 
     void App::recreate_swapchain()
@@ -1511,7 +1511,6 @@ namespace beva_demo
             CHECK_BV_RESULT(result, "wait for queue idle");
         }
 
-        cmd_buf->destroy();
         cmd_buf = nullptr;
     }
 
