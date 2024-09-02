@@ -1646,16 +1646,15 @@ namespace bv
     public:
         Error();
 
+        Error(std::string message);
+
+        Error(const ApiResult api_result);
+
         Error(
             std::string message,
             const std::optional<ApiResult>& api_result,
             bool api_result_already_embedded_in_message
         );
-
-        constexpr const std::string& message() const
-        {
-            return _message;
-        }
 
         constexpr const std::optional<ApiResult>& api_result() const
         {
@@ -1665,9 +1664,9 @@ namespace bv
         std::string to_string() const;
 
     private:
-        std::string _message;
+        std::string message;
         std::optional<ApiResult> _api_result;
-        bool print_api_result;
+        bool stringify_api_result;
 
     };
 
