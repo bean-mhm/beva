@@ -3,7 +3,7 @@
 beva (lowercase) is a thin wrapper over the Vulkan API. It abstracts away very
 little functionality from the original API and keeps the low-level design.
 
-## Overview
+# Overview
 
 The `beva.hpp` header (which is the only one) uses the `bv` namespace and
 contains 4 different regions.
@@ -65,7 +65,7 @@ provided.
 `Context` also provides static functions for getting a list of available
 layers or extensions.
 
-## RAII & Smart Pointers
+# RAII & Smart Pointers
 
 beva uses RAII. Object wrappers have a static `create()` function that usually
 takes in a config struct and returns a shared pointer of the associated type.
@@ -80,7 +80,7 @@ do nothing if so. However, if you call a member function on the fence that needs
 to use the device, an `Error` will be thrown complaining about the weak pointer
 having expired.
 
-## Expectations
+# Expectations
 
 beva only implements a tiny section of the Vulkan API, mostly the parts needed
 for traditional rasterized rendering and compute shaders. You can call
@@ -94,7 +94,7 @@ functions to see how to use them properly. For example, whether a
 `std::shared_ptr` field can be `nullptr` or must have a value, or in what
 conditions a `std::optional` field can actually be `std::nullopt`.
 
-## Documentation
+# Documentation
 
 I don't have time to write documentation but looking at the header, this page,
 the demos, and Khronos manual pages should give you enough information on how to
