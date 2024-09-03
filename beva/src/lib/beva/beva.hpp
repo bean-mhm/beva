@@ -20,15 +20,6 @@
 namespace bv
 {
 
-#pragma region data-only structs and enums
-
-    template<typename Enum>
-    using EnumStrMap = std::unordered_map<Enum, std::string>;
-
-#define _BV_DEFINE_SMART_PTR_TYPE_ALIASES(ClassName) \
-    using ClassName##Ptr = std::shared_ptr<ClassName>; \
-    using ClassName##WPtr = std::weak_ptr<ClassName>;
-
     // forward declarations
     class Allocator;
     class PhysicalDevice;
@@ -57,6 +48,10 @@ namespace bv
     class DescriptorPool;
     class BufferView;
 
+#define _BV_DEFINE_SMART_PTR_TYPE_ALIASES(ClassName) \
+    using ClassName##Ptr = std::shared_ptr<ClassName>; \
+    using ClassName##WPtr = std::weak_ptr<ClassName>;
+
     // smart pointer type aliases
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(Allocator);
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(Context);
@@ -83,6 +78,11 @@ namespace bv
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(DescriptorSet);
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(DescriptorPool);
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(BufferView);
+
+#pragma region data-only structs and enums
+
+    template<typename Enum>
+    using EnumStrMap = std::unordered_map<Enum, std::string>;
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_MAKE_API_VERSION.html
     struct Version
@@ -119,391 +119,250 @@ namespace bv
 
     };
 
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkResult.html
-    enum class ApiResult : int32_t
-    {
-        Success = 0,
-        NotReady = 1,
-        Timeout = 2,
-        EventSet = 3,
-        EventReset = 4,
-        Incomplete = 5,
-        ErrorOutOfHostMemory = -1,
-        ErrorOutOfDeviceMemory = -2,
-        ErrorInitializationFailed = -3,
-        ErrorDeviceLost = -4,
-        ErrorMemoryMapFailed = -5,
-        ErrorLayerNotPresent = -6,
-        ErrorExtensionNotPresent = -7,
-        ErrorFeatureNotPresent = -8,
-        ErrorIncompatibleDriver = -9,
-        ErrorTooManyObjects = -10,
-        ErrorFormatNotSupported = -11,
-        ErrorFragmentedPool = -12,
-        ErrorUnknown = -13,
-
-        // provided by VK_VERSION_1_1
-        ErrorOutOfPoolMemory = -1000069000,
-
-        // provided by VK_VERSION_1_1
-        ErrorInvalidExternalHandle = -1000072003,
-
-        // provided by VK_VERSION_1_2
-        ErrorFragmentation = -1000161000,
-
-        // provided by VK_VERSION_1_2
-        ErrorInvalidOpaqueCaptureAddress = -1000257000,
-
-        // provided by VK_VERSION_1_3
-        PipelineCompileRequired = 1000297000,
-
-        // provided by VK_KHR_surface
-        ErrorSurfaceLostKhr = -1000000000,
-
-        // provided by VK_KHR_surface
-        ErrorNativeWindowInUseKhr = -1000000001,
-
-        // provided by VK_KHR_swapchain
-        SuboptimalKhr = 1000001003,
-
-        // provided by VK_KHR_swapchain
-        ErrorOutOfDateKhr = -1000001004,
-
-        // provided by VK_KHR_display_swapchain
-        ErrorIncompatibleDisplayKhr = -1000003001,
-
-        // provided by VK_EXT_debug_report
-        ErrorValidationFailedExt = -1000011001,
-
-        // provided by VK_NV_glsl_shader
-        ErrorInvalidShaderNv = -1000012000,
-
-        // provided by VK_KHR_video_queue
-        ErrorImageUsageNotSupportedKhr = -1000023000,
-
-        // provided by VK_KHR_video_queue
-        ErrorVideoPictureLayoutNotSupportedKhr = -1000023001,
-
-        // provided by VK_KHR_video_queue
-        ErrorVideoProfileOperationNotSupportedKhr = -1000023002,
-
-        // provided by VK_KHR_video_queue
-        ErrorVideoProfileFormatNotSupportedKhr = -1000023003,
-
-        // provided by VK_KHR_video_queue
-        ErrorVideoProfileCodecNotSupportedKhr = -1000023004,
-
-        // provided by VK_KHR_video_queue
-        ErrorVideoStdVersionNotSupportedKhr = -1000023005,
-
-        // provided by VK_EXT_image_drm_format_modifier
-        ErrorInvalidDrmFormatModifierPlaneLayoutExt = -1000158000,
-
-        // provided by VK_KHR_global_priority
-        ErrorNotPermittedKhr = -1000174001,
-
-        // provided by VK_EXT_full_screen_exclusive
-        ErrorFullScreenExclusiveModeLostExt = -1000255000,
-
-        // provided by VK_KHR_deferred_host_operations
-        ThreadIdleKhr = 1000268000,
-
-        // provided by VK_KHR_deferred_host_operations
-        ThreadDoneKhr = 1000268001,
-
-        // provided by VK_KHR_deferred_host_operations
-        OperationDeferredKhr = 1000268002,
-
-        // provided by VK_KHR_deferred_host_operations
-        OperationNotDeferredKhr = 1000268003,
-
-        // provided by VK_KHR_video_encode_queue
-        ErrorInvalidVideoStdParametersKhr = -1000299000,
-
-        // provided by VK_EXT_image_compression_control
-        ErrorCompressionExhaustedExt = -1000338000,
-
-        // provided by VK_EXT_shader_object
-        IncompatibleShaderBinaryExt = 1000482000,
-
-        // provided by VK_KHR_maintenance1
-        ErrorOutOfPoolMemoryKhr = ErrorOutOfPoolMemory,
-
-        // provided by VK_KHR_external_memory
-        ErrorInvalidExternalHandleKhr = ErrorInvalidExternalHandle,
-
-        // provided by VK_EXT_descriptor_indexing
-        ErrorFragmentationExt = ErrorFragmentation,
-
-        // provided by VK_EXT_global_priority
-        ErrorNotPermittedExt = ErrorNotPermittedKhr,
-
-        // provided by VK_EXT_buffer_device_address
-        ErrorInvalidDeviceAddressExt = ErrorInvalidOpaqueCaptureAddress,
-
-        // provided by VK_KHR_buffer_device_address
-        ErrorInvalidOpaqueCaptureAddressKhr = ErrorInvalidOpaqueCaptureAddress,
-
-        // provided by VK_EXT_pipeline_creation_cache_control
-        PipelineCompileRequiredExt = PipelineCompileRequired,
-
-        // provided by VK_EXT_pipeline_creation_cache_control
-        ErrorPipelineCompileRequiredExt = PipelineCompileRequired,
-
-        // provided by VK_EXT_shader_object
-        // VK_ERROR_INCOMPATIBLE_SHADER_BINARY_EXT is a deprecated alias
-        ErrorIncompatibleShaderBinaryExt = IncompatibleShaderBinaryExt
-    };
-
-    static EnumStrMap<ApiResult> ApiResult_strmap{
+    static EnumStrMap<VkResult> VkResult_strmap{
         {
-            ApiResult::Success,
-            "Success: command successfully completed"
+            VK_SUCCESS,
+            "VK_SUCCESS: command successfully completed"
         },
 {
-    ApiResult::NotReady,
-    "NotReady: a fence or query has not yet completed"
+    VK_NOT_READY,
+    "VK_NOT_READY: a fence or query has not yet completed"
 },
 {
-    ApiResult::Timeout,
-    "Timeout: a wait operation has not completed in the specified time"
+    VK_TIMEOUT,
+    "VK_TIMEOUT: a wait operation has not completed in the specified time"
 },
 {
-    ApiResult::EventSet,
-    "EventSet: an event is signaled"
+    VK_EVENT_SET,
+    "VK_EVENT_SET: an event is signaled"
 },
 {
-    ApiResult::EventReset,
-    "EventReset: an event is unsignaled"
+    VK_EVENT_RESET,
+    "VK_EVENT_RESET: an event is unsignaled"
 },
 {
-    ApiResult::Incomplete,
-    "Incomplete: a return array was too small for the result"
+    VK_INCOMPLETE,
+    "VK_INCOMPLETE: a return array was too small for the result"
 },
 {
-    ApiResult::ErrorOutOfHostMemory,
-    "ErrorOutOfHostMemory: a host memory allocation has failed"
+    VK_ERROR_OUT_OF_HOST_MEMORY,
+    "VK_ERROR_OUT_OF_HOST_MEMORY: a host memory allocation has failed"
 },
 {
-    ApiResult::ErrorOutOfDeviceMemory,
-    "ErrorOutOfDeviceMemory: a device memory allocation has failed"
+    VK_ERROR_OUT_OF_DEVICE_MEMORY,
+    "VK_ERROR_OUT_OF_DEVICE_MEMORY: a device memory allocation has failed"
 },
 {
-    ApiResult::ErrorInitializationFailed,
-    "ErrorInitializationFailed: initialization of an object could not be "
+    VK_ERROR_INITIALIZATION_FAILED,
+    "VK_ERROR_INITIALIZATION_FAILED: initialization of an object could not be "
     "completed for implementation-specific reasons."
 },
 {
-    ApiResult::ErrorDeviceLost,
-    "ErrorDeviceLost: the logical or physical device has been lost"
+    VK_ERROR_DEVICE_LOST,
+    "VK_ERROR_DEVICE_LOST: the logical or physical device has been lost"
 },
 {
-    ApiResult::ErrorMemoryMapFailed,
-    "ErrorMemoryMapFailed: mapping of a memory object has failed"
+    VK_ERROR_MEMORY_MAP_FAILED,
+    "VK_ERROR_MEMORY_MAP_FAILED: mapping of a memory object has failed"
 },
 {
-    ApiResult::ErrorLayerNotPresent,
-    "ErrorLayerNotPresent: a requested layer is not present or could not be "
-    "loaded"
+    VK_ERROR_LAYER_NOT_PRESENT,
+    "VK_ERROR_LAYER_NOT_PRESENT: a requested layer is not present or could not "
+    "be loaded."
 },
 {
-    ApiResult::ErrorExtensionNotPresent,
-    "ErrorExtensionNotPresent: a requested extension is not supported"
+    VK_ERROR_EXTENSION_NOT_PRESENT,
+    "VK_ERROR_EXTENSION_NOT_PRESENT: a requested extension is not supported"
 },
 {
-    ApiResult::ErrorFeatureNotPresent,
-    "ErrorFeatureNotPresent: a requested feature is not supported"
+    VK_ERROR_FEATURE_NOT_PRESENT,
+    "VK_ERROR_FEATURE_NOT_PRESENT: a requested feature is not supported"
 },
 {
-    ApiResult::ErrorIncompatibleDriver,
-    "ErrorIncompatibleDriver: the requested version of Vulkan is not supported "
-    "by the driver or is otherwise incompatible for implementation-specific "
-        "reasons."
+    VK_ERROR_INCOMPATIBLE_DRIVER,
+    "VK_ERROR_INCOMPATIBLE_DRIVER: the requested version of Vulkan is not "
+    "supported by the driver or is otherwise incompatible for "
+        "implementation-specific reasons."
 },
 {
-    ApiResult::ErrorTooManyObjects,
-    "ErrorTooManyObjects: too many objects of the type have already been "
+    VK_ERROR_TOO_MANY_OBJECTS,
+    "VK_ERROR_TOO_MANY_OBJECTS: too many objects of the type have already been "
     "created"
 },
 {
-    ApiResult::ErrorFormatNotSupported,
-    "ErrorFormatNotSupported: a requested format is not supported on this "
-    "device"
+    VK_ERROR_FORMAT_NOT_SUPPORTED,
+    "VK_ERROR_FORMAT_NOT_SUPPORTED: a requested format is not supported on "
+    "this device."
 },
 {
-    ApiResult::ErrorFragmentedPool,
-    "ErrorFragmentedPool: a pool allocation has failed due to fragmentation of "
-    "the pool’s memory. this must only be returned if no attempt to allocate "
-        "host or device memory was made to accommodate the new allocation. "
-        "this should be returned in preference to VK_ERROR_OUT_OF_POOL_MEMORY, "
-        "but only if the implementation is certain that the pool allocation "
-        "failure was due to fragmentation."
+    VK_ERROR_FRAGMENTED_POOL,
+    "VK_ERROR_FRAGMENTED_POOL: a pool allocation has failed due to "
+    "fragmentation of the pool’s memory. this must only be returned if no "
+        "attempt to allocate host or device memory was made to accommodate the "
+        "new allocation. this should be returned in preference to "
+        "VK_ERROR_OUT_OF_POOL_MEMORY, but only if the implementation is "
+        "certain that the pool allocation failure was due to fragmentation."
 },
 {
-    ApiResult::ErrorUnknown,
-    "ErrorUnknown: an unknown error has occurred; either the application has "
-    "provided invalid input, or an implementation failure has occurred."
+    VK_ERROR_UNKNOWN,
+    "VK_ERROR_UNKNOWN: an unknown error has occurred; either the application "
+    "has provided invalid input, or an implementation failure has occurred."
 },
 {
-    ApiResult::ErrorOutOfPoolMemory,
-    "ErrorOutOfPoolMemory: a pool memory allocation has failed. this must only "
-    "be returned if no attempt to allocate host or device memory was made to "
-        "accommodate the new allocation. if the failure was definitely due to "
-        "fragmentation of the pool, VK_ERROR_FRAGMENTED_POOL should be "
+    VK_ERROR_OUT_OF_POOL_MEMORY,
+    "VK_ERROR_OUT_OF_POOL_MEMORY: a pool memory allocation has failed. this "
+    "must only be returned if no attempt to allocate host or device memory was "
+        "made to accommodate the new allocation. if the failure was definitely "
+        "due to fragmentation of the pool, VK_ERROR_FRAGMENTED_POOL should be "
         "returned instead."
 },
 {
-    ApiResult::ErrorInvalidExternalHandle,
-    "ErrorInvalidExternalHandle: an external handle is not a valid handle of "
-    "the specified type."
+    VK_ERROR_INVALID_EXTERNAL_HANDLE,
+    "VK_ERROR_INVALID_EXTERNAL_HANDLE: an external handle is not a valid "
+    "handle of the specified type."
 },
 {
-    ApiResult::ErrorFragmentation,
-    "ErrorFragmentation: a descriptor pool creation has failed due to "
+    VK_ERROR_FRAGMENTATION,
+    "VK_ERROR_FRAGMENTATION: a descriptor pool creation has failed due to "
     "fragmentation"
 },
 {
-    ApiResult::ErrorInvalidOpaqueCaptureAddress,
-    "ErrorInvalidOpaqueCaptureAddress: a buffer creation or memory allocation "
-    "failed because the requested address is not available. a shader group "
-        "handle assignment failed because the requested shader group handle "
-        "information is no longer valid."
+    VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS,
+    "VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS: a buffer creation or memory "
+    "allocation failed because the requested address is not available. a "
+        "shader group handle assignment failed because the requested shader "
+        "group handle information is no longer valid."
 },
 {
-    ApiResult::PipelineCompileRequired,
-    "PipelineCompileRequired: a requested pipeline creation would have "
+    VK_PIPELINE_COMPILE_REQUIRED,
+    "VK_PIPELINE_COMPILE_REQUIRED: a requested pipeline creation would have "
     "required compilation, but the application requested compilation to not be "
         "performed."
 },
 {
-    ApiResult::ErrorSurfaceLostKhr,
-    "ErrorSurfaceLostKhr: a surface is no longer available"
+    VK_ERROR_SURFACE_LOST_KHR,
+    "VK_ERROR_SURFACE_LOST_KHR: a surface is no longer available"
 },
 {
-    ApiResult::ErrorNativeWindowInUseKhr,
-    "ErrorNativeWindowInUseKhr: the requested window is already in use by "
-    "Vulkan or another API in a manner which prevents it from being used again."
+    VK_ERROR_NATIVE_WINDOW_IN_USE_KHR,
+    "VK_ERROR_NATIVE_WINDOW_IN_USE_KHR: the requested window is already in use "
+    "by Vulkan or another API in a manner which prevents it from being used "
+        "again."
 },
 {
-    ApiResult::SuboptimalKhr,
-    "SuboptimalKhr: a swapchain no longer matches the surface properties "
+    VK_SUBOPTIMAL_KHR,
+    "VK_SUBOPTIMAL_KHR: a swapchain no longer matches the surface properties "
     "exactly, but can still be used to present to the surface successfully."
 },
 {
-    ApiResult::ErrorOutOfDateKhr,
-    "ErrorOutOfDateKhr: a surface has changed in such a way that it is no "
-    "longer compatible with the swapchain, and further presentation requests "
-        "using the swapchain will fail. applications must query the new surface "
-        "properties and recreate their swapchain if they wish to continue "
-        "presenting to the surface."
+    VK_ERROR_OUT_OF_DATE_KHR,
+    "VK_ERROR_OUT_OF_DATE_KHR: a surface has changed in such a way that it is "
+    "no longer compatible with the swapchain, and further presentation "
+        "requests using the swapchain will fail. applications must query the "
+        "new surface properties and recreate their swapchain if they wish to "
+        "continue presenting to the surface."
 },
 {
-    ApiResult::ErrorIncompatibleDisplayKhr,
-    "ErrorIncompatibleDisplayKhr: the display used by a swapchain does not use "
-    "the same presentable image layout, or is incompatible in a way that "
-        "prevents sharing an image."
+    VK_ERROR_INCOMPATIBLE_DISPLAY_KHR,
+    "VK_ERROR_INCOMPATIBLE_DISPLAY_KHR: the display used by a swapchain does "
+    "not use the same presentable image layout, or is incompatible in a way "
+        "that prevents sharing an image."
 },
 {
-    ApiResult::ErrorValidationFailedExt,
-    "ErrorValidationFailedExt: a command failed because invalid usage was "
-    "detected by the implementation or a validation-layer."
+    VK_ERROR_VALIDATION_FAILED_EXT,
+    "VK_ERROR_VALIDATION_FAILED_EXT: a command failed because invalid usage "
+    "was detected by the implementation or a validation-layer."
 },
 {
-    ApiResult::ErrorInvalidShaderNv,
-    "ErrorInvalidShaderNv: one or more shaders failed to compile or link. more "
-    "details are reported back to the application via VK_EXT_debug_report if "
-        "enabled."
+    VK_ERROR_INVALID_SHADER_NV,
+    "VK_ERROR_INVALID_SHADER_NV: one or more shaders failed to compile or "
+    "link. more details are reported back to the application via "
+        "VK_EXT_debug_report if enabled."
 },
 {
-    ApiResult::ErrorImageUsageNotSupportedKhr,
-    "ErrorImageUsageNotSupportedKhr: the requested VkImageUsageFlags are not "
-    "supported"
+    VK_ERROR_IMAGE_USAGE_NOT_SUPPORTED_KHR,
+    "VK_ERROR_IMAGE_USAGE_NOT_SUPPORTED_KHR: the requested VkImageUsageFlags "
+    "are not supported"
 },
 {
-    ApiResult::ErrorVideoPictureLayoutNotSupportedKhr,
-    "ErrorVideoPictureLayoutNotSupportedKhr: the requested video picture "
-    "layout is not supported."
+    VK_ERROR_VIDEO_PICTURE_LAYOUT_NOT_SUPPORTED_KHR,
+    "VK_ERROR_VIDEO_PICTURE_LAYOUT_NOT_SUPPORTED_KHR: the requested video "
+    "picture layout is not supported."
 },
 {
-    ApiResult::ErrorVideoProfileOperationNotSupportedKhr,
-    "ErrorVideoProfileOperationNotSupportedKhr: a video profile operation "
-    "specified via VkVideoProfileInfoKHR::videoCodecOperation is not supported."
+    VK_ERROR_VIDEO_PROFILE_OPERATION_NOT_SUPPORTED_KHR,
+    "VK_ERROR_VIDEO_PROFILE_OPERATION_NOT_SUPPORTED_KHR: a video profile "
+    "operation specified via VkVideoProfileInfoKHR::videoCodecOperation is not "
+        "supported."
 },
 {
-    ApiResult::ErrorVideoProfileFormatNotSupportedKhr,
-    "ErrorVideoProfileFormatNotSupportedKhr: format parameters in a requested "
-    "VkVideoProfileInfoKHR chain are not supported."
-},
-{
-    ApiResult::ErrorVideoProfileCodecNotSupportedKhr,
-    "ErrorVideoProfileCodecNotSupportedKhr: codec-specific parameters in a "
+    VK_ERROR_VIDEO_PROFILE_FORMAT_NOT_SUPPORTED_KHR,
+    "VK_ERROR_VIDEO_PROFILE_FORMAT_NOT_SUPPORTED_KHR: format parameters in a "
     "requested VkVideoProfileInfoKHR chain are not supported."
 },
 {
-    ApiResult::ErrorVideoStdVersionNotSupportedKhr,
-    "ErrorVideoStdVersionNotSupportedKhr: the specified video Std header "
-    "version is not supported."
+    VK_ERROR_VIDEO_PROFILE_CODEC_NOT_SUPPORTED_KHR,
+    "VK_ERROR_VIDEO_PROFILE_CODEC_NOT_SUPPORTED_KHR: codec-specific parameters "
+    "in a requested VkVideoProfileInfoKHR chain are not supported."
 },
 {
-    ApiResult::ErrorInvalidDrmFormatModifierPlaneLayoutExt,
-    "ErrorInvalidDrmFormatModifierPlaneLayoutExt"
+    VK_ERROR_VIDEO_STD_VERSION_NOT_SUPPORTED_KHR,
+    "VK_ERROR_VIDEO_STD_VERSION_NOT_SUPPORTED_KHR: the specified video Std "
+    "header version is not supported."
 },
 {
-    ApiResult::ErrorNotPermittedKhr,
-    "ErrorNotPermittedKhr: the driver implementation has denied a request to "
-    "acquire a priority above the default priority "
-        "(VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_EXT) because the application does not "
-        "have sufficient privileges."
+    VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT,
+    "VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT"
 },
 {
-    ApiResult::ErrorFullScreenExclusiveModeLostExt,
-    "ErrorFullScreenExclusiveModeLostExt: an operation on a swapchain created "
-    "with VK_FULL_SCREEN_EXCLUSIVE_APPLICATION_CONTROLLED_EXT failed as it did "
-        "not have exclusive full-screen access. this may occur due to "
-        "implementation-dependent reasons, outside of the application’s control."
+    VK_ERROR_NOT_PERMITTED_KHR,
+    "VK_ERROR_NOT_PERMITTED_KHR: the driver implementation has denied a "
+    "request to acquire a priority above the default priority "
+        "(VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_EXT) because the application does "
+        "not have sufficient privileges."
 },
 {
-    ApiResult::ThreadIdleKhr,
-    "ThreadIdleKhr: a deferred operation is not complete but there is "
+    VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT,
+    "VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT: an operation on a swapchain "
+    "created with VK_FULL_SCREEN_EXCLUSIVE_APPLICATION_CONTROLLED_EXT failed "
+        "as it did not have exclusive full-screen access. this may occur due "
+        "to implementation-dependent reasons, outside of the application’s "
+        "control."
+},
+{
+    VK_THREAD_IDLE_KHR,
+    "VK_THREAD_IDLE_KHR: a deferred operation is not complete but there is "
     "currently no work for this thread to do at the time of this call."
 },
 {
-    ApiResult::ThreadDoneKhr,
-    "ThreadDoneKhr: a deferred operation is not complete but there is no work "
-    "remaining to assign to additional threads."
+    VK_THREAD_DONE_KHR,
+    "VK_THREAD_DONE_KHR: a deferred operation is not complete but there is no "
+    "work remaining to assign to additional threads."
 },
 {
-    ApiResult::OperationDeferredKhr,
-    "OperationDeferredKhr: a deferred operation was requested and at least "
-    "some of the work was deferred."
+    VK_OPERATION_DEFERRED_KHR,
+    "VK_OPERATION_DEFERRED_KHR: a deferred operation was requested and at "
+    "least some of the work was deferred."
 },
 {
-    ApiResult::OperationNotDeferredKhr,
-    "OperationNotDeferredKhr: a deferred operation was requested and no "
+    VK_OPERATION_NOT_DEFERRED_KHR,
+    "VK_OPERATION_NOT_DEFERRED_KHR: a deferred operation was requested and no "
     "operations were deferred."
 },
 {
-    ApiResult::ErrorInvalidVideoStdParametersKhr,
-    "ErrorInvalidVideoStdParametersKhr: the specified Video Std parameters do "
-    "not adhere to the syntactic or semantic requirements of the used video "
-        "compression standard, or values derived from parameters according to the "
-        "rules defined by the used video compression standard do not adhere to the "
-        "capabilities of the video compression standard or the implementation."
+    VK_ERROR_COMPRESSION_EXHAUSTED_EXT,
+    "VK_ERROR_COMPRESSION_EXHAUSTED_EXT: an image creation failed because "
+    "internal resources required for compression are exhausted. this must only "
+        "be returned when fixed-rate compression is requested."
 },
 {
-    ApiResult::ErrorCompressionExhaustedExt,
-    "ErrorCompressionExhaustedExt: an image creation failed because internal "
-    "resources required for compression are exhausted. this must only be "
-        "returned when fixed-rate compression is requested."
-},
-{
-    ApiResult::IncompatibleShaderBinaryExt,
-    "IncompatibleShaderBinaryExt: the provided binary shader code is not "
-    "compatible with this device."
+    VK_ERROR_INCOMPATIBLE_SHADER_BINARY_EXT,
+    "VK_INCOMPATIBLE_SHADER_BINARY_EXT : the provided binary shader code "
+    "is not compatible with this device."
 }
     };
 
-    std::string ApiResult_to_string(ApiResult result);
+    std::string VkResult_to_string(VkResult result);
 
     enum class VulkanApiVersion
     {
@@ -855,9 +714,8 @@ namespace bv
         // which specifies that the instance will enumerate available Vulkan
         // Portability-compliant physical devices and groups in addition to the
         // Vulkan physical devices and groups that are enumerated by default.
-        // you might want to enable the
-        // VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME extension when using
-        // this.
+        // you might want to enable the VK_KHR_portability_enumeration extension
+        // when using this.
         bool will_enumerate_portability = false;
 
         std::string app_name;
@@ -1646,31 +1504,31 @@ namespace bv
 
         Error(std::string message);
 
-        Error(const ApiResult api_result);
+        Error(const VkResult vk_result);
 
         Error(
             std::string message,
-            const std::optional<ApiResult>& api_result,
-            bool api_result_already_embedded_in_message
+            const std::optional<VkResult>& vk_result,
+            bool vk_result_already_embedded_in_message
         );
 
-        constexpr const std::optional<ApiResult>& api_result() const
+        constexpr const std::optional<VkResult>& vk_result() const
         {
-            return _api_result;
+            return _vk_result;
         }
 
         std::string to_string() const;
 
     private:
         std::string message;
-        std::optional<ApiResult> _api_result;
-        bool stringify_api_result;
+        std::optional<VkResult> _vk_result;
+        bool stringify_vk_result;
 
     };
 
 #pragma endregion
 
-#pragma region object wrappers and abstract classes
+#pragma region classes and object wrappers
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkAllocationCallbacks.html
     class Allocator
@@ -1751,7 +1609,7 @@ namespace bv
         }
 
         // this will only have a value if:
-        // - this extension is available: VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        // - the VK_KHR_swapchain extension is available
         // - a surface was provided to Context::fetch_physical_devices()
         const std::optional<SwapchainSupport>& swapchain_support() const
         {
@@ -1782,7 +1640,7 @@ namespace bv
             VkFormatFeatureFlags features
         ) const;
 
-        // might return error with ApiResult::ErrorFormatNotSupported
+        // might throw error with VK_ERROR_FORMAT_NOT_SUPPORTED
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceImageFormatProperties.html
         ImageFormatProperties fetch_image_format_properties(
             VkFormat format,
@@ -1825,9 +1683,9 @@ namespace bv
         Context(const Context& other) = delete;
         Context(Context&& other) noexcept;
 
-        // * it's best to keep at least one external reference to the allocator
-        //   so that it doesn't die with the Context because the driver might
-        //   still use the allocator even after the instance is destroyed.
+        // it's best to keep at least one external reference to the allocator so
+        // that it doesn't die with the Context because the driver might still
+        // use the allocator even after the instance is destroyed.
         static ContextPtr create(
             const ContextConfig& config,
             const AllocatorPtr& allocator = nullptr
@@ -1852,9 +1710,9 @@ namespace bv
             return _allocator;
         }
 
-        // * it's best to keep at least one external reference to the allocator
-        //   so that it doesn't die with the Context because the driver might
-        //   still use the allocator even after the instance is destroyed.
+        // it's best to keep at least one external reference to the allocator so
+        // that it doesn't die with the Context because the driver might still
+        // use the allocator even after the instance is destroyed.
         void set_allocator(
             const AllocatorPtr& allocator
         );
@@ -1864,6 +1722,9 @@ namespace bv
             return _vk_instance;
         }
 
+        // if _allocator == nullptr, this will return nullptr, otherwise it will
+        // return the address of _vk_instance which contains function pointers
+        // for callbacks.
         const VkAllocationCallbacks* vk_allocator_ptr() const;
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumeratePhysicalDevices.html
@@ -2042,7 +1903,7 @@ namespace bv
             const std::vector<SemaphorePtr>& wait_semaphores,
             const SwapchainPtr& swapchain,
             uint32_t image_index,
-            ApiResult* out_api_result = nullptr
+            VkResult* out_vk_result = nullptr
         );
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkQueueWaitIdle.html
@@ -2255,7 +2116,7 @@ namespace bv
             const SemaphorePtr& semaphore = nullptr,
             const FencePtr& fence = nullptr,
             uint64_t timeout = std::numeric_limits<uint64_t>::max(),
-            ApiResult* out_api_result = nullptr
+            VkResult* out_vk_result = nullptr
         );
 
         ~Swapchain();

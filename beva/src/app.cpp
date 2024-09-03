@@ -277,7 +277,7 @@ namespace beva_demo
         {
             throw std::runtime_error(bv::Error(
                 "failed to create window surface",
-                (bv::ApiResult)vk_result,
+                vk_result,
                 false
             ).to_string().c_str());
         }
@@ -912,7 +912,6 @@ namespace beva_demo
     void App::create_texture_image()
     {
         // load image file
-
         int texture_width, texture_height, tex_channels;
         stbi_uc* pixels = stbi_load(
             TEXTURE_PATH,
@@ -926,10 +925,12 @@ namespace beva_demo
             throw std::runtime_error("failed to load texture image");
         }
 
+        // mip levels
         texture_mip_levels = (uint32_t)(std::floor(
             std::log2((double)std::max(texture_width, texture_height))
         )) + 1;
 
+        // size info
         constexpr uint32_t n_channels = 4;
         constexpr uint32_t n_bytes_per_channel = 1;
         VkDeviceSize size =
@@ -1316,19 +1317,19 @@ namespace beva_demo
         fences_in_flight[frame_idx]->wait();
 
         uint32_t img_idx;
-        bv::ApiResult acquire_next_image_result;
+        VkResult acquire_next_image_vk_result;
         try
         {
             img_idx = swapchain->acquire_next_image(
                 semaphs_image_available[frame_idx],
                 nullptr,
                 UINT64_MAX,
-                &acquire_next_image_result
+                &acquire_next_image_vk_result
             );
         }
         catch (const bv::Error& e)
         {
-            if (acquire_next_image_result == bv::ApiResult::ErrorOutOfDateKhr)
+            if (acquire_next_image_vk_result == VK_ERROR_OUT_OF_DATE_KHR)
             {
                 recreate_swapchain();
                 return;
@@ -1354,26 +1355,26 @@ namespace beva_demo
             fences_in_flight[frame_idx]
         );
 
-        bv::ApiResult present_result;
+        VkResult present_vk_result;
         try
         {
             presentation_queue->present(
                 { semaphs_render_finished[frame_idx] },
                 swapchain,
                 img_idx,
-                &present_result
+                &present_vk_result
             );
         }
         catch (const bv::Error& e)
         {
-            if (present_result != bv::ApiResult::ErrorOutOfDateKhr
-                && present_result != bv::ApiResult::SuboptimalKhr)
+            if (present_vk_result != VK_ERROR_OUT_OF_DATE_KHR
+                && present_vk_result != VK_SUBOPTIMAL_KHR)
             {
                 throw e;
             }
         }
-        if (present_result == bv::ApiResult::ErrorOutOfDateKhr
-            || present_result == bv::ApiResult::SuboptimalKhr
+        if (present_vk_result == VK_ERROR_OUT_OF_DATE_KHR
+            || present_vk_result == VK_SUBOPTIMAL_KHR
             || framebuf_resized)
         {
             framebuf_resized = false;

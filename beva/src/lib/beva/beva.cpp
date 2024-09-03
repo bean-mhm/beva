@@ -134,11 +134,11 @@ namespace bv
         return std::format("{}.{}.{}.{}", variant, major, minor, patch);
     }
 
-    std::string ApiResult_to_string(ApiResult result)
+    std::string VkResult_to_string(VkResult result)
     {
-        if (ApiResult_strmap.contains(result))
+        if (VkResult_strmap.contains(result))
         {
-            return ApiResult_strmap[result];
+            return VkResult_strmap[result];
         }
         return std::format(
             "undocumented VkResult: {}",
@@ -1773,42 +1773,42 @@ namespace bv
 
     Error::Error()
         : message("no error information provided"),
-        _api_result(std::nullopt),
-        stringify_api_result(false)
+        _vk_result(std::nullopt),
+        stringify_vk_result(false)
     {}
 
     Error::Error(std::string message)
         : message(std::move(message)),
-        _api_result(std::nullopt),
-        stringify_api_result(false)
+        _vk_result(std::nullopt),
+        stringify_vk_result(false)
     {}
 
-    Error::Error(const ApiResult api_result)
+    Error::Error(const VkResult vk_result)
         : message(""),
-        _api_result(api_result),
-        stringify_api_result(true)
+        _vk_result(vk_result),
+        stringify_vk_result(true)
     {}
 
     Error::Error(
         std::string message,
-        const std::optional<ApiResult>& api_result,
-        bool api_result_already_embedded_in_message
+        const std::optional<VkResult>& vk_result,
+        bool vk_result_already_embedded_in_message
     )
         : message(std::move(message)),
-        _api_result(api_result),
-        stringify_api_result(!api_result_already_embedded_in_message)
+        _vk_result(vk_result),
+        stringify_vk_result(!vk_result_already_embedded_in_message)
     {}
 
     std::string Error::to_string() const
     {
         std::string s = message;
-        if (api_result().has_value() && stringify_api_result)
+        if (vk_result().has_value() && stringify_vk_result)
         {
             if (!message.empty())
             {
                 s += ": ";
             }
-            s += ApiResult_to_string(api_result().value());
+            s += VkResult_to_string(vk_result().value());
         }
         return s;
     }
@@ -1842,7 +1842,7 @@ namespace bv
         {
             throw Error(
                 "failed to fetch available device extensions",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -1897,7 +1897,7 @@ namespace bv
             throw Error(
                 "failed to get physical device surface capabilities while "
                 "updating swapchain support details.",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -1926,7 +1926,7 @@ namespace bv
                 throw Error(
                     "failed to get physical device surface formats while "
                     "updating swapchain support details.",
-                    (ApiResult)vk_result,
+                    vk_result,
                     false
                 );
             }
@@ -1962,7 +1962,7 @@ namespace bv
                 throw Error(
                     "failed to get physical device surface present modes while "
                     "updating swapchain support details.",
-                    (ApiResult)vk_result,
+                    vk_result,
                     false
                 );
             }
@@ -2033,7 +2033,7 @@ namespace bv
         {
             throw Error(
                 "failed to fetch image format properties",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -2158,7 +2158,7 @@ namespace bv
         {
             throw Error(
                 "failed to create instance for context",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -2182,7 +2182,7 @@ namespace bv
         {
             throw Error(
                 "failed to fetch available instance layers",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -2223,7 +2223,7 @@ namespace bv
         {
             throw Error(
                 "failed to fetch available instance extensions",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -2269,7 +2269,7 @@ namespace bv
         {
             throw Error(
                 "failed to fetch physical devices",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -2337,7 +2337,7 @@ namespace bv
                         throw Error(
                             "failed to check physical device's surface support "
                             "when fetching physical devices",
-                            (ApiResult)vk_result,
+                            vk_result,
                             false
                         );
                     }
@@ -2475,7 +2475,7 @@ namespace bv
         {
             throw Error(
                 "failed to create debug messenger",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -2581,7 +2581,7 @@ namespace bv
         {
             throw Error(
                 "failed to submit command buffer(s) to queue",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -2591,7 +2591,7 @@ namespace bv
         const std::vector<SemaphorePtr>& wait_semaphores,
         const SwapchainPtr& swapchain,
         uint32_t image_index,
-        ApiResult* out_api_result
+        VkResult* out_vk_result
     )
     {
         std::vector<VkSemaphore> vk_semaphores(wait_semaphores.size());
@@ -2617,15 +2617,15 @@ namespace bv
             handle(),
             &present_info
         );
-        if (out_api_result != nullptr)
+        if (out_vk_result != nullptr)
         {
-            *out_api_result = (ApiResult)vk_result;
+            *out_vk_result = vk_result;
         }
         if (vk_result != VK_SUCCESS && vk_result != VK_SUBOPTIMAL_KHR)
         {
             throw Error(
                 "failed to queue image for presentation",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -2638,7 +2638,7 @@ namespace bv
         {
             throw Error(
                 "failed to wait for queue to become idle",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -2744,7 +2744,7 @@ namespace bv
         {
             throw Error(
                 "failed to create device",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -2779,7 +2779,7 @@ namespace bv
         {
             throw Error(
                 "failed to wait for device to become idle",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -2820,13 +2820,13 @@ namespace bv
         }
         catch (const Error& e)
         {
-            if (e.api_result().has_value()
-                && e.api_result().value() == ApiResult::ErrorFormatNotSupported)
+            if (e.vk_result().has_value()
+                && e.vk_result().value() == VK_ERROR_FORMAT_NOT_SUPPORTED)
             {
                 throw Error(
                     "failed to create image: image format not supported with "
                     "the provided parameters",
-                    e.api_result(),
+                    e.vk_result(),
                     true
                 );
             }
@@ -2834,7 +2834,7 @@ namespace bv
             {
                 throw Error(
                     "failed to create image: " + e.to_string(),
-                    e.api_result(),
+                    e.vk_result(),
                     true
                 );
             }
@@ -2876,7 +2876,7 @@ namespace bv
         {
             throw Error(
                 "failed to create image",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -2909,7 +2909,7 @@ namespace bv
         {
             throw Error(
                 "failed to bind image memory",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -3005,7 +3005,7 @@ namespace bv
         {
             throw Error(
                 "failed to create swapchain",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -3029,7 +3029,7 @@ namespace bv
         {
             throw Error(
                 "failed to retrieve swapchain images after creating it",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -3049,7 +3049,7 @@ namespace bv
         const SemaphorePtr& semaphore,
         const FencePtr& fence,
         uint64_t timeout,
-        ApiResult* out_api_result
+        VkResult* out_vk_result
     )
     {
         uint32_t image_index;
@@ -3061,9 +3061,9 @@ namespace bv
             fence == nullptr ? nullptr : fence->handle(),
             &image_index
         );
-        if (out_api_result != nullptr)
+        if (out_vk_result != nullptr)
         {
-            *out_api_result = (ApiResult)vk_result;
+            *out_vk_result = vk_result;
         }
         if (vk_result == VK_SUCCESS
             || vk_result == VK_SUBOPTIMAL_KHR)
@@ -3072,7 +3072,7 @@ namespace bv
         }
         throw Error(
             "failed to acquire next swapchain image",
-            (ApiResult)vk_result,
+            vk_result,
             false
         );
     }
@@ -3144,7 +3144,7 @@ namespace bv
         {
             throw Error(
                 "failed to create image view",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -3212,7 +3212,7 @@ namespace bv
         {
             throw Error(
                 "failed to create shader module",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -3281,7 +3281,7 @@ namespace bv
         {
             throw Error(
                 "failed to create sampler",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -3354,7 +3354,7 @@ namespace bv
         {
             throw Error(
                 "failed to create descriptor set layout",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -3436,7 +3436,7 @@ namespace bv
         {
             throw Error(
                 "failed to create pipeline layout",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -3542,7 +3542,7 @@ namespace bv
         {
             throw Error(
                 "failed to create render pass",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -3756,7 +3756,7 @@ namespace bv
         {
             throw Error(
                 "failed to create graphics pipeline",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -3826,7 +3826,7 @@ namespace bv
         {
             throw Error(
                 "failed to create framebuffer",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -3862,7 +3862,7 @@ namespace bv
         {
             throw Error(
                 "failed to reset command buffer",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -3910,7 +3910,7 @@ namespace bv
         {
             throw Error(
                 "failed to begin recording a command buffer",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -3923,7 +3923,7 @@ namespace bv
         {
             throw Error(
                 "failed to end recording a command buffer",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -3980,7 +3980,7 @@ namespace bv
         {
             throw Error(
                 "failed to create command pool",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -4010,7 +4010,7 @@ namespace bv
         {
             throw Error(
                 "failed to allocate command buffer",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -4049,7 +4049,7 @@ namespace bv
         {
             throw Error(
                 "failed to allocate command buffer(s)",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -4107,7 +4107,7 @@ namespace bv
         {
             throw Error(
                 "failed to create semaphore",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -4156,7 +4156,7 @@ namespace bv
         {
             throw Error(
                 "failed to create fence",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -4176,7 +4176,7 @@ namespace bv
         {
             throw Error(
                 "failed to wait for fence to become signaled",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -4210,7 +4210,7 @@ namespace bv
         {
             throw Error(
                 "failed to wait for fence(s) to become signaled",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -4227,7 +4227,7 @@ namespace bv
         {
             throw Error(
                 "failed to reset fence",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -4249,7 +4249,7 @@ namespace bv
         }
         throw Error(
             "failed to get fence status",
-            (ApiResult)vk_result,
+            vk_result,
             false
         );
     }
@@ -4307,7 +4307,7 @@ namespace bv
         {
             throw Error(
                 "failed to create buffer",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -4340,7 +4340,7 @@ namespace bv
         {
             throw Error(
                 "failed to bind buffer memory",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -4392,7 +4392,7 @@ namespace bv
         {
             throw Error(
                 "failed to allocate device memory",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -4415,7 +4415,7 @@ namespace bv
             unmap();
             throw Error(
                 "failed to map device memory",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -4453,7 +4453,7 @@ namespace bv
         {
             throw Error(
                 "failed to flush mapped device memory range",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -4481,7 +4481,7 @@ namespace bv
         {
             throw Error(
                 "failed to invalidate mapped device memory range",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -4505,7 +4505,7 @@ namespace bv
         {
             throw Error(
                 "failed to upload data to device memory: " + e.to_string(),
-                e.api_result(),
+                e.vk_result(),
                 true
             );
         }
@@ -4524,7 +4524,7 @@ namespace bv
         {
             throw Error(
                 "failed to upload data to device memory: " + e.to_string(),
-                e.api_result(),
+                e.vk_result(),
                 true
             );
         }
@@ -4662,7 +4662,7 @@ namespace bv
         {
             throw Error(
                 "failed to create descriptor pool",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -4694,7 +4694,7 @@ namespace bv
         {
             throw Error(
                 "failed to allocate descriptor set",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -4739,7 +4739,7 @@ namespace bv
         {
             throw Error(
                 "failed to allocate descriptor set(s)",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
@@ -4809,7 +4809,7 @@ namespace bv
         {
             throw Error(
                 "failed to create buffer view",
-                (ApiResult)vk_result,
+                vk_result,
                 false
             );
         }
