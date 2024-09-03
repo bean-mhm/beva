@@ -183,9 +183,9 @@ namespace beva_demo
             bool use_transient_pool
         );
 
-        // if no fence is provided, Queue::wait_idle() will be used. if a fence
-        // is provided you'll be in charge of synchronization (like waiting on
-        // the fence).
+        // end and submit one-time command buffer. if no fence is provided,
+        // Queue::wait_idle() will be used. if a fence is provided you'll be in
+        // charge of synchronization (like waiting on the fence).
         void end_single_time_commands(
             bv::CommandBufferPtr& cmd_buf,
             const bv::FencePtr fence = nullptr

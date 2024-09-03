@@ -8,7 +8,7 @@
 #include <memory>
 #include <any>
 #include <optional>
-#include <variant>
+#include <limits>
 #include <type_traits>
 #include <functional>
 #include <stdexcept>
@@ -27,8 +27,7 @@ namespace bv
 
 #define _BV_DEFINE_SMART_PTR_TYPE_ALIASES(ClassName) \
     using ClassName##Ptr = std::shared_ptr<ClassName>; \
-    using ClassName##WPtr = std::weak_ptr<ClassName>; \
-    using ClassName##UPtr = std::unique_ptr<ClassName>;
+    using ClassName##WPtr = std::weak_ptr<ClassName>;
 
     // forward declarations
     class Allocator;
@@ -60,7 +59,6 @@ namespace bv
 
     // smart pointer type aliases
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(Allocator);
-    _BV_DEFINE_SMART_PTR_TYPE_ALIASES(PhysicalDevice);
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(Context);
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(DebugMessenger);
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(Surface);
@@ -1670,103 +1668,6 @@ namespace bv
 
     };
 
-    template<typename T = void>
-    class Result
-    {
-    public:
-        Result() = delete;
-
-        Result(const T& value)
-            : data(value)
-        {}
-
-        Result(T&& value)
-            : data(std::move(value))
-        {}
-
-        Result(const Error& error)
-            : data(error)
-        {}
-
-        constexpr bool ok() const
-        {
-            return std::holds_alternative<T>(data);
-        }
-
-        constexpr const T& value() const
-        {
-            if (!ok())
-            {
-                throw std::exception(
-                    "Result::value() called while there's an error"
-                );
-            }
-            return std::get<T>(data);
-        }
-
-        constexpr T& value()
-        {
-            if (!ok())
-            {
-                throw std::exception(
-                    "Result::value() called while there's an error"
-                );
-            }
-            return std::get<T>(data);
-        }
-
-        constexpr const Error& error() const
-        {
-            if (ok())
-            {
-                throw std::exception(
-                    "Result::error() called while there's no error"
-                );
-            }
-            return std::get<Error>(data);
-        }
-
-    private:
-        std::variant<T, Error> data;
-
-    };
-
-    template<>
-    class Result<void>
-    {
-    public:
-        Result(const Result&) = default;
-        Result& operator=(const Result&) = default;
-
-        Result()
-            : _error(std::nullopt)
-        {}
-
-        Result(const Error& error)
-            : _error(error)
-        {}
-
-        constexpr bool ok() const
-        {
-            return !_error.has_value();
-        }
-
-        constexpr const Error& error() const
-        {
-            if (!_error.has_value())
-            {
-                throw std::exception(
-                    "Result::error() called while there's no error"
-                );
-            }
-            return _error.value();
-        }
-
-    private:
-        std::optional<Error> _error;
-
-    };
-
 #pragma endregion
 
 #pragma region object wrappers and abstract classes
@@ -1858,14 +1759,14 @@ namespace bv
         }
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumerateDeviceExtensionProperties.html
-        Result<std::vector<ExtensionProperties>> fetch_available_extensions(
+        std::vector<ExtensionProperties> fetch_available_extensions(
             const std::string& layer_name = ""
         ) const;
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceCapabilitiesKHR.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceFormatsKHR.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfacePresentModesKHR.html
-        Result<> update_swapchain_support(
+        void update_swapchain_support(
             const SurfacePtr& surface
         );
 
@@ -1875,7 +1776,7 @@ namespace bv
         // find the first image format in the candidates that is supported with
         // the provided tiling and required features.
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceFormatProperties.html
-        Result<VkFormat> find_supported_image_format(
+        std::optional<VkFormat> find_supported_image_format(
             const std::vector<VkFormat>& candidates,
             VkImageTiling tiling,
             VkFormatFeatureFlags features
@@ -1883,7 +1784,7 @@ namespace bv
 
         // might return error with ApiResult::ErrorFormatNotSupported
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceImageFormatProperties.html
-        Result<ImageFormatProperties> fetch_image_format_properties(
+        ImageFormatProperties fetch_image_format_properties(
             VkFormat format,
             VkImageType type,
             VkImageTiling tiling,
@@ -1927,16 +1828,16 @@ namespace bv
         // * it's best to keep at least one external reference to the allocator
         //   so that it doesn't die with the Context because the driver might
         //   still use the allocator even after the instance is destroyed.
-        static Result<ContextPtr> create(
+        static ContextPtr create(
             const ContextConfig& config,
             const AllocatorPtr& allocator = nullptr
         );
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumerateInstanceLayerProperties.html
-        static Result<std::vector<LayerProperties>> fetch_available_layers();
+        static std::vector<LayerProperties> fetch_available_layers();
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumerateInstanceExtensionProperties.html
-        static Result<std::vector<ExtensionProperties>>
+        static std::vector<ExtensionProperties>
             fetch_available_extensions(
                 const std::string& layer_name = ""
             );
@@ -1971,7 +1872,7 @@ namespace bv
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceMemoryProperties.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceQueueFamilyProperties.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceSupportKHR.html
-        Result<std::vector<PhysicalDevice>> fetch_physical_devices(
+        std::vector<PhysicalDevice> fetch_physical_devices(
             const SurfacePtr& surface = nullptr
         ) const;
 
@@ -2000,7 +1901,7 @@ namespace bv
         DebugMessenger(const DebugMessenger& other) = delete;
         DebugMessenger(DebugMessenger&& other) = default;
 
-        static Result<DebugMessengerPtr> create(
+        static DebugMessengerPtr create(
             const ContextPtr& context,
             VkDebugUtilsMessageSeverityFlagsEXT message_severity_filter,
             VkDebugUtilsMessageTypeFlagsEXT message_type_filter,
@@ -2126,7 +2027,7 @@ namespace bv
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSubmitInfo.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkQueueSubmit.html
-        Result<> submit(
+        void submit(
             const std::vector<VkPipelineStageFlags>& wait_stages,
             const std::vector<SemaphorePtr>& wait_semaphores,
             const std::vector<CommandBufferPtr>& command_buffers,
@@ -2137,7 +2038,7 @@ namespace bv
         // provided by VK_KHR_swapchain
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentInfoKHR.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkQueuePresentKHR.html
-        Result<> present(
+        void present(
             const std::vector<SemaphorePtr>& wait_semaphores,
             const SwapchainPtr& swapchain,
             uint32_t image_index,
@@ -2145,7 +2046,7 @@ namespace bv
         );
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkQueueWaitIdle.html
-        Result<> wait_idle();
+        void wait_idle();
 
     protected:
         DeviceWPtr _device;
@@ -2170,7 +2071,7 @@ namespace bv
         Device(const Device& other) = delete;
         Device(Device&& other) = default;
 
-        static Result<DevicePtr> create(
+        static DevicePtr create(
             const ContextPtr& context,
             const PhysicalDevice& physical_device,
             const DeviceConfig& config
@@ -2204,7 +2105,7 @@ namespace bv
         );
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkDeviceWaitIdle.html
-        Result<> wait_idle();
+        void wait_idle();
 
         ~Device();
 
@@ -2237,7 +2138,7 @@ namespace bv
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceImageFormatProperties.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateImage.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetImageMemoryRequirements.html
-        static Result<ImagePtr> create(
+        static ImagePtr create(
             const DevicePtr& device,
             const ImageConfig& config
         );
@@ -2273,7 +2174,7 @@ namespace bv
         }
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkBindImageMemory.html
-        Result<> bind_memory(
+        void bind_memory(
             const DeviceMemoryPtr& memory,
             VkDeviceSize memory_offset
         );
@@ -2312,7 +2213,7 @@ namespace bv
         // this will fetch and store the swapchain images automatically
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateSwapchainKHR.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetSwapchainImagesKHR.html
-        static Result<SwapchainPtr> create(
+        static SwapchainPtr create(
             const DevicePtr& device,
             const SurfacePtr& surface,
             const SwapchainConfig& config,
@@ -2350,10 +2251,10 @@ namespace bv
         }
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAcquireNextImageKHR.html
-        Result<uint32_t> acquire_next_image(
+        uint32_t acquire_next_image(
             const SemaphorePtr& semaphore = nullptr,
             const FencePtr& fence = nullptr,
-            uint64_t timeout = UINT64_MAX,
+            uint64_t timeout = std::numeric_limits<uint64_t>::max(),
             ApiResult* out_api_result = nullptr
         );
 
@@ -2386,7 +2287,7 @@ namespace bv
         ImageView(const ImageView& other) = delete;
         ImageView(ImageView&& other) = default;
 
-        static Result<ImageViewPtr> create(
+        static ImageViewPtr create(
             const DevicePtr& device,
             const ImagePtr& image,
             const ImageViewConfig& config
@@ -2438,7 +2339,7 @@ namespace bv
         ShaderModule(const ShaderModule& other) = delete;
         ShaderModule(ShaderModule&& other) = default;
 
-        static Result<ShaderModulePtr> create(
+        static ShaderModulePtr create(
             const DevicePtr& device,
             const std::vector<uint8_t>& code
         );
@@ -2472,7 +2373,7 @@ namespace bv
         Sampler(const Sampler& other) = delete;
         Sampler(Sampler&& other) = default;
 
-        static Result<SamplerPtr> create(
+        static SamplerPtr create(
             const DevicePtr& device,
             const SamplerConfig& config
         );
@@ -2515,7 +2416,7 @@ namespace bv
         DescriptorSetLayout(const DescriptorSetLayout& other) = delete;
         DescriptorSetLayout(DescriptorSetLayout&& other) = default;
 
-        static Result<DescriptorSetLayoutPtr> create(
+        static DescriptorSetLayoutPtr create(
             const DevicePtr& device,
             const DescriptorSetLayoutConfig& config
         );
@@ -2558,7 +2459,7 @@ namespace bv
         PipelineLayout(const PipelineLayout& other) = delete;
         PipelineLayout(PipelineLayout&& other) = default;
 
-        static Result<PipelineLayoutPtr> create(
+        static PipelineLayoutPtr create(
             const DevicePtr& device,
             const PipelineLayoutConfig& config
         );
@@ -2601,7 +2502,7 @@ namespace bv
         RenderPass(const RenderPass& other) = delete;
         RenderPass(RenderPass&& other) = default;
 
-        static Result<RenderPassPtr> create(
+        static RenderPassPtr create(
             const DevicePtr& device,
             const RenderPassConfig& config
         );
@@ -2645,7 +2546,7 @@ namespace bv
         GraphicsPipeline(const GraphicsPipeline& other) = delete;
         GraphicsPipeline(GraphicsPipeline&& other) = default;
 
-        static Result<GraphicsPipelinePtr> create(
+        static GraphicsPipelinePtr create(
             const DevicePtr& device,
             const GraphicsPipelineConfig& config
         );
@@ -2688,7 +2589,7 @@ namespace bv
         Framebuffer(const Framebuffer& other) = delete;
         Framebuffer(Framebuffer&& other) = default;
 
-        static Result<FramebufferPtr> create(
+        static FramebufferPtr create(
             const DevicePtr& device,
             const FramebufferConfig& config
         );
@@ -2741,17 +2642,17 @@ namespace bv
             return _handle;
         }
 
-        Result<> reset(VkCommandBufferResetFlags flags);
+        void reset(VkCommandBufferResetFlags flags);
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBufferBeginInfo.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkBeginCommandBuffer.html
-        Result<> begin(
+        void begin(
             VkCommandBufferUsageFlags flags,
             std::optional<CommandBufferInheritance> inheritance = std::nullopt
         );
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEndCommandBuffer.html
-        Result<> end();
+        void end();
 
         ~CommandBuffer();
 
@@ -2774,7 +2675,7 @@ namespace bv
         CommandPool(const CommandPool& other) = delete;
         CommandPool(CommandPool&& other) = default;
 
-        static Result<CommandPoolPtr> create(
+        static CommandPoolPtr create(
             const DevicePtr& device,
             const CommandPoolConfig& config
         );
@@ -2796,14 +2697,14 @@ namespace bv
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBufferAllocateInfo.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAllocateCommandBuffers.html
-        static Result<CommandBufferPtr> allocate_buffer(
+        static CommandBufferPtr allocate_buffer(
             const CommandPoolPtr& pool,
             VkCommandBufferLevel level
         );
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCommandBufferAllocateInfo.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAllocateCommandBuffers.html
-        static Result<std::vector<CommandBufferPtr>> allocate_buffers(
+        static std::vector<CommandBufferPtr> allocate_buffers(
             const CommandPoolPtr& pool,
             VkCommandBufferLevel level,
             uint32_t count
@@ -2832,7 +2733,7 @@ namespace bv
         Semaphore(const Semaphore& other) = delete;
         Semaphore(Semaphore&& other) = default;
 
-        static Result<SemaphorePtr> create(const DevicePtr& device);
+        static SemaphorePtr create(const DevicePtr& device);
 
         constexpr const DeviceWPtr& device() const
         {
@@ -2863,7 +2764,7 @@ namespace bv
         Fence(const Fence& other) = delete;
         Fence(Fence&& other) = default;
 
-        static Result<FencePtr> create(
+        static FencePtr create(
             const DevicePtr& device,
             VkFenceCreateFlags flags
         );
@@ -2879,22 +2780,22 @@ namespace bv
         }
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkWaitForFences.html
-        Result<> wait(uint64_t timeout = UINT64_MAX);
+        void wait(uint64_t timeout = UINT64_MAX);
 
         // all provided fences must be from the same device, bad things might
         // happen otherwise.
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkWaitForFences.html
-        static Result<> wait_multiple(
+        static void wait_multiple(
             const std::vector<FencePtr>& fences,
             bool wait_all,
             uint64_t timeout = UINT64_MAX
         );
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkResetFences.html
-        Result<> reset();
+        void reset();
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetFenceStatus.html
-        Result<bool> is_signaled() const;
+        bool is_signaled() const;
 
         ~Fence();
 
@@ -2918,7 +2819,7 @@ namespace bv
         // this will automatically fetch and store the memory requirements
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateBuffer.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetBufferMemoryRequirements.html
-        static Result<BufferPtr> create(
+        static BufferPtr create(
             const DevicePtr& device,
             const BufferConfig& config
         );
@@ -2944,7 +2845,7 @@ namespace bv
         }
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkBindBufferMemory.html
-        Result<> bind_memory(
+        void bind_memory(
             const DeviceMemoryPtr& memory,
             VkDeviceSize memory_offset
         );
@@ -2974,7 +2875,7 @@ namespace bv
         DeviceMemory(const DeviceMemory& other) = delete;
         DeviceMemory(DeviceMemory&& other) = default;
 
-        static Result<DeviceMemoryPtr> allocate(
+        static DeviceMemoryPtr allocate(
             const DevicePtr& device,
             const DeviceMemoryConfig& config
         );
@@ -2995,23 +2896,23 @@ namespace bv
         }
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkMapMemory.html
-        Result<void*> map(VkDeviceSize offset, VkDeviceSize size);
+        void* map(VkDeviceSize offset, VkDeviceSize size);
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkUnmapMemory.html
         void unmap();
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkFlushMappedMemoryRanges.html
-        Result<> flush_mapped_range(VkDeviceSize offset, VkDeviceSize size);
+        void flush_mapped_range(VkDeviceSize offset, VkDeviceSize size);
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkInvalidateMappedMemoryRanges.html
-        Result<> invalidate_mapped_range(
+        void invalidate_mapped_range(
             VkDeviceSize offset,
             VkDeviceSize size
         );
 
         // map the whole memory, copy the provided data, flush, and unmap.
         // you should make sure that mapping is allowed for this memory.
-        Result<> upload(void* data, VkDeviceSize data_size);
+        void upload(void* data, VkDeviceSize data_size);
 
         ~DeviceMemory();
 
@@ -3076,7 +2977,7 @@ namespace bv
         DescriptorPool(const DescriptorPool& other) = delete;
         DescriptorPool(DescriptorPool&& other) = default;
 
-        static Result<DescriptorPoolPtr> create(
+        static DescriptorPoolPtr create(
             const DevicePtr& device,
             const DescriptorPoolConfig& config
         );
@@ -3098,14 +2999,14 @@ namespace bv
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSetAllocateInfo.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAllocateDescriptorSets.html
-        static Result<DescriptorSetPtr> allocate_set(
+        static DescriptorSetPtr allocate_set(
             const DescriptorPoolPtr& pool,
             const DescriptorSetLayoutPtr& set_layout
         );
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorSetAllocateInfo.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAllocateDescriptorSets.html
-        static Result<std::vector<DescriptorSetPtr>> allocate_sets(
+        static std::vector<DescriptorSetPtr> allocate_sets(
             const DescriptorPoolPtr& pool,
             uint32_t count,
             const std::vector<DescriptorSetLayoutPtr>& set_layouts
@@ -3134,7 +3035,7 @@ namespace bv
         BufferView(const BufferView& other) = delete;
         BufferView(BufferView&& other) = default;
 
-        static Result<BufferViewPtr> create(
+        static BufferViewPtr create(
             const DevicePtr& device,
             const BufferPtr& buffer,
             const BufferViewConfig& config

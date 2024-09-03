@@ -1813,10 +1813,9 @@ namespace bv
         return s;
     }
 
-    Result<std::vector<ExtensionProperties>>
-        PhysicalDevice::fetch_available_extensions(
-            const std::string& layer_name
-        ) const
+    std::vector<ExtensionProperties> PhysicalDevice::fetch_available_extensions(
+        const std::string& layer_name
+    ) const
     {
         const char* layer_name_cstr = nullptr;
         if (!layer_name.empty())
@@ -1841,7 +1840,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to fetch available device extensions",
+                (ApiResult)vk_result,
+                false
+            );
         }
 
         std::vector<ExtensionProperties> extensions;
@@ -1853,7 +1856,7 @@ namespace bv
         return extensions;
     }
 
-    Result<> PhysicalDevice::update_swapchain_support(
+    void PhysicalDevice::update_swapchain_support(
         const SurfacePtr& surface
     )
     {
@@ -1861,17 +1864,12 @@ namespace bv
 
         if (surface == nullptr)
         {
-            return Result();
+            return;
         }
 
         // check for extension
         {
-            auto available_extensions_result = fetch_available_extensions();
-            if (!available_extensions_result.ok())
-            {
-                return available_extensions_result.error();
-            }
-            auto available_extensions = available_extensions_result.value();
+            auto available_extensions = fetch_available_extensions();
 
             bool has_extension = false;
             for (const auto& ext : available_extensions)
@@ -1884,7 +1882,7 @@ namespace bv
             }
             if (!has_extension)
             {
-                return Result();
+                return;
             }
         }
 
@@ -1896,7 +1894,12 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to get physical device surface capabilities while "
+                "updating swapchain support details.",
+                (ApiResult)vk_result,
+                false
+            );
         }
 
         std::vector<SurfaceFormat> surface_formats;
@@ -1920,7 +1923,12 @@ namespace bv
             );
             if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
             {
-                return Error((ApiResult)vk_result);
+                throw Error(
+                    "failed to get physical device surface formats while "
+                    "updating swapchain support details.",
+                    (ApiResult)vk_result,
+                    false
+                );
             }
 
             surface_formats.reserve(vk_surface_formats.size());
@@ -1951,7 +1959,12 @@ namespace bv
             );
             if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
             {
-                return Error((ApiResult)vk_result);
+                throw Error(
+                    "failed to get physical device surface present modes while "
+                    "updating swapchain support details.",
+                    (ApiResult)vk_result,
+                    false
+                );
             }
         }
 
@@ -1960,8 +1973,6 @@ namespace bv
             .surface_formats = surface_formats,
             .present_modes = present_modes
         };
-
-        return Result();
     }
 
     FormatProperties PhysicalDevice::fetch_format_properties(
@@ -1977,7 +1988,7 @@ namespace bv
         return FormatProperties_from_vk(vk_properties);
     }
 
-    Result<VkFormat> PhysicalDevice::find_supported_image_format(
+    std::optional<VkFormat> PhysicalDevice::find_supported_image_format(
         const std::vector<VkFormat>& candidates,
         VkImageTiling tiling,
         VkFormatFeatureFlags features
@@ -1997,13 +2008,10 @@ namespace bv
                 return format;
             }
         }
-        return Error(
-            "none of the provided candidates for an image format are supported "
-            "with the provided tiling and required features."
-        );
+        return std::nullopt;
     }
 
-    Result<ImageFormatProperties> PhysicalDevice::fetch_image_format_properties(
+    ImageFormatProperties PhysicalDevice::fetch_image_format_properties(
         VkFormat format,
         VkImageType type,
         VkImageTiling tiling,
@@ -2023,7 +2031,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to fetch image format properties",
+                (ApiResult)vk_result,
+                false
+            );
         }
         return ImageFormatProperties_from_vk(vk_properties);
     }
@@ -2061,7 +2073,7 @@ namespace bv
         other._vk_instance = nullptr;
     }
 
-    Result<ContextPtr> Context::create(
+    ContextPtr Context::create(
         const ContextConfig& config,
         const AllocatorPtr& allocator
     )
@@ -2105,7 +2117,6 @@ namespace bv
         }
         create_info.pApplicationInfo = &app_info;
 
-        // layers
         std::vector<const char*> layers_cstr;
         {
             layers_cstr.reserve(
@@ -2122,7 +2133,6 @@ namespace bv
                 layers_cstr.data();
         }
 
-        // extensions
         std::vector<const char*> extensions_cstr;
         {
             extensions_cstr.reserve(
@@ -2139,7 +2149,6 @@ namespace bv
                 extensions_cstr.data();
         }
 
-        // create instance
         VkResult vk_result = vkCreateInstance(
             &create_info,
             c->vk_allocator_ptr(),
@@ -2147,12 +2156,16 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to create instance for context",
+                (ApiResult)vk_result,
+                false
+            );
         }
         return c;
     }
 
-    Result<std::vector<LayerProperties>> Context::fetch_available_layers()
+    std::vector<LayerProperties> Context::fetch_available_layers()
     {
         uint32_t count = 0;
         vkEnumerateInstanceLayerProperties(
@@ -2167,7 +2180,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to fetch available instance layers",
+                (ApiResult)vk_result,
+                false
+            );
         }
 
         std::vector<LayerProperties> layers;
@@ -2179,10 +2196,9 @@ namespace bv
         return layers;
     }
 
-    Result<std::vector<ExtensionProperties>>
-        Context::fetch_available_extensions(
-            const std::string& layer_name
-        )
+    std::vector<ExtensionProperties> Context::fetch_available_extensions(
+        const std::string& layer_name
+    )
     {
         const char* layer_name_cstr = nullptr;
         if (!layer_name.empty())
@@ -2205,7 +2221,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to fetch available instance extensions",
+                (ApiResult)vk_result,
+                false
+            );
         }
 
         std::vector<ExtensionProperties> extensions;
@@ -2232,7 +2252,7 @@ namespace bv
         return &_vk_allocator;
     }
 
-    Result<std::vector<PhysicalDevice>> Context::fetch_physical_devices(
+    std::vector<PhysicalDevice> Context::fetch_physical_devices(
         const SurfacePtr& surface
     ) const
     {
@@ -2247,7 +2267,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to fetch physical devices",
+                (ApiResult)vk_result,
+                false
+            );
         }
 
         std::vector<PhysicalDevice> physical_devices;
@@ -2310,8 +2334,9 @@ namespace bv
                     );
                     if (vk_result != VK_SUCCESS)
                     {
-                        return Error(
-                            "failed to check surface support",
+                        throw Error(
+                            "failed to check physical device's surface support "
+                            "when fetching physical devices",
                             (ApiResult)vk_result,
                             false
                         );
@@ -2397,19 +2422,7 @@ namespace bv
                 queue_family_indices
             ));
 
-            auto update_swapchain_support_result =
-                physical_devices.back().update_swapchain_support(surface);
-            if (!update_swapchain_support_result.ok())
-            {
-                auto err = update_swapchain_support_result.error();
-                return Error(
-                    "failed to fetch swapchain support details for a physical "
-                    "device: "
-                    + err.to_string(),
-                    err.api_result(),
-                    true
-                );
-            }
+            physical_devices.back().update_swapchain_support(surface);
         }
 
         return physical_devices;
@@ -2427,7 +2440,7 @@ namespace bv
         : _config(config), _allocator(allocator)
     {}
 
-    Result<DebugMessengerPtr> DebugMessenger::create(
+    DebugMessengerPtr DebugMessenger::create(
         const ContextPtr& context,
         VkDebugUtilsMessageSeverityFlagsEXT message_severity_filter,
         VkDebugUtilsMessageTypeFlagsEXT message_type_filter,
@@ -2460,7 +2473,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to create debug messenger",
+                (ApiResult)vk_result,
+                false
+            );
         }
         return messenger;
     }
@@ -2512,7 +2529,7 @@ namespace bv
         : _context(context), _handle(handle)
     {}
 
-    Result<> Queue::submit(
+    void Queue::submit(
         const std::vector<VkPipelineStageFlags>& wait_stages,
         const std::vector<SemaphorePtr>& wait_semaphores,
         const std::vector<CommandBufferPtr>& command_buffers,
@@ -2562,12 +2579,15 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to submit command buffer(s) to queue",
+                (ApiResult)vk_result,
+                false
+            );
         }
-        return Result();
     }
 
-    Result<> Queue::present(
+    void Queue::present(
         const std::vector<SemaphorePtr>& wait_semaphores,
         const SwapchainPtr& swapchain,
         uint32_t image_index,
@@ -2603,19 +2623,25 @@ namespace bv
         }
         if (vk_result != VK_SUCCESS && vk_result != VK_SUBOPTIMAL_KHR)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to queue image for presentation",
+                (ApiResult)vk_result,
+                false
+            );
         }
-        return Result();
     }
 
-    Result<> Queue::wait_idle()
+    void Queue::wait_idle()
     {
         VkResult vk_result = vkQueueWaitIdle(handle());
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to wait for queue to become idle",
+                (ApiResult)vk_result,
+                false
+            );
         }
-        return Result();
     }
 
     Queue::Queue(
@@ -2630,7 +2656,7 @@ namespace bv
         _handle(handle)
     {}
 
-    Result<DevicePtr>Device::create(
+    DevicePtr Device::create(
         const ContextPtr& context,
         const PhysicalDevice& physical_device,
         const DeviceConfig& config
@@ -2653,9 +2679,9 @@ namespace bv
             if (queue_request.priorities.size()
                 != queue_request.num_queues_to_create)
             {
-                return Error(
-                    "there should be the same number of queue priorities as "
-                    "the number of queues to create"
+                throw Error(
+                    "failed to create device: there should be the same number "
+                    "of queue priorities as the number of queues to create"
                 );
             }
 
@@ -2716,7 +2742,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to create device",
+                (ApiResult)vk_result,
+                false
+            );
         }
         return device;
     }
@@ -2742,14 +2772,17 @@ namespace bv
         );
     }
 
-    Result<> Device::wait_idle()
+    void Device::wait_idle()
     {
         VkResult vk_result = vkDeviceWaitIdle(_handle);
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to wait for device to become idle",
+                (ApiResult)vk_result,
+                false
+            );
         }
-        return Result();
     }
 
     Device::~Device()
@@ -2768,39 +2801,43 @@ namespace bv
         _config(config)
     {}
 
-    Result<ImagePtr> Image::create(
+    ImagePtr Image::create(
         const DevicePtr& device,
         const ImageConfig& config
     )
     {
-        auto img_format_props_result =
-            device->physical_device().fetch_image_format_properties(
-                config.format,
-                config.image_type,
-                config.tiling,
-                config.usage,
-                config.flags
-            );
-        if (!img_format_props_result.ok()
-            && img_format_props_result.error().api_result().has_value()
-            && img_format_props_result.error().api_result().value()
-            == ApiResult::ErrorFormatNotSupported)
+        ImageFormatProperties img_format_props{};
+        try
         {
-            return Error(
-                "image format not supported with the provided parameters",
-                img_format_props_result.error().api_result(),
-                true
-            );
+            img_format_props =
+                device->physical_device().fetch_image_format_properties(
+                    config.format,
+                    config.image_type,
+                    config.tiling,
+                    config.usage,
+                    config.flags
+                );
         }
-        else if (!img_format_props_result.ok())
+        catch (const Error& e)
         {
-            return Error(
-                "failed to fetch image format properties: "
-                + img_format_props_result.error().to_string(),
-
-                img_format_props_result.error().api_result(),
-                true
-            );
+            if (e.api_result().has_value()
+                && e.api_result().value() == ApiResult::ErrorFormatNotSupported)
+            {
+                throw Error(
+                    "failed to create image: image format not supported with "
+                    "the provided parameters",
+                    e.api_result(),
+                    true
+                );
+            }
+            else
+            {
+                throw Error(
+                    "failed to create image: " + e.to_string(),
+                    e.api_result(),
+                    true
+                );
+            }
         }
 
         ImagePtr img = std::make_shared<Image_public_ctor>(
@@ -2837,7 +2874,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to create image",
+                (ApiResult)vk_result,
+                false
+            );
         }
 
         VkMemoryRequirements vk_mem_requirements;
@@ -2853,7 +2894,7 @@ namespace bv
         return img;
     }
 
-    Result<> Image::bind_memory(
+    void Image::bind_memory(
         const DeviceMemoryPtr& memory,
         VkDeviceSize memory_offset
     )
@@ -2866,9 +2907,12 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to bind image memory",
+                (ApiResult)vk_result,
+                false
+            );
         }
-        return Result();
     }
 
     Image::~Image()
@@ -2907,7 +2951,7 @@ namespace bv
         _handle(handle_created_externally)
     {}
 
-    Result<SwapchainPtr> Swapchain::create(
+    SwapchainPtr Swapchain::create(
         const DevicePtr& device,
         const SurfacePtr& surface,
         const SwapchainConfig& config,
@@ -2959,7 +3003,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to create swapchain",
+                (ApiResult)vk_result,
+                false
+            );
         }
 
         uint32_t actual_image_count;
@@ -2979,8 +3027,8 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
         {
-            return Error(
-                "failed to retrieve images",
+            throw Error(
+                "failed to retrieve swapchain images after creating it",
                 (ApiResult)vk_result,
                 false
             );
@@ -2997,7 +3045,7 @@ namespace bv
         return sc;
     }
 
-    Result<uint32_t> Swapchain::acquire_next_image(
+    uint32_t Swapchain::acquire_next_image(
         const SemaphorePtr& semaphore,
         const FencePtr& fence,
         uint64_t timeout,
@@ -3018,12 +3066,15 @@ namespace bv
             *out_api_result = (ApiResult)vk_result;
         }
         if (vk_result == VK_SUCCESS
-            || vk_result == VK_TIMEOUT
             || vk_result == VK_SUBOPTIMAL_KHR)
         {
             return image_index;
         }
-        return Error((ApiResult)vk_result);
+        throw Error(
+            "failed to acquire next swapchain image",
+            (ApiResult)vk_result,
+            false
+        );
     }
 
     Swapchain::~Swapchain()
@@ -3058,7 +3109,7 @@ namespace bv
         }
     }
 
-    Result<ImageViewPtr> ImageView::create(
+    ImageViewPtr ImageView::create(
         const DevicePtr& device,
         const ImagePtr& image,
         const ImageViewConfig& config
@@ -3091,7 +3142,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to create image view",
+                (ApiResult)vk_result,
+                false
+            );
         }
         return view;
     }
@@ -3121,7 +3176,7 @@ namespace bv
         _config(config)
     {}
 
-    Result<ShaderModulePtr> ShaderModule::create(
+    ShaderModulePtr ShaderModule::create(
         const DevicePtr& device,
         const std::vector<uint8_t>& code
     )
@@ -3155,7 +3210,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to create shader module",
+                (ApiResult)vk_result,
+                false
+            );
         }
         return module;
     }
@@ -3179,7 +3238,7 @@ namespace bv
         : _device(device)
     {}
 
-    Result<SamplerPtr> Sampler::create(
+    SamplerPtr Sampler::create(
         const DevicePtr& device,
         const SamplerConfig& config
     )
@@ -3220,7 +3279,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to create sampler",
+                (ApiResult)vk_result,
+                false
+            );
         }
         return sampler;
     }
@@ -3248,7 +3311,7 @@ namespace bv
         _config(config)
     {}
 
-    Result<DescriptorSetLayoutPtr> DescriptorSetLayout::create(
+    DescriptorSetLayoutPtr DescriptorSetLayout::create(
         const DevicePtr& device,
         const DescriptorSetLayoutConfig& config
     )
@@ -3289,7 +3352,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to create descriptor set layout",
+                (ApiResult)vk_result,
+                false
+            );
         }
         return layout;
     }
@@ -3317,7 +3384,7 @@ namespace bv
         _config(config)
     {}
 
-    Result<PipelineLayoutPtr> PipelineLayout::create(
+    PipelineLayoutPtr PipelineLayout::create(
         const DevicePtr& device,
         const PipelineLayoutConfig& config
     )
@@ -3367,7 +3434,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to create pipeline layout",
+                (ApiResult)vk_result,
+                false
+            );
         }
         return layout;
     }
@@ -3394,7 +3465,7 @@ namespace bv
         : _device(device), _config(config)
     {}
 
-    Result<RenderPassPtr> RenderPass::create(
+    RenderPassPtr RenderPass::create(
         const DevicePtr& device,
         const RenderPassConfig& config
     )
@@ -3469,7 +3540,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to create render pass",
+                (ApiResult)vk_result,
+                false
+            );
         }
         return pass;
     }
@@ -3496,7 +3571,7 @@ namespace bv
         : _device(device), _config(config)
     {}
 
-    Result<GraphicsPipelinePtr> GraphicsPipeline::create(
+    GraphicsPipelinePtr GraphicsPipeline::create(
         const DevicePtr& device,
         const GraphicsPipelineConfig& config
     )
@@ -3679,7 +3754,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to create graphics pipeline",
+                (ApiResult)vk_result,
+                false
+            );
         }
         return pipe;
     }
@@ -3706,7 +3785,7 @@ namespace bv
         : _device(device), _config(config)
     {}
 
-    Result<FramebufferPtr> Framebuffer::create(
+    FramebufferPtr Framebuffer::create(
         const DevicePtr& device,
         const FramebufferConfig& config
     )
@@ -3745,7 +3824,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to create framebuffer",
+                (ApiResult)vk_result,
+                false
+            );
         }
         return buf;
     }
@@ -3772,17 +3855,20 @@ namespace bv
         : _device(device), _config(config)
     {}
 
-    Result<> CommandBuffer::reset(VkCommandBufferResetFlags flags)
+    void CommandBuffer::reset(VkCommandBufferResetFlags flags)
     {
         VkResult vk_result = vkResetCommandBuffer(_handle, flags);
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to reset command buffer",
+                (ApiResult)vk_result,
+                false
+            );
         }
-        return Result();
     }
 
-    Result<> CommandBuffer::begin(
+    void CommandBuffer::begin(
         VkCommandBufferUsageFlags flags,
         std::optional<CommandBufferInheritance> inheritance
     )
@@ -3822,19 +3908,25 @@ namespace bv
         VkResult vk_result = vkBeginCommandBuffer(handle(), &begin_info);
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to begin recording a command buffer",
+                (ApiResult)vk_result,
+                false
+            );
         }
-        return Result();
     }
 
-    Result<> CommandBuffer::end()
+    void CommandBuffer::end()
     {
         VkResult vk_result = vkEndCommandBuffer(handle());
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to end recording a command buffer",
+                (ApiResult)vk_result,
+                false
+            );
         }
-        return Result();
     }
 
     CommandBuffer::~CommandBuffer()
@@ -3861,7 +3953,7 @@ namespace bv
         _handle(handle)
     {}
 
-    Result<CommandPoolPtr> CommandPool::create(
+    CommandPoolPtr CommandPool::create(
         const DevicePtr& device,
         const CommandPoolConfig& config
     )
@@ -3886,12 +3978,16 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to create command pool",
+                (ApiResult)vk_result,
+                false
+            );
         }
         return pool;
     }
 
-    Result<CommandBufferPtr> CommandPool::allocate_buffer(
+    CommandBufferPtr CommandPool::allocate_buffer(
         const CommandPoolPtr& pool,
         VkCommandBufferLevel level
     )
@@ -3912,7 +4008,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to allocate command buffer",
+                (ApiResult)vk_result,
+                false
+            );
         }
         return (CommandBufferPtr)std::make_shared<CommandBuffer_public_ctor>(
             pool,
@@ -3920,12 +4020,17 @@ namespace bv
         );
     }
 
-    Result<std::vector<CommandBufferPtr>> CommandPool::allocate_buffers(
+    std::vector<CommandBufferPtr> CommandPool::allocate_buffers(
         const CommandPoolPtr& pool,
         VkCommandBufferLevel level,
         uint32_t count
     )
     {
+        if (count < 1)
+        {
+            return {};
+        }
+
         VkCommandBufferAllocateInfo alloc_info{
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
             .pNext = nullptr,
@@ -3942,7 +4047,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to allocate command buffer(s)",
+                (ApiResult)vk_result,
+                false
+            );
         }
 
         std::vector<CommandBufferPtr> command_buffers(count);
@@ -3978,7 +4087,7 @@ namespace bv
         : _device(device), _config(config)
     {}
 
-    Result<SemaphorePtr> Semaphore::create(const DevicePtr& device)
+    SemaphorePtr Semaphore::create(const DevicePtr& device)
     {
         SemaphorePtr sema = std::make_shared<Semaphore_public_ctor>(device);
 
@@ -3996,7 +4105,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to create semaphore",
+                (ApiResult)vk_result,
+                false
+            );
         }
         return sema;
     }
@@ -4020,7 +4133,7 @@ namespace bv
         : _device(device)
     {}
 
-    Result<FencePtr> Fence::create(
+    FencePtr Fence::create(
         const DevicePtr& device,
         VkFenceCreateFlags flags
     )
@@ -4041,12 +4154,16 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to create fence",
+                (ApiResult)vk_result,
+                false
+            );
         }
         return fence;
     }
 
-    Result<> Fence::wait(uint64_t timeout)
+    void Fence::wait(uint64_t timeout)
     {
         VkResult vk_result = vkWaitForFences(
             lock_wptr(device())->handle(),
@@ -4057,12 +4174,15 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to wait for fence to become signaled",
+                (ApiResult)vk_result,
+                false
+            );
         }
-        return Result();
     }
 
-    Result<> Fence::wait_multiple(
+    void Fence::wait_multiple(
         const std::vector<FencePtr>& fences,
         bool wait_all,
         uint64_t timeout
@@ -4070,7 +4190,7 @@ namespace bv
     {
         if (fences.empty())
         {
-            return Result();
+            return;
         }
 
         std::vector<VkFence> vk_fences(fences.size());
@@ -4088,12 +4208,15 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to wait for fence(s) to become signaled",
+                (ApiResult)vk_result,
+                false
+            );
         }
-        return Result();
     }
 
-    Result<> Fence::reset()
+    void Fence::reset()
     {
         VkResult vk_result = vkResetFences(
             lock_wptr(device())->handle(),
@@ -4102,12 +4225,15 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to reset fence",
+                (ApiResult)vk_result,
+                false
+            );
         }
-        return Result();
     }
 
-    Result<bool> Fence::is_signaled() const
+    bool Fence::is_signaled() const
     {
         VkResult vk_result = vkGetFenceStatus(
             lock_wptr(device())->handle(),
@@ -4121,7 +4247,11 @@ namespace bv
         {
             return false;
         }
-        return Error((ApiResult)vk_result);
+        throw Error(
+            "failed to get fence status",
+            (ApiResult)vk_result,
+            false
+        );
     }
 
     Fence::~Fence()
@@ -4143,7 +4273,7 @@ namespace bv
         : _device(device)
     {}
 
-    Result<BufferPtr> Buffer::create(
+    BufferPtr Buffer::create(
         const DevicePtr& device,
         const BufferConfig& config
     )
@@ -4175,7 +4305,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to create buffer",
+                (ApiResult)vk_result,
+                false
+            );
         }
 
         VkMemoryRequirements vk_mem_requirements;
@@ -4191,7 +4325,7 @@ namespace bv
         return buf;
     }
 
-    Result<> Buffer::bind_memory(
+    void Buffer::bind_memory(
         const DeviceMemoryPtr& memory,
         VkDeviceSize memory_offset
     )
@@ -4204,9 +4338,12 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to bind buffer memory",
+                (ApiResult)vk_result,
+                false
+            );
         }
-        return Result();
     }
 
     Buffer::~Buffer()
@@ -4228,7 +4365,7 @@ namespace bv
         : _device(device), _config(config)
     {}
 
-    Result<DeviceMemoryPtr> DeviceMemory::allocate(
+    DeviceMemoryPtr DeviceMemory::allocate(
         const DevicePtr& device,
         const DeviceMemoryConfig& config
     )
@@ -4253,12 +4390,16 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to allocate device memory",
+                (ApiResult)vk_result,
+                false
+            );
         }
         return mem;
     }
 
-    Result<void*> DeviceMemory::map(VkDeviceSize offset, VkDeviceSize size)
+    void* DeviceMemory::map(VkDeviceSize offset, VkDeviceSize size)
     {
         void* p;
         VkResult vk_result = vkMapMemory(
@@ -4272,7 +4413,11 @@ namespace bv
         if (vk_result != VK_SUCCESS)
         {
             unmap();
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to map device memory",
+                (ApiResult)vk_result,
+                false
+            );
         }
         return p;
     }
@@ -4286,7 +4431,7 @@ namespace bv
         vkUnmapMemory(device().lock()->handle(), handle());
     }
 
-    Result<> DeviceMemory::flush_mapped_range(
+    void DeviceMemory::flush_mapped_range(
         VkDeviceSize offset,
         VkDeviceSize size
     )
@@ -4306,12 +4451,15 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to flush mapped device memory range",
+                (ApiResult)vk_result,
+                false
+            );
         }
-        return Result();
     }
 
-    Result<> DeviceMemory::invalidate_mapped_range(
+    void DeviceMemory::invalidate_mapped_range(
         VkDeviceSize offset,
         VkDeviceSize size
     )
@@ -4331,51 +4479,57 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to invalidate mapped device memory range",
+                (ApiResult)vk_result,
+                false
+            );
         }
-        return Result();
     }
 
-    Result<> DeviceMemory::upload(void* data, VkDeviceSize data_size)
+    void DeviceMemory::upload(void* data, VkDeviceSize data_size)
     {
         if (data_size > config().allocation_size)
         {
-            return Error("data is too big");
+            throw Error(
+                "failed to upload data to device memory: data is too big"
+            );
         }
 
-        auto map_result = map(0, config().allocation_size);
-        if (!map_result.ok())
+        void* mapped = nullptr;
+        try
         {
-            return Error(
-                "failed to map memory: " + map_result.error().to_string(),
-                map_result.error().api_result(),
+            mapped = map(0, config().allocation_size);
+        }
+        catch (const Error& e)
+        {
+            throw Error(
+                "failed to upload data to device memory: " + e.to_string(),
+                e.api_result(),
                 true
             );
         }
 
-        auto mapped_data = map_result.value();
-        {
-            std::copy(
-                (uint8_t*)data,
-                (uint8_t*)data + data_size,
-                (uint8_t*)mapped_data
-            );
-        }
+        std::copy(
+            (uint8_t*)data,
+            (uint8_t*)data + data_size,
+            (uint8_t*)mapped
+        );
 
-        auto flush_result = flush_mapped_range(0, VK_WHOLE_SIZE);
-        if (!flush_result.ok())
+        try
         {
-            return Error(
-                "failed to flush mapped memory range: "
-                + flush_result.error().to_string(),
-                flush_result.error().api_result(),
+            flush_mapped_range(0, VK_WHOLE_SIZE);
+        }
+        catch (const Error& e)
+        {
+            throw Error(
+                "failed to upload data to device memory: " + e.to_string(),
+                e.api_result(),
                 true
             );
         }
 
         unmap();
-
-        return Result();
     }
 
     DeviceMemory::~DeviceMemory()
@@ -4469,7 +4623,7 @@ namespace bv
         : _pool(pool), _handle(handle)
     {}
 
-    Result<DescriptorPoolPtr> DescriptorPool::create(
+    DescriptorPoolPtr DescriptorPool::create(
         const DevicePtr& device,
         const DescriptorPoolConfig& config
     )
@@ -4506,30 +4660,61 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to create descriptor pool",
+                (ApiResult)vk_result,
+                false
+            );
         }
         return pool;
     }
 
-    Result<DescriptorSetPtr> DescriptorPool::allocate_set(
+    DescriptorSetPtr DescriptorPool::allocate_set(
         const DescriptorPoolPtr& pool,
         const DescriptorSetLayoutPtr& set_layout
     )
     {
-        auto result = DescriptorPool::allocate_sets(pool, 1, { set_layout });
-        if (!result.ok())
+        VkDescriptorSetLayout vk_set_layout = set_layout->handle();
+
+        VkDescriptorSetAllocateInfo alloc_info{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            .pNext = nullptr,
+            .descriptorPool = pool->handle(),
+            .descriptorSetCount = 1,
+            .pSetLayouts = &vk_set_layout
+        };
+
+        VkDescriptorSet vk_set;
+        VkResult vk_result = vkAllocateDescriptorSets(
+            lock_wptr(pool->device())->handle(),
+            &alloc_info,
+            &vk_set
+        );
+        if (vk_result != VK_SUCCESS)
         {
-            return result.error();
+            throw Error(
+                "failed to allocate descriptor set",
+                (ApiResult)vk_result,
+                false
+            );
         }
-        return result.value()[0];
+        return (DescriptorSetPtr)std::make_shared<DescriptorSet_public_ctor>(
+            pool,
+            vk_set
+        );
     }
 
-    Result<std::vector<DescriptorSetPtr>> DescriptorPool::allocate_sets(
+    std::vector<DescriptorSetPtr> DescriptorPool::allocate_sets(
         const DescriptorPoolPtr& pool,
         uint32_t count,
         const std::vector<DescriptorSetLayoutPtr>& set_layouts
     )
     {
+        if (count < 1)
+        {
+            return {};
+        }
+
         std::vector<VkDescriptorSetLayout> vk_set_layouts(set_layouts.size());
         for (size_t i = 0; i < set_layouts.size(); i++)
         {
@@ -4552,16 +4737,20 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to allocate descriptor set(s)",
+                (ApiResult)vk_result,
+                false
+            );
         }
 
-        std::vector<DescriptorSetPtr> sets;
-        for (auto vk_set : vk_sets)
+        std::vector<DescriptorSetPtr> sets(count);
+        for (size_t i = 0; i < count; i++)
         {
-            sets.push_back(std::make_shared<DescriptorSet_public_ctor>(
+            sets[i] = std::make_shared<DescriptorSet_public_ctor>(
                 pool,
-                vk_set
-            ));
+                vk_sets[i]
+            );
         }
         return sets;
     }
@@ -4588,7 +4777,7 @@ namespace bv
         : _device(device), _config(config)
     {}
 
-    Result<BufferViewPtr> BufferView::create(
+    BufferViewPtr BufferView::create(
         const DevicePtr& device,
         const BufferPtr& buffer,
         const BufferViewConfig& config
@@ -4618,7 +4807,11 @@ namespace bv
         );
         if (vk_result != VK_SUCCESS)
         {
-            return Error((ApiResult)vk_result);
+            throw Error(
+                "failed to create buffer view",
+                (ApiResult)vk_result,
+                false
+            );
         }
         return view;
     }
