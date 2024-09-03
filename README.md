@@ -103,10 +103,10 @@ use beva.
 # Including beva
 
 Make a new directory named `beva` somewhere in your include directories and copy
-`beva.hpp` and `beva.cpp` into it. Make sure your compiler is recognizing and
-actually compiling `beva.cpp`. And of course, make sure to set up and include
-the latest Vulkan SDK such that `#include "vulkan/vulkan.h"` works.
-[Here's a tutorial on that.](https://docs.vulkan.org/tutorial/latest/02_Development_environment.html)
+`beva/src/lib/beva/beva.hpp` and `beva.cpp` into it. Make sure your compiler is
+recognizing and actually compiling `beva.cpp`. And of course, make sure to set
+up and include the latest Vulkan SDK such that `#include "vulkan/vulkan.h"`
+works. [Here's a tutorial on that.](https://docs.vulkan.org/tutorial/latest/02_Development_environment.html)
 
 Note: beva requires C++20.
 
