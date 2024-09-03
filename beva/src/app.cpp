@@ -954,7 +954,7 @@ namespace beva_demo
         staging_buf_mem->upload((void*)pixels, size);
         stbi_image_free(pixels);
 
-        constexpr VkFormat texture_format = VK_FORMAT_R64_UINT;
+        constexpr VkFormat texture_format = VK_FORMAT_R8G8B8A8_SRGB;
 
         // create image
         create_image(
