@@ -93,6 +93,7 @@ namespace beva_demo_02_textured_model
         create_descriptor_set_layout();
         create_graphics_pipeline();
         create_command_pools();
+        create_color_resources();
         create_depth_resources();
         create_swapchain_framebuffers();
         create_texture_image();
@@ -400,6 +401,9 @@ namespace beva_demo_02_textured_model
         std::cout << '\n';
 
         physical_device = supported_physical_devices[idx];
+
+        msaa_samples = find_max_sample_count();
+
         glfwShowWindow(window);
     }
 
@@ -563,13 +567,13 @@ namespace beva_demo_02_textured_model
         bv::Attachment color_attachment{
             .flags = 0,
             .format = swapchain->config().image_format,
-            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .samples = msaa_samples,
             .load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
             .store_op = VK_ATTACHMENT_STORE_OP_STORE,
             .stencil_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencil_store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE,
             .initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .final_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+            .final_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
         };
 
         bv::AttachmentReference color_attachment_ref{
@@ -580,7 +584,7 @@ namespace beva_demo_02_textured_model
         bv::Attachment depth_attachment{
             .flags = 0,
             .format = find_depth_format(),
-            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .samples = msaa_samples,
             .load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
             .store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE,
             .stencil_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
@@ -594,12 +598,29 @@ namespace beva_demo_02_textured_model
             .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
         };
 
+        bv::Attachment color_attachment_resolve{
+            .flags = 0,
+            .format = swapchain->config().image_format,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .store_op = VK_ATTACHMENT_STORE_OP_STORE,
+            .stencil_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .stencil_store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .final_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+        };
+
+        bv::AttachmentReference color_attachment_resolve_ref{
+            .attachment = 2,
+            .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        };
+
         bv::Subpass subpass{
             .flags = 0,
             .pipeline_bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS,
             .input_attachments = {},
             .color_attachments = { color_attachment_ref },
-            .resolve_attachments = {},
+            .resolve_attachments = { color_attachment_resolve_ref },
             .depth_stencil_attachment = depth_attachment_ref,
             .preserve_attachment_indices = {}
         };
@@ -616,7 +637,9 @@ namespace beva_demo_02_textured_model
             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
             | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
 
-            .src_access_mask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+            .src_access_mask =
+            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+            | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 
             .dst_access_mask =
             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
@@ -625,11 +648,16 @@ namespace beva_demo_02_textured_model
             .dependency_flags = 0
         };
 
+        std::vector<bv::Attachment> attachments{
+            color_attachment,
+            depth_attachment,
+            color_attachment_resolve
+        };
         render_pass = bv::RenderPass::create(
             device,
             {
                 .flags = 0,
-                .attachments = { color_attachment, depth_attachment },
+                .attachments = attachments,
                 .subpasses = { subpass },
                 .dependencies = { dependency }
             }
@@ -742,7 +770,7 @@ namespace beva_demo_02_textured_model
         };
 
         bv::MultisampleState multisample_state{
-            .rasterization_samples = VK_SAMPLE_COUNT_1_BIT,
+            .rasterization_samples = msaa_samples,
             .sample_shading_enable = false,
             .min_sample_shading = 1.f,
             .sample_mask = {},
@@ -841,6 +869,31 @@ namespace beva_demo_02_textured_model
         );
     }
 
+    void App::create_color_resources()
+    {
+        create_image(
+            swapchain->config().image_extent.width,
+            swapchain->config().image_extent.height,
+            1,
+            msaa_samples,
+            swapchain->config().image_format,
+            VK_IMAGE_TILING_OPTIMAL,
+
+            VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT
+            | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            color_img,
+            color_img_mem
+        );
+        color_imgview = create_image_view(
+            color_img,
+            swapchain->config().image_format,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            1
+        );
+    }
+
     void App::create_depth_resources()
     {
         VkFormat depth_format = find_depth_format();
@@ -848,6 +901,7 @@ namespace beva_demo_02_textured_model
             swapchain->config().image_extent.width,
             swapchain->config().image_extent.height,
             1,
+            msaa_samples,
             depth_format,
             VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
@@ -878,12 +932,17 @@ namespace beva_demo_02_textured_model
         swapchain_framebufs.clear();
         for (size_t i = 0; i < swapchain_imgviews.size(); i++)
         {
+            std::vector<bv::ImageViewWPtr> attachments{
+                color_imgview,
+                depth_imgview,
+                swapchain_imgviews[i]
+            };
             swapchain_framebufs.push_back(bv::Framebuffer::create(
                 device,
                 {
                     .flags = 0,
                     .render_pass = render_pass,
-                    .attachments = { swapchain_imgviews[i], depth_imgview },
+                    .attachments = attachments,
                     .width = swapchain->config().image_extent.width,
                     .height = swapchain->config().image_extent.height,
                     .layers = 1
@@ -945,6 +1004,7 @@ namespace beva_demo_02_textured_model
             (uint32_t)texture_width,
             (uint32_t)texture_height,
             texture_mip_levels,
+            VK_SAMPLE_COUNT_1_BIT,
             texture_format,
             VK_IMAGE_TILING_OPTIMAL,
 
@@ -1375,6 +1435,10 @@ namespace beva_demo_02_textured_model
         depth_img = nullptr;
         depth_img_mem = nullptr;
 
+        color_imgview = nullptr;
+        color_img = nullptr;
+        color_img_mem = nullptr;
+
         swapchain_imgviews.clear();
         swapchain = nullptr;
     }
@@ -1394,6 +1458,7 @@ namespace beva_demo_02_textured_model
         cleanup_swapchain();
 
         create_swapchain();
+        create_color_resources();
         create_depth_resources();
         create_swapchain_framebuffers();
     }
@@ -1462,10 +1527,28 @@ namespace beva_demo_02_textured_model
         return format.value();
     }
 
+    VkSampleCountFlagBits App::find_max_sample_count()
+    {
+        const auto& limits = physical_device.value().properties().limits;
+        VkSampleCountFlags counts =
+            limits.framebuffer_color_sample_counts
+            & limits.framebuffer_depth_sample_counts;
+
+        // 64 samples is insanely high
+        //if (counts & VK_SAMPLE_COUNT_64_BIT) return VK_SAMPLE_COUNT_64_BIT;
+        //if (counts & VK_SAMPLE_COUNT_32_BIT) return VK_SAMPLE_COUNT_32_BIT;
+        if (counts & VK_SAMPLE_COUNT_16_BIT) return VK_SAMPLE_COUNT_16_BIT;
+        if (counts & VK_SAMPLE_COUNT_8_BIT) return VK_SAMPLE_COUNT_8_BIT;
+        if (counts & VK_SAMPLE_COUNT_4_BIT) return VK_SAMPLE_COUNT_4_BIT;
+        if (counts & VK_SAMPLE_COUNT_2_BIT) return VK_SAMPLE_COUNT_2_BIT;
+        return VK_SAMPLE_COUNT_1_BIT;
+    }
+
     void App::create_image(
         uint32_t width,
         uint32_t height,
         uint32_t mip_levels,
+        VkSampleCountFlagBits num_samples,
         VkFormat format,
         VkImageTiling tiling,
         VkImageUsageFlags usage,
@@ -1489,7 +1572,7 @@ namespace beva_demo_02_textured_model
                 .extent = extent,
                 .mip_levels = mip_levels,
                 .array_layers = 1,
-                .samples = VK_SAMPLE_COUNT_1_BIT,
+                .samples = num_samples,
                 .tiling = tiling,
                 .usage = usage,
                 .sharing_mode = VK_SHARING_MODE_EXCLUSIVE,

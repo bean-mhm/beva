@@ -100,6 +100,10 @@ namespace beva_demo_02_textured_model
         bv::CommandPoolPtr cmd_pool = nullptr;
         bv::CommandPoolPtr transient_cmd_pool = nullptr;
 
+        bv::ImagePtr color_img = nullptr;
+        bv::DeviceMemoryPtr color_img_mem = nullptr;
+        bv::ImageViewPtr color_imgview = nullptr;
+
         bv::ImagePtr depth_img = nullptr;
         bv::DeviceMemoryPtr depth_img_mem = nullptr;
         bv::ImageViewPtr depth_imgview = nullptr;
@@ -140,6 +144,8 @@ namespace beva_demo_02_textured_model
         bool framebuf_resized = false;
         uint32_t frame_idx = 0;
 
+        VkSampleCountFlagBits msaa_samples = VK_SAMPLE_COUNT_1_BIT;
+
         std::chrono::steady_clock::time_point start_time;
 
         void init_window();
@@ -153,6 +159,7 @@ namespace beva_demo_02_textured_model
         void create_descriptor_set_layout();
         void create_graphics_pipeline();
         void create_command_pools();
+        void create_color_resources();
         void create_depth_resources();
         void create_swapchain_framebuffers();
         void create_texture_image();
@@ -194,10 +201,13 @@ namespace beva_demo_02_textured_model
 
         VkFormat find_depth_format();
 
+        VkSampleCountFlagBits find_max_sample_count();
+
         void create_image(
             uint32_t width,
             uint32_t height,
             uint32_t mip_levels,
+            VkSampleCountFlagBits num_samples,
             VkFormat format,
             VkImageTiling tiling,
             VkImageUsageFlags usage,
