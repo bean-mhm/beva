@@ -2953,13 +2953,13 @@ namespace bv
 
     std::string cstr_to_std(const char* cstr);
 
-    // try to lock a weak pointer and throw an exception if it has expired
+    // try to lock a weak pointer and throw an Error if it has expired
     template<typename T>
     std::shared_ptr<T> lock_wptr(const std::weak_ptr<T>& wptr)
     {
         if (wptr.expired())
         {
-            throw std::runtime_error("weak pointer has expired");
+            throw Error("weak pointer has expired");
         }
         return wptr.lock();
     }

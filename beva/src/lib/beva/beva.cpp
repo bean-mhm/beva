@@ -1817,43 +1817,50 @@ namespace bv
         const std::string& layer_name
     ) const
     {
-        const char* layer_name_cstr = nullptr;
-        if (!layer_name.empty())
+        try
         {
-            layer_name_cstr = layer_name.c_str();
+            const char* layer_name_cstr = nullptr;
+            if (!layer_name.empty())
+            {
+                layer_name_cstr = layer_name.c_str();
+            }
+
+            uint32_t count = 0;
+            vkEnumerateDeviceExtensionProperties(
+                handle(),
+                layer_name_cstr,
+                &count,
+                nullptr
+            );
+
+            std::vector<VkExtensionProperties> vk_extensions(count);
+            VkResult vk_result = vkEnumerateDeviceExtensionProperties(
+                handle(),
+                layer_name_cstr,
+                &count,
+                vk_extensions.data()
+            );
+            if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
+            {
+                throw Error(vk_result);
+            }
+
+            std::vector<ExtensionProperties> extensions;
+            extensions.reserve(vk_extensions.size());
+            for (const auto& vk_ext : vk_extensions)
+            {
+                extensions.push_back(ExtensionProperties_from_vk(vk_ext));
+            }
+            return extensions;
         }
-
-        uint32_t count = 0;
-        vkEnumerateDeviceExtensionProperties(
-            handle(),
-            layer_name_cstr,
-            &count,
-            nullptr
-        );
-
-        std::vector<VkExtensionProperties> vk_extensions(count);
-        VkResult vk_result = vkEnumerateDeviceExtensionProperties(
-            handle(),
-            layer_name_cstr,
-            &count,
-            vk_extensions.data()
-        );
-        if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
+        catch (const Error& e)
         {
             throw Error(
-                "failed to fetch available device extensions",
-                vk_result,
-                false
+                "failed to fetch available device extensions: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-
-        std::vector<ExtensionProperties> extensions;
-        extensions.reserve(vk_extensions.size());
-        for (const auto& vk_ext : vk_extensions)
-        {
-            extensions.push_back(ExtensionProperties_from_vk(vk_ext));
-        }
-        return extensions;
     }
 
     void PhysicalDevice::update_swapchain_support(
@@ -1867,112 +1874,120 @@ namespace bv
             return;
         }
 
-        // check for extension
+        try
         {
-            auto available_extensions = fetch_available_extensions();
-
-            bool has_extension = false;
-            for (const auto& ext : available_extensions)
+            // check for extension
             {
-                if (ext.name == VK_KHR_SWAPCHAIN_EXTENSION_NAME)
+                auto available_extensions = fetch_available_extensions();
+
+                bool has_extension = false;
+                for (const auto& ext : available_extensions)
                 {
-                    has_extension = true;
-                    break;
+                    if (ext.name == VK_KHR_SWAPCHAIN_EXTENSION_NAME)
+                    {
+                        has_extension = true;
+                        break;
+                    }
+                }
+                if (!has_extension)
+                {
+                    return;
                 }
             }
-            if (!has_extension)
-            {
-                return;
-            }
-        }
 
-        VkSurfaceCapabilitiesKHR vk_capabilities;
-        VkResult vk_result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-            handle(),
-            surface->handle(),
-            &vk_capabilities
-        );
-        if (vk_result != VK_SUCCESS)
+            VkSurfaceCapabilitiesKHR vk_capabilities;
+            VkResult vk_result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
+                handle(),
+                surface->handle(),
+                &vk_capabilities
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(
+                    "failed to get physical device surface capabilities",
+                    vk_result,
+                    false
+                );
+            }
+
+            std::vector<SurfaceFormat> surface_formats;
+            {
+                uint32_t surface_format_count;
+                vkGetPhysicalDeviceSurfaceFormatsKHR(
+                    handle(),
+                    surface->handle(),
+                    &surface_format_count,
+                    nullptr
+                );
+
+                std::vector<VkSurfaceFormatKHR> vk_surface_formats(
+                    surface_format_count
+                );
+                vk_result = vkGetPhysicalDeviceSurfaceFormatsKHR(
+                    handle(),
+                    surface->handle(),
+                    &surface_format_count,
+                    vk_surface_formats.data()
+                );
+                if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
+                {
+                    throw Error(
+                        "failed to get physical device surface formats",
+                        vk_result,
+                        false
+                    );
+                }
+
+                surface_formats.reserve(vk_surface_formats.size());
+                for (const auto& vk_surface_format : vk_surface_formats)
+                {
+                    surface_formats.push_back(
+                        SurfaceFormat_from_vk(vk_surface_format)
+                    );
+                }
+            }
+
+            std::vector<VkPresentModeKHR> present_modes;
+            {
+                uint32_t present_mode_count;
+                vkGetPhysicalDeviceSurfacePresentModesKHR(
+                    handle(),
+                    surface->handle(),
+                    &present_mode_count,
+                    nullptr
+                );
+
+                present_modes.resize(present_mode_count);
+                vk_result = vkGetPhysicalDeviceSurfacePresentModesKHR(
+                    handle(),
+                    surface->handle(),
+                    &present_mode_count,
+                    present_modes.data()
+                );
+                if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
+                {
+                    throw Error(
+                        "failed to get physical device surface present modes",
+                        vk_result,
+                        false
+                    );
+                }
+            }
+
+            _swapchain_support = SwapchainSupport{
+                .capabilities = SurfaceCapabilities_from_vk(vk_capabilities),
+                .surface_formats = surface_formats,
+                .present_modes = present_modes
+            };
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to get physical device surface capabilities while "
-                "updating swapchain support details.",
-                vk_result,
-                false
+                "failed to update swapchain support details: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-
-        std::vector<SurfaceFormat> surface_formats;
-        {
-            uint32_t surface_format_count;
-            vkGetPhysicalDeviceSurfaceFormatsKHR(
-                handle(),
-                surface->handle(),
-                &surface_format_count,
-                nullptr
-            );
-
-            std::vector<VkSurfaceFormatKHR> vk_surface_formats(
-                surface_format_count
-            );
-            vk_result = vkGetPhysicalDeviceSurfaceFormatsKHR(
-                handle(),
-                surface->handle(),
-                &surface_format_count,
-                vk_surface_formats.data()
-            );
-            if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
-            {
-                throw Error(
-                    "failed to get physical device surface formats while "
-                    "updating swapchain support details.",
-                    vk_result,
-                    false
-                );
-            }
-
-            surface_formats.reserve(vk_surface_formats.size());
-            for (const auto& vk_surface_format : vk_surface_formats)
-            {
-                surface_formats.push_back(
-                    SurfaceFormat_from_vk(vk_surface_format)
-                );
-            }
-        }
-
-        std::vector<VkPresentModeKHR> present_modes;
-        {
-            uint32_t present_mode_count;
-            vkGetPhysicalDeviceSurfacePresentModesKHR(
-                handle(),
-                surface->handle(),
-                &present_mode_count,
-                nullptr
-            );
-
-            present_modes.resize(present_mode_count);
-            vk_result = vkGetPhysicalDeviceSurfacePresentModesKHR(
-                handle(),
-                surface->handle(),
-                &present_mode_count,
-                present_modes.data()
-            );
-            if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
-            {
-                throw Error(
-                    "failed to get physical device surface present modes while "
-                    "updating swapchain support details.",
-                    vk_result,
-                    false
-                );
-            }
-        }
-
-        _swapchain_support = SwapchainSupport{
-            .capabilities = SurfaceCapabilities_from_vk(vk_capabilities),
-            .surface_formats = surface_formats,
-            .present_modes = present_modes
-        };
     }
 
     FormatProperties PhysicalDevice::fetch_format_properties(
@@ -2019,25 +2034,32 @@ namespace bv
         VkImageCreateFlags flags
     ) const
     {
-        VkImageFormatProperties vk_properties;
-        VkResult vk_result = vkGetPhysicalDeviceImageFormatProperties(
-            handle(),
-            format,
-            type,
-            tiling,
-            usage,
-            flags,
-            &vk_properties
-        );
-        if (vk_result != VK_SUCCESS)
+        try
+        {
+            VkImageFormatProperties vk_properties;
+            VkResult vk_result = vkGetPhysicalDeviceImageFormatProperties(
+                handle(),
+                format,
+                type,
+                tiling,
+                usage,
+                flags,
+                &vk_properties
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return ImageFormatProperties_from_vk(vk_properties);
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to fetch image format properties",
-                vk_result,
-                false
+                "failed to fetch image format properties: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-        return ImageFormatProperties_from_vk(vk_properties);
     }
 
     PhysicalDevice::PhysicalDevice(
@@ -2078,163 +2100,186 @@ namespace bv
         const AllocatorPtr& allocator
     )
     {
-        ContextPtr c = std::make_shared<Context_public_ctor>(
-            config,
-            allocator
-        );
-
-        // allocation callbacks
+        try
         {
-            c->_vk_allocator.pUserData = c->allocator().get();
-            c->_vk_allocator.pfnAllocation = vk_allocation_callback;
-            c->_vk_allocator.pfnReallocation = vk_reallocation_callback;
-            c->_vk_allocator.pfnFree = vk_free_callback;
-            c->_vk_allocator.pfnInternalAllocation =
-                vk_internal_allocation_notification;
-            c->_vk_allocator.pfnInternalFree = vk_internal_free_notification;
-        }
-
-        VkInstanceCreateInfo create_info{};
-        create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-
-        if (c->config().will_enumerate_portability)
-            create_info.flags |=
-            VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-
-        VkApplicationInfo app_info{};
-        {
-            app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-
-            app_info.pApplicationName = c->config().app_name.c_str();
-            app_info.applicationVersion = c->config().app_version.encode();
-
-            app_info.pEngineName = c->config().engine_name.c_str();
-            app_info.engineVersion = c->config().engine_version.encode();
-
-            app_info.apiVersion = VulkanApiVersion_encode(
-                c->config().vulkan_api_version
+            ContextPtr c = std::make_shared<Context_public_ctor>(
+                config,
+                allocator
             );
-        }
-        create_info.pApplicationInfo = &app_info;
 
-        std::vector<const char*> layers_cstr;
-        {
-            layers_cstr.reserve(
-                c->config().layers.size()
-            );
-            for (const auto& layer : c->config().layers)
+            // allocation callbacks
             {
-                layers_cstr.push_back(layer.c_str());
+                c->_vk_allocator.pUserData = c->allocator().get();
+                c->_vk_allocator.pfnAllocation = vk_allocation_callback;
+                c->_vk_allocator.pfnReallocation = vk_reallocation_callback;
+                c->_vk_allocator.pfnFree = vk_free_callback;
+                c->_vk_allocator.pfnInternalAllocation =
+                    vk_internal_allocation_notification;
+                c->_vk_allocator.pfnInternalFree =
+                    vk_internal_free_notification;
             }
 
-            create_info.enabledLayerCount =
-                (uint32_t)layers_cstr.size();
-            create_info.ppEnabledLayerNames =
-                layers_cstr.data();
-        }
+            VkInstanceCreateInfo create_info{};
+            create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 
-        std::vector<const char*> extensions_cstr;
-        {
-            extensions_cstr.reserve(
-                c->config().extensions.size()
-            );
-            for (const auto& ext : c->config().extensions)
+            if (c->config().will_enumerate_portability)
+                create_info.flags |=
+                VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+
+            VkApplicationInfo app_info{};
             {
-                extensions_cstr.push_back(ext.c_str());
+                app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+
+                app_info.pApplicationName = c->config().app_name.c_str();
+                app_info.applicationVersion = c->config().app_version.encode();
+
+                app_info.pEngineName = c->config().engine_name.c_str();
+                app_info.engineVersion = c->config().engine_version.encode();
+
+                app_info.apiVersion = VulkanApiVersion_encode(
+                    c->config().vulkan_api_version
+                );
+            }
+            create_info.pApplicationInfo = &app_info;
+
+            std::vector<const char*> layers_cstr;
+            {
+                layers_cstr.reserve(
+                    c->config().layers.size()
+                );
+                for (const auto& layer : c->config().layers)
+                {
+                    layers_cstr.push_back(layer.c_str());
+                }
+
+                create_info.enabledLayerCount =
+                    (uint32_t)layers_cstr.size();
+                create_info.ppEnabledLayerNames =
+                    layers_cstr.data();
             }
 
-            create_info.enabledExtensionCount =
-                (uint32_t)extensions_cstr.size();
-            create_info.ppEnabledExtensionNames =
-                extensions_cstr.data();
-        }
+            std::vector<const char*> extensions_cstr;
+            {
+                extensions_cstr.reserve(
+                    c->config().extensions.size()
+                );
+                for (const auto& ext : c->config().extensions)
+                {
+                    extensions_cstr.push_back(ext.c_str());
+                }
 
-        VkResult vk_result = vkCreateInstance(
-            &create_info,
-            c->vk_allocator_ptr(),
-            &c->_vk_instance
-        );
-        if (vk_result != VK_SUCCESS)
+                create_info.enabledExtensionCount =
+                    (uint32_t)extensions_cstr.size();
+                create_info.ppEnabledExtensionNames =
+                    extensions_cstr.data();
+            }
+
+            VkResult vk_result = vkCreateInstance(
+                &create_info,
+                c->vk_allocator_ptr(),
+                &c->_vk_instance
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return c;
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to create instance for context",
-                vk_result,
-                false
+                "failed to create instance for context: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-        return c;
     }
 
     std::vector<LayerProperties> Context::fetch_available_layers()
     {
-        uint32_t count = 0;
-        vkEnumerateInstanceLayerProperties(
-            &count,
-            nullptr
-        );
+        try
+        {
+            uint32_t count = 0;
+            vkEnumerateInstanceLayerProperties(
+                &count,
+                nullptr
+            );
 
-        std::vector<VkLayerProperties> vk_layers(count);
-        VkResult vk_result = vkEnumerateInstanceLayerProperties(
-            &count,
-            vk_layers.data()
-        );
-        if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
+            std::vector<VkLayerProperties> vk_layers(count);
+            VkResult vk_result = vkEnumerateInstanceLayerProperties(
+                &count,
+                vk_layers.data()
+            );
+            if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
+            {
+                throw Error(vk_result);
+            }
+
+            std::vector<LayerProperties> layers;
+            layers.reserve(vk_layers.size());
+            for (const auto& vk_layer : vk_layers)
+            {
+                layers.push_back(LayerProperties_from_vk(vk_layer));
+            }
+            return layers;
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to fetch available instance layers",
-                vk_result,
-                false
+                "failed to fetch available instance layers: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-
-        std::vector<LayerProperties> layers;
-        layers.reserve(vk_layers.size());
-        for (const auto& vk_layer : vk_layers)
-        {
-            layers.push_back(LayerProperties_from_vk(vk_layer));
-        }
-        return layers;
     }
 
     std::vector<ExtensionProperties> Context::fetch_available_extensions(
         const std::string& layer_name
     )
     {
-        const char* layer_name_cstr = nullptr;
-        if (!layer_name.empty())
+        try
         {
-            layer_name_cstr = layer_name.c_str();
+            const char* layer_name_cstr = nullptr;
+            if (!layer_name.empty())
+            {
+                layer_name_cstr = layer_name.c_str();
+            }
+
+            uint32_t count = 0;
+            vkEnumerateInstanceExtensionProperties(
+                layer_name_cstr,
+                &count,
+                nullptr
+            );
+
+            std::vector<VkExtensionProperties> vk_extensions(count);
+            VkResult vk_result = vkEnumerateInstanceExtensionProperties(
+                layer_name_cstr,
+                &count,
+                vk_extensions.data()
+            );
+            if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
+            {
+                throw Error(vk_result);
+            }
+
+            std::vector<ExtensionProperties> extensions;
+            extensions.reserve(vk_extensions.size());
+            for (const auto& vk_ext : vk_extensions)
+            {
+                extensions.push_back(ExtensionProperties_from_vk(vk_ext));
+            }
+            return extensions;
         }
-
-        uint32_t count = 0;
-        vkEnumerateInstanceExtensionProperties(
-            layer_name_cstr,
-            &count,
-            nullptr
-        );
-
-        std::vector<VkExtensionProperties> vk_extensions(count);
-        VkResult vk_result = vkEnumerateInstanceExtensionProperties(
-            layer_name_cstr,
-            &count,
-            vk_extensions.data()
-        );
-        if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
+        catch (const Error& e)
         {
             throw Error(
-                "failed to fetch available instance extensions",
-                vk_result,
-                false
+                "failed to fetch available instance extensions: "
+                + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-
-        std::vector<ExtensionProperties> extensions;
-        extensions.reserve(vk_extensions.size());
-        for (const auto& vk_ext : vk_extensions)
-        {
-            extensions.push_back(ExtensionProperties_from_vk(vk_ext));
-        }
-        return extensions;
     }
 
     void Context::set_allocator(const AllocatorPtr& allocator)
@@ -2256,176 +2301,189 @@ namespace bv
         const SurfacePtr& surface
     ) const
     {
-        uint32_t count = 0;
-        vkEnumeratePhysicalDevices(_vk_instance, &count, nullptr);
-
-        std::vector<VkPhysicalDevice> vk_physical_devices(count);
-        VkResult vk_result = vkEnumeratePhysicalDevices(
-            _vk_instance,
-            &count,
-            vk_physical_devices.data()
-        );
-        if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
+        try
         {
-            throw Error(
-                "failed to fetch physical devices",
-                vk_result,
-                false
-            );
-        }
+            uint32_t count = 0;
+            vkEnumeratePhysicalDevices(_vk_instance, &count, nullptr);
 
-        std::vector<PhysicalDevice> physical_devices;
-        physical_devices.reserve(vk_physical_devices.size());
-        for (const auto& vk_physical_device : vk_physical_devices)
-        {
-            VkPhysicalDeviceProperties vk_properties;
-            vkGetPhysicalDeviceProperties(
-                vk_physical_device,
-                &vk_properties
+            std::vector<VkPhysicalDevice> vk_physical_devices(count);
+            VkResult vk_result = vkEnumeratePhysicalDevices(
+                _vk_instance,
+                &count,
+                vk_physical_devices.data()
             );
-            auto properties = PhysicalDeviceProperties_from_vk(vk_properties);
-
-            VkPhysicalDeviceFeatures vk_features;
-            vkGetPhysicalDeviceFeatures(vk_physical_device, &vk_features);
-            auto features = PhysicalDeviceFeatures_from_vk(vk_features);
-
-            VkPhysicalDeviceMemoryProperties vk_memory_properties;
-            vkGetPhysicalDeviceMemoryProperties(
-                vk_physical_device,
-                &vk_memory_properties
-            );
-            auto memory_properties = PhysicalDeviceMemoryProperties_from_vk(
-                vk_memory_properties
-            );
-
-            uint32_t queue_family_count = 0;
-            vkGetPhysicalDeviceQueueFamilyProperties(
-                vk_physical_device,
-                &queue_family_count,
-                nullptr
-            );
-
-            std::vector<VkQueueFamilyProperties> vk_queue_families(
-                queue_family_count
-            );
-            vkGetPhysicalDeviceQueueFamilyProperties(
-                vk_physical_device,
-                &queue_family_count,
-                vk_queue_families.data()
-            );
-
-            QueueFamilyIndices queue_family_indices;
-
-            std::vector<QueueFamily> queue_families;
-            queue_families.reserve(vk_queue_families.size());
-            for (size_t i = 0; i < vk_queue_families.size(); i++)
+            if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
             {
-                const VkQueueFamilyProperties& vk_queue_family =
-                    vk_queue_families[i];
-
-                VkBool32 vk_surface_support = VK_FALSE;
-                if (surface != nullptr)
-                {
-                    vk_result = vkGetPhysicalDeviceSurfaceSupportKHR(
-                        vk_physical_device,
-                        (uint32_t)i,
-                        surface->handle(),
-                        &vk_surface_support
-                    );
-                    if (vk_result != VK_SUCCESS)
-                    {
-                        throw Error(
-                            "failed to check physical device's surface support "
-                            "when fetching physical devices",
-                            vk_result,
-                            false
-                        );
-                    }
-                }
-
-                auto queue_family = QueueFamily_from_vk(
-                    vk_queue_family,
-                    vk_surface_support
-                );
-
-                if ((queue_family.queue_flags & VK_QUEUE_GRAPHICS_BIT)
-                    && !queue_family_indices.graphics.has_value())
-                {
-                    queue_family_indices.graphics = i;
-                }
-                if (queue_family.surface_support
-                    && !queue_family_indices.presentation.has_value())
-                {
-                    queue_family_indices.presentation = i;
-                }
-                if ((queue_family.queue_flags & VK_QUEUE_COMPUTE_BIT)
-                    && !queue_family_indices.compute.has_value())
-                {
-                    queue_family_indices.compute = i;
-                }
-                if ((queue_family.queue_flags & VK_QUEUE_TRANSFER_BIT)
-                    && !queue_family_indices.transfer.has_value())
-                {
-                    queue_family_indices.transfer = i;
-                }
-                if ((queue_family.queue_flags & VK_QUEUE_SPARSE_BINDING_BIT)
-                    && !queue_family_indices.sparse_binding.has_value())
-                {
-                    queue_family_indices.sparse_binding = i;
-                }
-                if ((queue_family.queue_flags & VK_QUEUE_PROTECTED_BIT)
-                    && !queue_family_indices.protected_.has_value())
-                {
-                    queue_family_indices.protected_ = i;
-                }
-                if ((queue_family.queue_flags & VK_QUEUE_VIDEO_DECODE_BIT_KHR)
-                    && !queue_family_indices.video_decode.has_value())
-                {
-                    queue_family_indices.video_decode = i;
-                }
-                if ((queue_family.queue_flags & VK_QUEUE_OPTICAL_FLOW_BIT_NV)
-                    && !queue_family_indices.optical_flow_nv.has_value())
-                {
-                    queue_family_indices.optical_flow_nv = i;
-                }
-
-                bool supports_both_graphics_and_presentation =
-                    (queue_family.queue_flags & VK_QUEUE_GRAPHICS_BIT)
-                    && queue_family.surface_support;
-
-                bool already_have_shared_graphics_and_presentation_indices =
-                    (
-                        queue_family_indices.graphics.has_value()
-                        && queue_family_indices.presentation.has_value()
-                        )
-                    && (
-                        queue_family_indices.graphics.value()
-                        == queue_family_indices.presentation.value()
-                        );
-
-                if (supports_both_graphics_and_presentation &&
-                    !already_have_shared_graphics_and_presentation_indices)
-                {
-                    queue_family_indices.graphics = i;
-                    queue_family_indices.presentation = i;
-                }
-
-                queue_families.push_back(queue_family);
+                throw Error(vk_result);
             }
 
-            physical_devices.push_back(PhysicalDevice(
-                vk_physical_device,
-                properties,
-                features,
-                memory_properties,
-                queue_families,
-                queue_family_indices
-            ));
+            std::vector<PhysicalDevice> physical_devices;
+            physical_devices.reserve(vk_physical_devices.size());
+            for (const auto& vk_physical_device : vk_physical_devices)
+            {
+                VkPhysicalDeviceProperties vk_properties;
+                vkGetPhysicalDeviceProperties(
+                    vk_physical_device,
+                    &vk_properties
+                );
+                auto properties = PhysicalDeviceProperties_from_vk(
+                    vk_properties
+                );
 
-            physical_devices.back().update_swapchain_support(surface);
+                VkPhysicalDeviceFeatures vk_features;
+                vkGetPhysicalDeviceFeatures(vk_physical_device, &vk_features);
+                auto features = PhysicalDeviceFeatures_from_vk(vk_features);
+
+                VkPhysicalDeviceMemoryProperties vk_memory_properties;
+                vkGetPhysicalDeviceMemoryProperties(
+                    vk_physical_device,
+                    &vk_memory_properties
+                );
+                auto memory_properties = PhysicalDeviceMemoryProperties_from_vk(
+                    vk_memory_properties
+                );
+
+                uint32_t queue_family_count = 0;
+                vkGetPhysicalDeviceQueueFamilyProperties(
+                    vk_physical_device,
+                    &queue_family_count,
+                    nullptr
+                );
+
+                std::vector<VkQueueFamilyProperties> vk_queue_families(
+                    queue_family_count
+                );
+                vkGetPhysicalDeviceQueueFamilyProperties(
+                    vk_physical_device,
+                    &queue_family_count,
+                    vk_queue_families.data()
+                );
+
+                QueueFamilyIndices queue_family_indices;
+
+                std::vector<QueueFamily> queue_families;
+                queue_families.reserve(vk_queue_families.size());
+                for (size_t i = 0; i < vk_queue_families.size(); i++)
+                {
+                    const VkQueueFamilyProperties& vk_queue_family =
+                        vk_queue_families[i];
+
+                    VkBool32 vk_surface_support = VK_FALSE;
+                    if (surface != nullptr)
+                    {
+                        vk_result = vkGetPhysicalDeviceSurfaceSupportKHR(
+                            vk_physical_device,
+                            (uint32_t)i,
+                            surface->handle(),
+                            &vk_surface_support
+                        );
+                        if (vk_result != VK_SUCCESS)
+                        {
+                            throw Error(
+                                "failed to check physical device's surface "
+                                "support",
+                                vk_result,
+                                false
+                            );
+                        }
+                    }
+
+                    auto queue_family = QueueFamily_from_vk(
+                        vk_queue_family,
+                        vk_surface_support
+                    );
+
+                    if ((queue_family.queue_flags & VK_QUEUE_GRAPHICS_BIT)
+                        && !queue_family_indices.graphics.has_value())
+                    {
+                        queue_family_indices.graphics = i;
+                    }
+                    if (queue_family.surface_support
+                        && !queue_family_indices.presentation.has_value())
+                    {
+                        queue_family_indices.presentation = i;
+                    }
+                    if ((queue_family.queue_flags & VK_QUEUE_COMPUTE_BIT)
+                        && !queue_family_indices.compute.has_value())
+                    {
+                        queue_family_indices.compute = i;
+                    }
+                    if ((queue_family.queue_flags & VK_QUEUE_TRANSFER_BIT)
+                        && !queue_family_indices.transfer.has_value())
+                    {
+                        queue_family_indices.transfer = i;
+                    }
+                    if ((queue_family.queue_flags
+                        & VK_QUEUE_SPARSE_BINDING_BIT)
+                        && !queue_family_indices.sparse_binding.has_value())
+                    {
+                        queue_family_indices.sparse_binding = i;
+                    }
+                    if ((queue_family.queue_flags & VK_QUEUE_PROTECTED_BIT)
+                        && !queue_family_indices.protected_.has_value())
+                    {
+                        queue_family_indices.protected_ = i;
+                    }
+                    if ((queue_family.queue_flags
+                        & VK_QUEUE_VIDEO_DECODE_BIT_KHR)
+                        && !queue_family_indices.video_decode.has_value())
+                    {
+                        queue_family_indices.video_decode = i;
+                    }
+                    if ((queue_family.queue_flags
+                        & VK_QUEUE_OPTICAL_FLOW_BIT_NV)
+                        && !queue_family_indices.optical_flow_nv.has_value())
+                    {
+                        queue_family_indices.optical_flow_nv = i;
+                    }
+
+                    bool supports_both_graphics_and_presentation =
+                        (queue_family.queue_flags & VK_QUEUE_GRAPHICS_BIT)
+                        && queue_family.surface_support;
+
+                    bool already_have_shared_graphics_and_presentation_indices =
+                        (
+                            queue_family_indices.graphics.has_value()
+                            && queue_family_indices.presentation.has_value()
+                            )
+                        && (
+                            queue_family_indices.graphics.value()
+                            == queue_family_indices.presentation.value()
+                            );
+
+                    if (supports_both_graphics_and_presentation &&
+                        !already_have_shared_graphics_and_presentation_indices)
+                    {
+                        queue_family_indices.graphics = i;
+                        queue_family_indices.presentation = i;
+                    }
+
+                    queue_families.push_back(queue_family);
+                }
+
+                physical_devices.push_back(PhysicalDevice(
+                    vk_physical_device,
+                    properties,
+                    features,
+                    memory_properties,
+                    queue_families,
+                    queue_family_indices
+                ));
+
+                physical_devices.back().update_swapchain_support(surface);
+            }
+
+            return physical_devices;
+
         }
-
-        return physical_devices;
+        catch (const Error& e)
+        {
+            throw Error(
+                "failed to fetch physical devices: " + e.to_string(),
+                e.vk_result(),
+                true
+            );
+        }
     }
 
     Context::~Context()
@@ -2447,39 +2505,48 @@ namespace bv
         const DebugCallback& callback
     )
     {
-        DebugMessengerPtr messenger =
-            std::make_shared<DebugMessenger_public_ctor>(
-                context,
-                message_severity_filter,
-                message_type_filter,
-                callback
+        try
+        {
+            DebugMessengerPtr messenger =
+                std::make_shared<DebugMessenger_public_ctor>(
+                    context,
+                    message_severity_filter,
+                    message_type_filter,
+                    callback
+                );
+
+            VkDebugUtilsMessengerCreateInfoEXT create_info{
+                .sType =
+                VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+
+                .pNext = nullptr,
+                .flags = 0,
+                .messageSeverity = messenger->message_severity_filter(),
+                .messageType = messenger->message_type_filter(),
+                .pfnUserCallback = vk_debug_callback,
+                .pUserData = messenger.get()
+            };
+
+            VkResult vk_result = CreateDebugUtilsMessengerEXT(
+                context->vk_instance(),
+                &create_info,
+                context->vk_allocator_ptr(),
+                &messenger->_handle
             );
-
-        VkDebugUtilsMessengerCreateInfoEXT create_info{
-            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-            .pNext = nullptr,
-            .flags = 0,
-            .messageSeverity = messenger->message_severity_filter(),
-            .messageType = messenger->message_type_filter(),
-            .pfnUserCallback = vk_debug_callback,
-            .pUserData = messenger.get()
-        };
-
-        VkResult vk_result = CreateDebugUtilsMessengerEXT(
-            context->vk_instance(),
-            &create_info,
-            context->vk_allocator_ptr(),
-            &messenger->_handle
-        );
-        if (vk_result != VK_SUCCESS)
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return messenger;
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to create debug messenger",
-                vk_result,
-                false
+                "failed to create debug messenger: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-        return messenger;
     }
 
     DebugMessenger::~DebugMessenger()
@@ -2537,52 +2604,61 @@ namespace bv
         const FencePtr& signal_fence
     )
     {
-        std::vector<VkSemaphore> vk_semaphores(
-            wait_semaphores.size() + signal_semaphores.size()
-        );
-        for (size_t i = 0; i < wait_semaphores.size(); i++)
+        try
         {
-            vk_semaphores[i] = wait_semaphores[i]->handle();
+            std::vector<VkSemaphore> vk_semaphores(
+                wait_semaphores.size() + signal_semaphores.size()
+            );
+            for (size_t i = 0; i < wait_semaphores.size(); i++)
+            {
+                vk_semaphores[i] = wait_semaphores[i]->handle();
+            }
+            for (size_t i = 0; i < signal_semaphores.size(); i++)
+            {
+                vk_semaphores[wait_semaphores.size() + i] =
+                    signal_semaphores[i]->handle();
+            }
+
+            std::vector<VkCommandBuffer> vk_command_buffers(
+                command_buffers.size()
+            );
+            for (size_t i = 0; i < command_buffers.size(); i++)
+            {
+                vk_command_buffers[i] = command_buffers[i]->handle();
+            }
+
+            VkSubmitInfo submit_info{
+                .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+                .pNext = nullptr,
+                .waitSemaphoreCount = (uint32_t)wait_semaphores.size(),
+                .pWaitSemaphores = vk_semaphores.data(),
+                .pWaitDstStageMask = wait_stages.data(),
+                .commandBufferCount = (uint32_t)vk_command_buffers.size(),
+                .pCommandBuffers = vk_command_buffers.data(),
+                .signalSemaphoreCount = (uint32_t)signal_semaphores.size(),
+
+                .pSignalSemaphores =
+                signal_semaphores.empty()
+                ? nullptr : vk_semaphores.data() + wait_semaphores.size()
+            };
+
+            VkResult vk_result = vkQueueSubmit(
+                handle(),
+                1,
+                &submit_info,
+                signal_fence == nullptr ? nullptr : signal_fence->handle()
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
         }
-        for (size_t i = 0; i < signal_semaphores.size(); i++)
-        {
-            vk_semaphores[wait_semaphores.size() + i] =
-                signal_semaphores[i]->handle();
-        }
-
-        std::vector<VkCommandBuffer> vk_command_buffers(command_buffers.size());
-        for (size_t i = 0; i < command_buffers.size(); i++)
-        {
-            vk_command_buffers[i] = command_buffers[i]->handle();
-        }
-
-        VkSubmitInfo submit_info{
-            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-            .pNext = nullptr,
-            .waitSemaphoreCount = (uint32_t)wait_semaphores.size(),
-            .pWaitSemaphores = vk_semaphores.data(),
-            .pWaitDstStageMask = wait_stages.data(),
-            .commandBufferCount = (uint32_t)vk_command_buffers.size(),
-            .pCommandBuffers = vk_command_buffers.data(),
-            .signalSemaphoreCount = (uint32_t)signal_semaphores.size(),
-
-            .pSignalSemaphores =
-            signal_semaphores.empty()
-            ? nullptr : vk_semaphores.data() + wait_semaphores.size()
-        };
-
-        VkResult vk_result = vkQueueSubmit(
-            handle(),
-            1,
-            &submit_info,
-            signal_fence == nullptr ? nullptr : signal_fence->handle()
-        );
-        if (vk_result != VK_SUCCESS)
+        catch (const Error& e)
         {
             throw Error(
-                "failed to submit command buffer(s) to queue",
-                vk_result,
-                false
+                "failed to submit command buffer(s) to queue: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
     }
@@ -2594,39 +2670,46 @@ namespace bv
         VkResult* out_vk_result
     )
     {
-        std::vector<VkSemaphore> vk_semaphores(wait_semaphores.size());
-        for (size_t i = 0; i < wait_semaphores.size(); i++)
+        try
         {
-            vk_semaphores[i] = wait_semaphores[i]->handle();
+            std::vector<VkSemaphore> vk_semaphores(wait_semaphores.size());
+            for (size_t i = 0; i < wait_semaphores.size(); i++)
+            {
+                vk_semaphores[i] = wait_semaphores[i]->handle();
+            }
+
+            VkSwapchainKHR vk_swapchain = swapchain->handle();
+
+            VkPresentInfoKHR present_info{
+                .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+                .pNext = nullptr,
+                .waitSemaphoreCount = (uint32_t)wait_semaphores.size(),
+                .pWaitSemaphores = vk_semaphores.data(),
+                .swapchainCount = 1,
+                .pSwapchains = &vk_swapchain,
+                .pImageIndices = &image_index,
+                .pResults = nullptr
+            };
+
+            VkResult vk_result = vkQueuePresentKHR(
+                handle(),
+                &present_info
+            );
+            if (out_vk_result != nullptr)
+            {
+                *out_vk_result = vk_result;
+            }
+            if (vk_result != VK_SUCCESS && vk_result != VK_SUBOPTIMAL_KHR)
+            {
+                throw Error(vk_result);
+            }
         }
-
-        VkSwapchainKHR vk_swapchain = swapchain->handle();
-
-        VkPresentInfoKHR present_info{
-            .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-            .pNext = nullptr,
-            .waitSemaphoreCount = (uint32_t)wait_semaphores.size(),
-            .pWaitSemaphores = vk_semaphores.data(),
-            .swapchainCount = 1,
-            .pSwapchains = &vk_swapchain,
-            .pImageIndices = &image_index,
-            .pResults = nullptr
-        };
-
-        VkResult vk_result = vkQueuePresentKHR(
-            handle(),
-            &present_info
-        );
-        if (out_vk_result != nullptr)
-        {
-            *out_vk_result = vk_result;
-        }
-        if (vk_result != VK_SUCCESS && vk_result != VK_SUBOPTIMAL_KHR)
+        catch (const Error& e)
         {
             throw Error(
-                "failed to queue image for presentation",
-                vk_result,
-                false
+                "failed to queue image for presentation: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
     }
@@ -2662,93 +2745,100 @@ namespace bv
         const DeviceConfig& config
     )
     {
-        DevicePtr device = std::make_shared<Device_public_ctor>(
-            context,
-            physical_device,
-            config
-        );
-
-        std::vector<VkDeviceQueueCreateInfo> vk_queue_requests;
-        std::vector<std::vector<float>> wastes_priorities(
-            device->config().queue_requests.size()
-        );
-        for (size_t i = 0; i < device->config().queue_requests.size(); i++)
+        try
         {
-            const auto& queue_request = device->config().queue_requests[i];
+            DevicePtr device = std::make_shared<Device_public_ctor>(
+                context,
+                physical_device,
+                config
+            );
 
-            if (queue_request.priorities.size()
-                != queue_request.num_queues_to_create)
+            std::vector<VkDeviceQueueCreateInfo> vk_queue_requests;
+            std::vector<std::vector<float>> wastes_priorities(
+                device->config().queue_requests.size()
+            );
+            for (size_t i = 0; i < device->config().queue_requests.size(); i++)
             {
-                throw Error(
-                    "failed to create device: there should be the same number "
-                    "of queue priorities as the number of queues to create"
+                const auto& queue_request = device->config().queue_requests[i];
+
+                if (queue_request.priorities.size()
+                    != queue_request.num_queues_to_create)
+                {
+                    throw Error(
+                        "there should be the same number of queue priorities "
+                        "as the number of queues to create"
+                    );
+                }
+
+                vk_queue_requests.push_back(
+                    QueueRequest_to_vk(
+                        queue_request,
+                        wastes_priorities[i]
+                    )
                 );
             }
 
-            vk_queue_requests.push_back(
-                QueueRequest_to_vk(
-                    queue_request,
-                    wastes_priorities[i]
-                )
-            );
-        }
-
-        std::vector<const char*> layers_cstr;
-        {
-            layers_cstr.reserve(
-                context->config().layers.size()
-            );
-            for (const auto& layer
-                : context->config().layers)
+            std::vector<const char*> layers_cstr;
             {
-                layers_cstr.push_back(layer.c_str());
+                layers_cstr.reserve(
+                    context->config().layers.size()
+                );
+                for (const auto& layer
+                    : context->config().layers)
+                {
+                    layers_cstr.push_back(layer.c_str());
+                }
             }
-        }
 
-        std::vector<const char*> extensions_cstr;
-        {
-            extensions_cstr.reserve(
-                device->config().extensions.size()
-            );
-            for (const auto& ext : device->config().extensions)
+            std::vector<const char*> extensions_cstr;
             {
-                extensions_cstr.push_back(ext.c_str());
+                extensions_cstr.reserve(
+                    device->config().extensions.size()
+                );
+                for (const auto& ext : device->config().extensions)
+                {
+                    extensions_cstr.push_back(ext.c_str());
+                }
             }
-        }
 
-        VkPhysicalDeviceFeatures vk_enabled_features =
-            PhysicalDeviceFeatures_to_vk(
-                device->config().enabled_features
+            VkPhysicalDeviceFeatures vk_enabled_features =
+                PhysicalDeviceFeatures_to_vk(
+                    device->config().enabled_features
+                );
+
+            VkDeviceCreateInfo create_info{
+                .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = 0,
+                .queueCreateInfoCount = (uint32_t)vk_queue_requests.size(),
+                .pQueueCreateInfos = vk_queue_requests.data(),
+                .enabledLayerCount = (uint32_t)layers_cstr.size(),
+                .ppEnabledLayerNames = layers_cstr.data(),
+                .enabledExtensionCount = (uint32_t)extensions_cstr.size(),
+                .ppEnabledExtensionNames = extensions_cstr.data(),
+                .pEnabledFeatures = &vk_enabled_features
+            };
+
+            VkResult vk_result = vkCreateDevice(
+                device->physical_device().handle(),
+                &create_info,
+                context->vk_allocator_ptr(),
+                &device->_handle
             );
-
-        VkDeviceCreateInfo create_info{
-            .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = 0,
-            .queueCreateInfoCount = (uint32_t)vk_queue_requests.size(),
-            .pQueueCreateInfos = vk_queue_requests.data(),
-            .enabledLayerCount = (uint32_t)layers_cstr.size(),
-            .ppEnabledLayerNames = layers_cstr.data(),
-            .enabledExtensionCount = (uint32_t)extensions_cstr.size(),
-            .ppEnabledExtensionNames = extensions_cstr.data(),
-            .pEnabledFeatures = &vk_enabled_features
-        };
-
-        VkResult vk_result = vkCreateDevice(
-            device->physical_device().handle(),
-            &create_info,
-            context->vk_allocator_ptr(),
-            &device->_handle
-        );
-        if (vk_result != VK_SUCCESS)
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return device;
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to create device",
-                vk_result,
-                false
+                "failed to create device: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-        return device;
     }
 
     QueuePtr Device::retrieve_queue(
@@ -2806,92 +2896,97 @@ namespace bv
         const ImageConfig& config
     )
     {
-        ImageFormatProperties img_format_props{};
         try
         {
-            img_format_props =
-                device->physical_device().fetch_image_format_properties(
-                    config.format,
-                    config.image_type,
-                    config.tiling,
-                    config.usage,
-                    config.flags
-                );
+            ImageFormatProperties img_format_props{};
+            try
+            {
+                img_format_props =
+                    device->physical_device().fetch_image_format_properties(
+                        config.format,
+                        config.image_type,
+                        config.tiling,
+                        config.usage,
+                        config.flags
+                    );
+            }
+            catch (const Error& e)
+            {
+                if (e.vk_result().has_value()
+                    && e.vk_result().value() == VK_ERROR_FORMAT_NOT_SUPPORTED)
+                {
+                    throw Error(
+                        "image format not supported with the provided "
+                        "parameters",
+                        e.vk_result(),
+                        true
+                    );
+                }
+                else
+                {
+                    throw e;
+                }
+            }
+
+            ImagePtr img = std::make_shared<Image_public_ctor>(
+                device,
+                config
+            );
+
+            VkImageCreateInfo create_info{
+                .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = img->config().flags,
+                .imageType = img->config().image_type,
+                .format = img->config().format,
+                .extent = Extent3d_to_vk(img->config().extent),
+                .mipLevels = img->config().mip_levels,
+                .arrayLayers = img->config().array_layers,
+                .samples = img->config().samples,
+                .tiling = img->config().tiling,
+                .usage = img->config().usage,
+                .sharingMode = img->config().sharing_mode,
+
+                .queueFamilyIndexCount =
+                (uint32_t)img->config().queue_family_indices.size(),
+
+                .pQueueFamilyIndices =
+                img->config().queue_family_indices.data(),
+
+                .initialLayout = img->config().initial_layout
+            };
+
+            VkResult vk_result = vkCreateImage(
+                device->handle(),
+                &create_info,
+                lock_wptr(device->context())->vk_allocator_ptr(),
+                &img->_handle
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+
+            VkMemoryRequirements vk_mem_requirements;
+            vkGetImageMemoryRequirements(
+                device->handle(),
+                img->handle(),
+                &vk_mem_requirements
+            );
+            img->_memory_requirements = MemoryRequirements_from_vk(
+                vk_mem_requirements
+            );
+
+            return img;
         }
         catch (const Error& e)
         {
-            if (e.vk_result().has_value()
-                && e.vk_result().value() == VK_ERROR_FORMAT_NOT_SUPPORTED)
-            {
-                throw Error(
-                    "failed to create image: image format not supported with "
-                    "the provided parameters",
-                    e.vk_result(),
-                    true
-                );
-            }
-            else
-            {
-                throw Error(
-                    "failed to create image: " + e.to_string(),
-                    e.vk_result(),
-                    true
-                );
-            }
-        }
-
-        ImagePtr img = std::make_shared<Image_public_ctor>(
-            device,
-            config
-        );
-
-        VkImageCreateInfo create_info{
-            .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = img->config().flags,
-            .imageType = img->config().image_type,
-            .format = img->config().format,
-            .extent = Extent3d_to_vk(img->config().extent),
-            .mipLevels = img->config().mip_levels,
-            .arrayLayers = img->config().array_layers,
-            .samples = img->config().samples,
-            .tiling = img->config().tiling,
-            .usage = img->config().usage,
-            .sharingMode = img->config().sharing_mode,
-
-            .queueFamilyIndexCount =
-            (uint32_t)img->config().queue_family_indices.size(),
-
-            .pQueueFamilyIndices = img->config().queue_family_indices.data(),
-            .initialLayout = img->config().initial_layout
-        };
-
-        VkResult vk_result = vkCreateImage(
-            device->handle(),
-            &create_info,
-            lock_wptr(device->context())->vk_allocator_ptr(),
-            &img->_handle
-        );
-        if (vk_result != VK_SUCCESS)
-        {
             throw Error(
-                "failed to create image",
-                vk_result,
-                false
+                "failed to create image: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-
-        VkMemoryRequirements vk_mem_requirements;
-        vkGetImageMemoryRequirements(
-            device->handle(),
-            img->handle(),
-            &vk_mem_requirements
-        );
-        img->_memory_requirements = MemoryRequirements_from_vk(
-            vk_mem_requirements
-        );
-
-        return img;
     }
 
     void Image::bind_memory(
@@ -2899,18 +2994,25 @@ namespace bv
         VkDeviceSize memory_offset
     )
     {
-        VkResult vk_result = vkBindImageMemory(
-            lock_wptr(device())->handle(),
-            handle(),
-            memory->handle(),
-            memory_offset
-        );
-        if (vk_result != VK_SUCCESS)
+        try
+        {
+            VkResult vk_result = vkBindImageMemory(
+                lock_wptr(device())->handle(),
+                handle(),
+                memory->handle(),
+                memory_offset
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to bind image memory",
-                vk_result,
-                false
+                "failed to bind image memory: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
     }
@@ -2958,91 +3060,98 @@ namespace bv
         const SwapchainPtr& old_swapchain
     )
     {
-        SwapchainPtr sc = std::make_shared<Swapchain_public_ctor>(
-            device,
-            surface,
-            config,
-            old_swapchain
-        );
-
-        VkSwapchainKHR vk_old_swapchain = nullptr;
-        if (old_swapchain != nullptr)
+        try
         {
-            vk_old_swapchain = old_swapchain->handle();
+            SwapchainPtr sc = std::make_shared<Swapchain_public_ctor>(
+                device,
+                surface,
+                config,
+                old_swapchain
+            );
+
+            VkSwapchainKHR vk_old_swapchain = nullptr;
+            if (old_swapchain != nullptr)
+            {
+                vk_old_swapchain = old_swapchain->handle();
+            }
+
+            VkSwapchainCreateInfoKHR create_info{
+                .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+                .pNext = nullptr,
+                .flags = sc->config().flags,
+                .surface = surface->handle(),
+                .minImageCount = sc->config().min_image_count,
+                .imageFormat = sc->config().image_format,
+                .imageColorSpace = sc->config().image_color_space,
+                .imageExtent = Extent2d_to_vk(sc->config().image_extent),
+                .imageArrayLayers = sc->config().image_array_layers,
+                .imageUsage = sc->config().image_usage,
+                .imageSharingMode = sc->config().image_sharing_mode,
+
+                .queueFamilyIndexCount =
+                (uint32_t)sc->config().queue_family_indices.size(),
+
+                .pQueueFamilyIndices = sc->config().queue_family_indices.data(),
+                .preTransform = sc->config().pre_transform,
+                .compositeAlpha = sc->config().composite_alpha,
+                .presentMode = sc->config().present_mode,
+                .clipped = sc->config().clipped,
+                .oldSwapchain = vk_old_swapchain
+            };
+
+            VkResult vk_result = vkCreateSwapchainKHR(
+                device->handle(),
+                &create_info,
+                lock_wptr(device->context())->vk_allocator_ptr(),
+                &sc->_handle
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+
+            uint32_t actual_image_count;
+            vkGetSwapchainImagesKHR(
+                device->handle(),
+                sc->handle(),
+                &actual_image_count,
+                nullptr
+            );
+
+            std::vector<VkImage> vk_images(actual_image_count);
+            vk_result = vkGetSwapchainImagesKHR(
+                device->handle(),
+                sc->handle(),
+                &actual_image_count,
+                vk_images.data()
+            );
+            if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
+            {
+                throw Error(
+                    "failed to retrieve swapchain images after creating it",
+                    vk_result,
+                    false
+                );
+            }
+
+            sc->_images.reserve(actual_image_count);
+            for (auto vk_image : vk_images)
+            {
+                sc->_images.push_back(
+                    std::make_shared<Image_public_ctor>(vk_image)
+                );
+            }
+
+            return sc;
         }
-
-        VkSwapchainCreateInfoKHR create_info{
-            .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-            .pNext = nullptr,
-            .flags = sc->config().flags,
-            .surface = surface->handle(),
-            .minImageCount = sc->config().min_image_count,
-            .imageFormat = sc->config().image_format,
-            .imageColorSpace = sc->config().image_color_space,
-            .imageExtent = Extent2d_to_vk(sc->config().image_extent),
-            .imageArrayLayers = sc->config().image_array_layers,
-            .imageUsage = sc->config().image_usage,
-            .imageSharingMode = sc->config().image_sharing_mode,
-
-            .queueFamilyIndexCount =
-            (uint32_t)sc->config().queue_family_indices.size(),
-
-            .pQueueFamilyIndices = sc->config().queue_family_indices.data(),
-            .preTransform = sc->config().pre_transform,
-            .compositeAlpha = sc->config().composite_alpha,
-            .presentMode = sc->config().present_mode,
-            .clipped = sc->config().clipped,
-            .oldSwapchain = vk_old_swapchain
-        };
-
-        VkResult vk_result = vkCreateSwapchainKHR(
-            device->handle(),
-            &create_info,
-            lock_wptr(device->context())->vk_allocator_ptr(),
-            &sc->_handle
-        );
-        if (vk_result != VK_SUCCESS)
+        catch (const Error& e)
         {
             throw Error(
-                "failed to create swapchain",
-                vk_result,
-                false
+                "failed to create swapchain: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-
-        uint32_t actual_image_count;
-        vkGetSwapchainImagesKHR(
-            device->handle(),
-            sc->handle(),
-            &actual_image_count,
-            nullptr
-        );
-
-        std::vector<VkImage> vk_images(actual_image_count);
-        vk_result = vkGetSwapchainImagesKHR(
-            device->handle(),
-            sc->handle(),
-            &actual_image_count,
-            vk_images.data()
-        );
-        if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
-        {
-            throw Error(
-                "failed to retrieve swapchain images after creating it",
-                vk_result,
-                false
-            );
-        }
-
-        sc->_images.reserve(actual_image_count);
-        for (auto vk_image : vk_images)
-        {
-            sc->_images.push_back(
-                std::make_shared<Image_public_ctor>(vk_image)
-            );
-        }
-
-        return sc;
     }
 
     uint32_t Swapchain::acquire_next_image(
@@ -3052,29 +3161,36 @@ namespace bv
         VkResult* out_vk_result
     )
     {
-        uint32_t image_index;
-        VkResult vk_result = vkAcquireNextImageKHR(
-            lock_wptr(device())->handle(),
-            handle(),
-            timeout,
-            semaphore == nullptr ? nullptr : semaphore->handle(),
-            fence == nullptr ? nullptr : fence->handle(),
-            &image_index
-        );
-        if (out_vk_result != nullptr)
+        try
         {
-            *out_vk_result = vk_result;
+            uint32_t image_index;
+            VkResult vk_result = vkAcquireNextImageKHR(
+                lock_wptr(device())->handle(),
+                handle(),
+                timeout,
+                semaphore == nullptr ? nullptr : semaphore->handle(),
+                fence == nullptr ? nullptr : fence->handle(),
+                &image_index
+            );
+            if (out_vk_result != nullptr)
+            {
+                *out_vk_result = vk_result;
+            }
+            if (vk_result == VK_SUCCESS
+                || vk_result == VK_SUBOPTIMAL_KHR)
+            {
+                return image_index;
+            }
+            throw Error(vk_result);
         }
-        if (vk_result == VK_SUCCESS
-            || vk_result == VK_SUBOPTIMAL_KHR)
+        catch (const Error& e)
         {
-            return image_index;
+            throw Error(
+                "failed to acquire next swapchain image: " + e.to_string(),
+                e.vk_result(),
+                true
+            );
         }
-        throw Error(
-            "failed to acquire next swapchain image",
-            vk_result,
-            false
-        );
     }
 
     Swapchain::~Swapchain()
@@ -3115,40 +3231,47 @@ namespace bv
         const ImageViewConfig& config
     )
     {
-        ImageViewPtr view = std::make_shared<ImageView_public_ctor>(
-            device,
-            image,
-            config
-        );
+        try
+        {
+            ImageViewPtr view = std::make_shared<ImageView_public_ctor>(
+                device,
+                image,
+                config
+            );
 
-        VkImageViewCreateInfo create_info{
-            .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = view->config().flags,
-            .image = lock_wptr(view->image())->handle(),
-            .viewType = view->config().view_type,
-            .format = view->config().format,
-            .components = ComponentMapping_to_vk(view->config().components),
-            .subresourceRange = ImageSubresourceRange_to_vk(
-                view->config().subresource_range
-            )
-        };
+            VkImageViewCreateInfo create_info{
+                .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = view->config().flags,
+                .image = lock_wptr(view->image())->handle(),
+                .viewType = view->config().view_type,
+                .format = view->config().format,
+                .components = ComponentMapping_to_vk(view->config().components),
+                .subresourceRange = ImageSubresourceRange_to_vk(
+                    view->config().subresource_range
+                )
+            };
 
-        VkResult vk_result = vkCreateImageView(
-            device->handle(),
-            &create_info,
-            lock_wptr(device->context())->vk_allocator_ptr(),
-            &view->_handle
-        );
-        if (vk_result != VK_SUCCESS)
+            VkResult vk_result = vkCreateImageView(
+                device->handle(),
+                &create_info,
+                lock_wptr(device->context())->vk_allocator_ptr(),
+                &view->_handle
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return view;
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to create image view",
-                vk_result,
-                false
+                "failed to create image view: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-        return view;
     }
 
     ImageView::~ImageView()
@@ -3181,42 +3304,49 @@ namespace bv
         const std::vector<uint8_t>& code
     )
     {
-        ShaderModulePtr module = std::make_shared<ShaderModule_public_ctor>(
-            device
-        );
-
-        std::vector<uint8_t> code_aligned = code;
-        if (code_aligned.size() % 8 != 0)
+        try
         {
-            for (size_t i = 0; i < 8 - (code_aligned.size() % 8); i++)
+            ShaderModulePtr module = std::make_shared<ShaderModule_public_ctor>(
+                device
+            );
+
+            std::vector<uint8_t> code_aligned = code;
+            if (code_aligned.size() % 8 != 0)
             {
-                code_aligned.push_back(0);
+                for (size_t i = 0; i < 8 - (code_aligned.size() % 8); i++)
+                {
+                    code_aligned.push_back(0);
+                }
             }
+
+            VkShaderModuleCreateInfo create_info{
+                .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = 0,
+                .codeSize = code.size(),
+                .pCode = reinterpret_cast<const uint32_t*>(code_aligned.data())
+            };
+
+            VkResult vk_result = vkCreateShaderModule(
+                device->handle(),
+                &create_info,
+                lock_wptr(device->context())->vk_allocator_ptr(),
+                &module->_handle
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return module;
         }
-
-        VkShaderModuleCreateInfo create_info{
-            .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = 0,
-            .codeSize = code.size(),
-            .pCode = reinterpret_cast<const uint32_t*>(code_aligned.data())
-        };
-
-        VkResult vk_result = vkCreateShaderModule(
-            device->handle(),
-            &create_info,
-            lock_wptr(device->context())->vk_allocator_ptr(),
-            &module->_handle
-        );
-        if (vk_result != VK_SUCCESS)
+        catch (const Error& e)
         {
             throw Error(
-                "failed to create shader module",
-                vk_result,
-                false
+                "failed to create shader module: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-        return module;
     }
 
     ShaderModule::~ShaderModule()
@@ -3243,49 +3373,56 @@ namespace bv
         const SamplerConfig& config
     )
     {
-        SamplerPtr sampler = std::make_shared<Sampler_public_ctor>(
-            device,
-            config
-        );
+        try
+        {
+            SamplerPtr sampler = std::make_shared<Sampler_public_ctor>(
+                device,
+                config
+            );
 
-        VkSamplerCreateInfo create_info{
-            .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = sampler->config().flags,
-            .magFilter = sampler->config().mag_filter,
-            .minFilter = sampler->config().min_filter,
-            .mipmapMode = sampler->config().mipmap_mode,
-            .addressModeU = sampler->config().address_mode_u,
-            .addressModeV = sampler->config().address_mode_v,
-            .addressModeW = sampler->config().address_mode_w,
-            .mipLodBias = sampler->config().mip_lod_bias,
-            .anisotropyEnable = sampler->config().anisotropy_enable,
-            .maxAnisotropy = sampler->config().max_anisotropy,
-            .compareEnable = sampler->config().compare_enable,
-            .compareOp = sampler->config().compare_op,
-            .minLod = sampler->config().min_lod,
-            .maxLod = sampler->config().max_lod,
-            .borderColor = sampler->config().border_color,
+            VkSamplerCreateInfo create_info{
+                .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = sampler->config().flags,
+                .magFilter = sampler->config().mag_filter,
+                .minFilter = sampler->config().min_filter,
+                .mipmapMode = sampler->config().mipmap_mode,
+                .addressModeU = sampler->config().address_mode_u,
+                .addressModeV = sampler->config().address_mode_v,
+                .addressModeW = sampler->config().address_mode_w,
+                .mipLodBias = sampler->config().mip_lod_bias,
+                .anisotropyEnable = sampler->config().anisotropy_enable,
+                .maxAnisotropy = sampler->config().max_anisotropy,
+                .compareEnable = sampler->config().compare_enable,
+                .compareOp = sampler->config().compare_op,
+                .minLod = sampler->config().min_lod,
+                .maxLod = sampler->config().max_lod,
+                .borderColor = sampler->config().border_color,
 
-            .unnormalizedCoordinates =
-            sampler->config().unnormalized_coordinates
-        };
+                .unnormalizedCoordinates =
+                sampler->config().unnormalized_coordinates
+            };
 
-        VkResult vk_result = vkCreateSampler(
-            device->handle(),
-            &create_info,
-            lock_wptr(device->context())->vk_allocator_ptr(),
-            &sampler->_handle
-        );
-        if (vk_result != VK_SUCCESS)
+            VkResult vk_result = vkCreateSampler(
+                device->handle(),
+                &create_info,
+                lock_wptr(device->context())->vk_allocator_ptr(),
+                &sampler->_handle
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return sampler;
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to create sampler",
-                vk_result,
-                false
+                "failed to create sampler: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-        return sampler;
     }
 
     Sampler::~Sampler()
@@ -3316,49 +3453,56 @@ namespace bv
         const DescriptorSetLayoutConfig& config
     )
     {
-        DescriptorSetLayoutPtr layout =
-            std::make_shared<DescriptorSetLayout_public_ctor>(
-                device,
-                config
-            );
-
-        std::vector<VkDescriptorSetLayoutBinding> vk_bindings(
-            layout->config().bindings.size()
-        );
-        std::vector<std::vector<VkSampler>> wastes_vk_immutable_samplers(
-            layout->config().bindings.size()
-        );
-        for (size_t i = 0; i < layout->config().bindings.size(); i++)
+        try
         {
-            vk_bindings[i] = DescriptorSetLayoutBinding_to_vk(
-                layout->config().bindings[i],
-                wastes_vk_immutable_samplers[i]
+            DescriptorSetLayoutPtr layout =
+                std::make_shared<DescriptorSetLayout_public_ctor>(
+                    device,
+                    config
+                );
+
+            std::vector<VkDescriptorSetLayoutBinding> vk_bindings(
+                layout->config().bindings.size()
             );
+            std::vector<std::vector<VkSampler>> wastes_vk_immutable_samplers(
+                layout->config().bindings.size()
+            );
+            for (size_t i = 0; i < layout->config().bindings.size(); i++)
+            {
+                vk_bindings[i] = DescriptorSetLayoutBinding_to_vk(
+                    layout->config().bindings[i],
+                    wastes_vk_immutable_samplers[i]
+                );
+            }
+
+            VkDescriptorSetLayoutCreateInfo create_info{
+                .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = layout->config().flags,
+                .bindingCount = (uint32_t)vk_bindings.size(),
+                .pBindings = vk_bindings.data()
+            };
+
+            VkResult vk_result = vkCreateDescriptorSetLayout(
+                device->handle(),
+                &create_info,
+                lock_wptr(device->context())->vk_allocator_ptr(),
+                &layout->_handle
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return layout;
         }
-
-        VkDescriptorSetLayoutCreateInfo create_info{
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = layout->config().flags,
-            .bindingCount = (uint32_t)vk_bindings.size(),
-            .pBindings = vk_bindings.data()
-        };
-
-        VkResult vk_result = vkCreateDescriptorSetLayout(
-            device->handle(),
-            &create_info,
-            lock_wptr(device->context())->vk_allocator_ptr(),
-            &layout->_handle
-        );
-        if (vk_result != VK_SUCCESS)
+        catch (const Error& e)
         {
             throw Error(
-                "failed to create descriptor set layout",
-                vk_result,
-                false
+                "failed to create descriptor set layout: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-        return layout;
     }
 
     DescriptorSetLayout::~DescriptorSetLayout()
@@ -3389,58 +3533,68 @@ namespace bv
         const PipelineLayoutConfig& config
     )
     {
-        PipelineLayoutPtr layout =
-            std::make_shared<PipelineLayout_public_ctor>(
-                device,
-                config
-            );
-
-        std::vector<VkDescriptorSetLayout> vk_set_layouts(
-            layout->config().set_layouts.size()
-        );
-        for (size_t i = 0; i < layout->config().set_layouts.size(); i++)
+        try
         {
-            vk_set_layouts[i] =
-                lock_wptr(layout->config().set_layouts[i])->handle();
-        }
+            PipelineLayoutPtr layout =
+                std::make_shared<PipelineLayout_public_ctor>(
+                    device,
+                    config
+                );
 
-        std::vector<VkPushConstantRange> vk_push_constant_ranges(
-            layout->config().push_constant_ranges.size()
-        );
-        for (size_t i = 0;
-            i < layout->config().push_constant_ranges.size();
-            i++)
-        {
-            vk_push_constant_ranges[i] = PushConstantRange_to_vk(
-                layout->config().push_constant_ranges[i]
+            std::vector<VkDescriptorSetLayout> vk_set_layouts(
+                layout->config().set_layouts.size()
             );
+            for (size_t i = 0; i < layout->config().set_layouts.size(); i++)
+            {
+                vk_set_layouts[i] =
+                    lock_wptr(layout->config().set_layouts[i])->handle();
+            }
+
+            std::vector<VkPushConstantRange> vk_push_constant_ranges(
+                layout->config().push_constant_ranges.size()
+            );
+            for (size_t i = 0;
+                i < layout->config().push_constant_ranges.size();
+                i++)
+            {
+                vk_push_constant_ranges[i] = PushConstantRange_to_vk(
+                    layout->config().push_constant_ranges[i]
+                );
+            }
+
+            VkPipelineLayoutCreateInfo create_info{
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = layout->config().flags,
+                .setLayoutCount = (uint32_t)vk_set_layouts.size(),
+                .pSetLayouts = vk_set_layouts.data(),
+
+                .pushConstantRangeCount =
+                (uint32_t)vk_push_constant_ranges.size(),
+
+                .pPushConstantRanges = vk_push_constant_ranges.data()
+            };
+
+            VkResult vk_result = vkCreatePipelineLayout(
+                device->handle(),
+                &create_info,
+                lock_wptr(device->context())->vk_allocator_ptr(),
+                &layout->_handle
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return layout;
         }
-
-        VkPipelineLayoutCreateInfo create_info{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = layout->config().flags,
-            .setLayoutCount = (uint32_t)vk_set_layouts.size(),
-            .pSetLayouts = vk_set_layouts.data(),
-            .pushConstantRangeCount = (uint32_t)vk_push_constant_ranges.size(),
-            .pPushConstantRanges = vk_push_constant_ranges.data()
-        };
-
-        VkResult vk_result = vkCreatePipelineLayout(
-            device->handle(),
-            &create_info,
-            lock_wptr(device->context())->vk_allocator_ptr(),
-            &layout->_handle
-        );
-        if (vk_result != VK_SUCCESS)
+        catch (const Error& e)
         {
             throw Error(
-                "failed to create pipeline layout",
-                vk_result,
-                false
+                "failed to create pipeline layout: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-        return layout;
     }
 
     PipelineLayout::~PipelineLayout()
@@ -3470,83 +3624,94 @@ namespace bv
         const RenderPassConfig& config
     )
     {
-        RenderPassPtr pass = std::make_shared<RenderPass_public_ctor>(
-            device,
-            config
-        );
-
-        std::vector<VkAttachmentDescription> vk_attachments(
-            pass->config().attachments.size()
-        );
-        for (size_t i = 0; i < pass->config().attachments.size(); i++)
+        try
         {
-            vk_attachments[i] = Attachment_to_vk(pass->config().attachments[i]);
-        }
-
-        std::vector<VkSubpassDescription> vk_subpasses(
-            pass->config().subpasses.size()
-        );
-        std::vector<std::vector<VkAttachmentReference>>
-            wastes_vk_input_attachments(pass->config().subpasses.size());
-        std::vector<std::vector<VkAttachmentReference>>
-            wastes_vk_color_attachments(pass->config().subpasses.size());
-        std::vector<std::vector<VkAttachmentReference>>
-            wastes_vk_resolve_attachments(pass->config().subpasses.size());
-        std::vector<VkAttachmentReference> wastes_vk_depth_stencil_attachment(
-            pass->config().subpasses.size()
-        );
-        std::vector<std::vector<uint32_t>> wastes_preserve_attachment_indices(
-            pass->config().subpasses.size()
-        );
-        for (size_t i = 0; i < pass->config().subpasses.size(); i++)
-        {
-            vk_subpasses[i] = Subpass_to_vk(
-                pass->config().subpasses[i],
-                wastes_vk_input_attachments[i],
-                wastes_vk_color_attachments[i],
-                wastes_vk_resolve_attachments[i],
-                wastes_vk_depth_stencil_attachment[i],
-                wastes_preserve_attachment_indices[i]
+            RenderPassPtr pass = std::make_shared<RenderPass_public_ctor>(
+                device,
+                config
             );
-        }
 
-        std::vector<VkSubpassDependency> vk_dependencies(
-            pass->config().dependencies.size()
-        );
-        for (size_t i = 0; i < pass->config().dependencies.size(); i++)
-        {
-            vk_dependencies[i] = SubpassDependency_to_vk(
-                pass->config().dependencies[i]
+            std::vector<VkAttachmentDescription> vk_attachments(
+                pass->config().attachments.size()
             );
+            for (size_t i = 0; i < pass->config().attachments.size(); i++)
+            {
+                vk_attachments[i] = Attachment_to_vk(
+                    pass->config().attachments[i]
+                );
+            }
+
+            std::vector<VkSubpassDescription> vk_subpasses(
+                pass->config().subpasses.size()
+            );
+            std::vector<std::vector<VkAttachmentReference>>
+                wastes_vk_input_attachments(pass->config().subpasses.size());
+            std::vector<std::vector<VkAttachmentReference>>
+                wastes_vk_color_attachments(pass->config().subpasses.size());
+            std::vector<std::vector<VkAttachmentReference>>
+                wastes_vk_resolve_attachments(pass->config().subpasses.size());
+            std::vector<VkAttachmentReference>
+                wastes_vk_depth_stencil_attachment(
+                    pass->config().subpasses.size()
+                );
+            std::vector<std::vector<uint32_t>>
+                wastes_preserve_attachment_indices(
+                    pass->config().subpasses.size()
+                );
+            for (size_t i = 0; i < pass->config().subpasses.size(); i++)
+            {
+                vk_subpasses[i] = Subpass_to_vk(
+                    pass->config().subpasses[i],
+                    wastes_vk_input_attachments[i],
+                    wastes_vk_color_attachments[i],
+                    wastes_vk_resolve_attachments[i],
+                    wastes_vk_depth_stencil_attachment[i],
+                    wastes_preserve_attachment_indices[i]
+                );
+            }
+
+            std::vector<VkSubpassDependency> vk_dependencies(
+                pass->config().dependencies.size()
+            );
+            for (size_t i = 0; i < pass->config().dependencies.size(); i++)
+            {
+                vk_dependencies[i] = SubpassDependency_to_vk(
+                    pass->config().dependencies[i]
+                );
+            }
+
+            VkRenderPassCreateInfo create_info{
+                .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = pass->config().flags,
+                .attachmentCount = (uint32_t)vk_attachments.size(),
+                .pAttachments = vk_attachments.data(),
+                .subpassCount = (uint32_t)vk_subpasses.size(),
+                .pSubpasses = vk_subpasses.data(),
+                .dependencyCount = (uint32_t)vk_dependencies.size(),
+                .pDependencies = vk_dependencies.data()
+            };
+
+            VkResult vk_result = vkCreateRenderPass(
+                device->handle(),
+                &create_info,
+                lock_wptr(device->context())->vk_allocator_ptr(),
+                &pass->_handle
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return pass;
         }
-
-        VkRenderPassCreateInfo create_info{
-            .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = pass->config().flags,
-            .attachmentCount = (uint32_t)vk_attachments.size(),
-            .pAttachments = vk_attachments.data(),
-            .subpassCount = (uint32_t)vk_subpasses.size(),
-            .pSubpasses = vk_subpasses.data(),
-            .dependencyCount = (uint32_t)vk_dependencies.size(),
-            .pDependencies = vk_dependencies.data()
-        };
-
-        VkResult vk_result = vkCreateRenderPass(
-            device->handle(),
-            &create_info,
-            lock_wptr(device->context())->vk_allocator_ptr(),
-            &pass->_handle
-        );
-        if (vk_result != VK_SUCCESS)
+        catch (const Error& e)
         {
             throw Error(
-                "failed to create render pass",
-                vk_result,
-                false
+                "failed to create render pass: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-        return pass;
     }
 
     RenderPass::~RenderPass()
@@ -3576,191 +3741,198 @@ namespace bv
         const GraphicsPipelineConfig& config
     )
     {
-        GraphicsPipelinePtr pipe =
-            std::make_shared<GraphicsPipeline_public_ctor>(
-                device,
-                config
-            );
-
-        std::vector<VkPipelineShaderStageCreateInfo> vk_stages(
-            pipe->config().stages.size()
-        );
-        std::vector<VkSpecializationInfo> wastes_vk_specialization_info(
-            pipe->config().stages.size()
-        );
-        std::vector<std::vector<VkSpecializationMapEntry>>
-            wastes_vk_map_entries(pipe->config().stages.size());
-        std::vector<std::vector<uint8_t>> wastes_data(
-            pipe->config().stages.size()
-        );
-        for (size_t i = 0; i < pipe->config().stages.size(); i++)
+        try
         {
-            vk_stages[i] = ShaderStage_to_vk(
-                pipe->config().stages[i],
-                wastes_vk_specialization_info[i],
-                wastes_vk_map_entries[i],
-                wastes_data[i]
+            GraphicsPipelinePtr pipe =
+                std::make_shared<GraphicsPipeline_public_ctor>(
+                    device,
+                    config
+                );
+
+            std::vector<VkPipelineShaderStageCreateInfo> vk_stages(
+                pipe->config().stages.size()
             );
+            std::vector<VkSpecializationInfo> wastes_vk_specialization_info(
+                pipe->config().stages.size()
+            );
+            std::vector<std::vector<VkSpecializationMapEntry>>
+                wastes_vk_map_entries(pipe->config().stages.size());
+            std::vector<std::vector<uint8_t>> wastes_data(
+                pipe->config().stages.size()
+            );
+            for (size_t i = 0; i < pipe->config().stages.size(); i++)
+            {
+                vk_stages[i] = ShaderStage_to_vk(
+                    pipe->config().stages[i],
+                    wastes_vk_specialization_info[i],
+                    wastes_vk_map_entries[i],
+                    wastes_data[i]
+                );
+            }
+
+            VkPipelineVertexInputStateCreateInfo vk_vertex_input_state{};
+            std::vector<VkVertexInputBindingDescription>
+                waste_vk_binding_descriptions;
+            std::vector<VkVertexInputAttributeDescription>
+                waste_vk_attribute_descriptions;
+            if (pipe->config().vertex_input_state.has_value())
+            {
+                vk_vertex_input_state = VertexInputState_to_vk(
+                    pipe->config().vertex_input_state.value(),
+                    waste_vk_binding_descriptions,
+                    waste_vk_attribute_descriptions
+                );
+            }
+
+            VkPipelineInputAssemblyStateCreateInfo vk_input_assembly_state{};
+            if (pipe->config().input_assembly_state.has_value())
+            {
+                vk_input_assembly_state = InputAssemblyState_to_vk(
+                    pipe->config().input_assembly_state.value()
+                );
+            }
+
+            VkPipelineTessellationStateCreateInfo vk_tessellation_state{};
+            if (pipe->config().tessellation_state.has_value())
+            {
+                vk_tessellation_state = TessellationState_to_vk(
+                    pipe->config().tessellation_state.value()
+                );
+            }
+
+            VkPipelineViewportStateCreateInfo vk_viewport_state{};
+            std::vector<VkViewport> waste_vk_viewports;
+            std::vector<VkRect2D> waste_vk_scissors;
+            if (pipe->config().viewport_state.has_value())
+            {
+                vk_viewport_state = ViewportState_to_vk(
+                    pipe->config().viewport_state.value(),
+                    waste_vk_viewports,
+                    waste_vk_scissors
+                );
+            }
+
+            VkPipelineRasterizationStateCreateInfo vk_rasterization_state{};
+            if (pipe->config().rasterization_state.has_value())
+            {
+                vk_rasterization_state = RasterizationState_to_vk(
+                    pipe->config().rasterization_state.value()
+                );
+            }
+
+            VkPipelineMultisampleStateCreateInfo vk_multisample_state{};
+            std::vector<VkSampleMask> waste_sample_mask;
+            if (pipe->config().multisample_state.has_value())
+            {
+                vk_multisample_state = MultisampleState_to_vk(
+                    pipe->config().multisample_state.value(),
+                    waste_sample_mask
+                );
+            }
+
+            VkPipelineDepthStencilStateCreateInfo vk_depth_stencil_state{};
+            if (pipe->config().depth_stencil_state.has_value())
+            {
+                vk_depth_stencil_state = DepthStencilState_to_vk(
+                    pipe->config().depth_stencil_state.value()
+                );
+            }
+
+            VkPipelineColorBlendStateCreateInfo vk_color_blend_state{};
+            std::vector<VkPipelineColorBlendAttachmentState>
+                waste_vk_color_blend_attachments;
+            if (pipe->config().color_blend_state.has_value())
+            {
+                vk_color_blend_state = ColorBlendState_to_vk(
+                    pipe->config().color_blend_state.value(),
+                    waste_vk_color_blend_attachments
+                );
+            }
+
+            std::vector<VkDynamicState> waste_dynamic_states;
+            VkPipelineDynamicStateCreateInfo vk_dynamic_states =
+                DynamicStates_to_vk(
+                    pipe->config().dynamic_states,
+                    waste_dynamic_states
+                );
+
+            VkGraphicsPipelineCreateInfo create_info{
+                .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = pipe->config().flags,
+                .stageCount = (uint32_t)vk_stages.size(),
+                .pStages = vk_stages.data(),
+
+                .pVertexInputState =
+                pipe->config().vertex_input_state.has_value()
+                ? &vk_vertex_input_state : nullptr,
+
+                .pInputAssemblyState =
+                pipe->config().input_assembly_state.has_value()
+                ? &vk_input_assembly_state : nullptr,
+
+                .pTessellationState =
+                pipe->config().tessellation_state.has_value()
+                ? &vk_tessellation_state : nullptr,
+
+                .pViewportState =
+                pipe->config().viewport_state.has_value()
+                ? &vk_viewport_state : nullptr,
+
+                .pRasterizationState =
+                pipe->config().rasterization_state.has_value()
+                ? &vk_rasterization_state : nullptr,
+
+                .pMultisampleState =
+                pipe->config().multisample_state.has_value()
+                ? &vk_multisample_state : nullptr,
+
+                .pDepthStencilState =
+                pipe->config().depth_stencil_state.has_value()
+                ? &vk_depth_stencil_state : nullptr,
+
+                .pColorBlendState =
+                pipe->config().color_blend_state.has_value()
+                ? &vk_color_blend_state : nullptr,
+
+                .pDynamicState =
+                pipe->config().dynamic_states.empty()
+                ? nullptr : &vk_dynamic_states,
+
+                .layout = lock_wptr(pipe->config().layout)->handle(),
+                .renderPass = lock_wptr(pipe->config().render_pass)->handle(),
+                .subpass = pipe->config().subpass_index,
+
+                .basePipelineHandle =
+                pipe->config().base_pipeline.has_value()
+                ? lock_wptr(pipe->config().base_pipeline.value())->handle()
+                : nullptr,
+
+                .basePipelineIndex = -1
+            };
+
+            VkResult vk_result = vkCreateGraphicsPipelines(
+                device->handle(),
+                nullptr,
+                1,
+                &create_info,
+                lock_wptr(device->context())->vk_allocator_ptr(),
+                &pipe->_handle
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return pipe;
         }
-
-        VkPipelineVertexInputStateCreateInfo vk_vertex_input_state{};
-        std::vector<VkVertexInputBindingDescription>
-            waste_vk_binding_descriptions;
-        std::vector<VkVertexInputAttributeDescription>
-            waste_vk_attribute_descriptions;
-        if (pipe->config().vertex_input_state.has_value())
-        {
-            vk_vertex_input_state = VertexInputState_to_vk(
-                pipe->config().vertex_input_state.value(),
-                waste_vk_binding_descriptions,
-                waste_vk_attribute_descriptions
-            );
-        }
-
-        VkPipelineInputAssemblyStateCreateInfo vk_input_assembly_state{};
-        if (pipe->config().input_assembly_state.has_value())
-        {
-            vk_input_assembly_state = InputAssemblyState_to_vk(
-                pipe->config().input_assembly_state.value()
-            );
-        }
-
-        VkPipelineTessellationStateCreateInfo vk_tessellation_state{};
-        if (pipe->config().tessellation_state.has_value())
-        {
-            vk_tessellation_state = TessellationState_to_vk(
-                pipe->config().tessellation_state.value()
-            );
-        }
-
-        VkPipelineViewportStateCreateInfo vk_viewport_state{};
-        std::vector<VkViewport> waste_vk_viewports;
-        std::vector<VkRect2D> waste_vk_scissors;
-        if (pipe->config().viewport_state.has_value())
-        {
-            vk_viewport_state = ViewportState_to_vk(
-                pipe->config().viewport_state.value(),
-                waste_vk_viewports,
-                waste_vk_scissors
-            );
-        }
-
-        VkPipelineRasterizationStateCreateInfo vk_rasterization_state{};
-        if (pipe->config().rasterization_state.has_value())
-        {
-            vk_rasterization_state = RasterizationState_to_vk(
-                pipe->config().rasterization_state.value()
-            );
-        }
-
-        VkPipelineMultisampleStateCreateInfo vk_multisample_state{};
-        std::vector<VkSampleMask> waste_sample_mask;
-        if (pipe->config().multisample_state.has_value())
-        {
-            vk_multisample_state = MultisampleState_to_vk(
-                pipe->config().multisample_state.value(),
-                waste_sample_mask
-            );
-        }
-
-        VkPipelineDepthStencilStateCreateInfo vk_depth_stencil_state{};
-        if (pipe->config().depth_stencil_state.has_value())
-        {
-            vk_depth_stencil_state = DepthStencilState_to_vk(
-                pipe->config().depth_stencil_state.value()
-            );
-        }
-
-        VkPipelineColorBlendStateCreateInfo vk_color_blend_state{};
-        std::vector<VkPipelineColorBlendAttachmentState>
-            waste_vk_color_blend_attachments;
-        if (pipe->config().color_blend_state.has_value())
-        {
-            vk_color_blend_state = ColorBlendState_to_vk(
-                pipe->config().color_blend_state.value(),
-                waste_vk_color_blend_attachments
-            );
-        }
-
-        std::vector<VkDynamicState> waste_dynamic_states;
-        VkPipelineDynamicStateCreateInfo vk_dynamic_states =
-            DynamicStates_to_vk(
-                pipe->config().dynamic_states,
-                waste_dynamic_states
-            );
-
-        VkGraphicsPipelineCreateInfo create_info{
-            .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = pipe->config().flags,
-            .stageCount = (uint32_t)vk_stages.size(),
-            .pStages = vk_stages.data(),
-
-            .pVertexInputState =
-            pipe->config().vertex_input_state.has_value()
-            ? &vk_vertex_input_state : nullptr,
-
-            .pInputAssemblyState =
-            pipe->config().input_assembly_state.has_value()
-            ? &vk_input_assembly_state : nullptr,
-
-            .pTessellationState =
-            pipe->config().tessellation_state.has_value()
-            ? &vk_tessellation_state : nullptr,
-
-            .pViewportState =
-            pipe->config().viewport_state.has_value()
-            ? &vk_viewport_state : nullptr,
-
-            .pRasterizationState =
-            pipe->config().rasterization_state.has_value()
-            ? &vk_rasterization_state : nullptr,
-
-            .pMultisampleState =
-            pipe->config().multisample_state.has_value()
-            ? &vk_multisample_state : nullptr,
-
-            .pDepthStencilState =
-            pipe->config().depth_stencil_state.has_value()
-            ? &vk_depth_stencil_state : nullptr,
-
-            .pColorBlendState =
-            pipe->config().color_blend_state.has_value()
-            ? &vk_color_blend_state : nullptr,
-
-            .pDynamicState =
-            pipe->config().dynamic_states.empty()
-            ? nullptr : &vk_dynamic_states,
-
-            .layout = lock_wptr(pipe->config().layout)->handle(),
-            .renderPass = lock_wptr(pipe->config().render_pass)->handle(),
-            .subpass = pipe->config().subpass_index,
-
-            .basePipelineHandle =
-            pipe->config().base_pipeline.has_value()
-            ? lock_wptr(pipe->config().base_pipeline.value())->handle()
-            : nullptr,
-
-            .basePipelineIndex = -1
-        };
-
-        VkResult vk_result = vkCreateGraphicsPipelines(
-            device->handle(),
-            nullptr,
-            1,
-            &create_info,
-            lock_wptr(device->context())->vk_allocator_ptr(),
-            &pipe->_handle
-        );
-        if (vk_result != VK_SUCCESS)
+        catch (const Error& e)
         {
             throw Error(
-                "failed to create graphics pipeline",
-                vk_result,
-                false
+                "failed to create graphics pipeline: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-        return pipe;
     }
 
     GraphicsPipeline::~GraphicsPipeline()
@@ -3790,47 +3962,54 @@ namespace bv
         const FramebufferConfig& config
     )
     {
-        FramebufferPtr buf = std::make_shared<Framebuffer_public_ctor>(
-            device,
-            config
-        );
-
-        std::vector<VkImageView> vk_attachments(
-            buf->config().attachments.size()
-        );
-        for (size_t i = 0; i < buf->config().attachments.size(); i++)
+        try
         {
-            vk_attachments[i] =
-                lock_wptr(buf->config().attachments[i])->handle();
+            FramebufferPtr buf = std::make_shared<Framebuffer_public_ctor>(
+                device,
+                config
+            );
+
+            std::vector<VkImageView> vk_attachments(
+                buf->config().attachments.size()
+            );
+            for (size_t i = 0; i < buf->config().attachments.size(); i++)
+            {
+                vk_attachments[i] =
+                    lock_wptr(buf->config().attachments[i])->handle();
+            }
+
+            VkFramebufferCreateInfo create_info{
+                .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = buf->config().flags,
+                .renderPass = lock_wptr(buf->config().render_pass)->handle(),
+                .attachmentCount = (uint32_t)vk_attachments.size(),
+                .pAttachments = vk_attachments.data(),
+                .width = buf->config().width,
+                .height = buf->config().height,
+                .layers = buf->config().layers
+            };
+
+            VkResult vk_result = vkCreateFramebuffer(
+                device->handle(),
+                &create_info,
+                lock_wptr(device->context())->vk_allocator_ptr(),
+                &buf->_handle
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return buf;
         }
-
-        VkFramebufferCreateInfo create_info{
-            .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = buf->config().flags,
-            .renderPass = lock_wptr(buf->config().render_pass)->handle(),
-            .attachmentCount = (uint32_t)vk_attachments.size(),
-            .pAttachments = vk_attachments.data(),
-            .width = buf->config().width,
-            .height = buf->config().height,
-            .layers = buf->config().layers
-        };
-
-        VkResult vk_result = vkCreateFramebuffer(
-            device->handle(),
-            &create_info,
-            lock_wptr(device->context())->vk_allocator_ptr(),
-            &buf->_handle
-        );
-        if (vk_result != VK_SUCCESS)
+        catch (const Error& e)
         {
             throw Error(
-                "failed to create framebuffer",
-                vk_result,
-                false
+                "failed to create framebuffer: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-        return buf;
     }
 
     Framebuffer::~Framebuffer()
@@ -3873,45 +4052,56 @@ namespace bv
         std::optional<CommandBufferInheritance> inheritance
     )
     {
-        VkCommandBufferInheritanceInfo vk_inheritance;
-        if (inheritance.has_value())
+        try
         {
-            vk_inheritance = VkCommandBufferInheritanceInfo{
-                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
-                .pNext = nullptr,
+            VkCommandBufferInheritanceInfo vk_inheritance;
+            if (inheritance.has_value())
+            {
+                vk_inheritance = VkCommandBufferInheritanceInfo{
+                    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
+                    .pNext = nullptr,
 
-                .renderPass =
-                lock_wptr(inheritance.value().render_pass)->handle(),
+                    .renderPass =
+                    lock_wptr(inheritance.value().render_pass)->handle(),
 
-                .subpass = inheritance.value().subpass_index,
+                    .subpass = inheritance.value().subpass_index,
 
-                .framebuffer =
-                inheritance.value().framebuffer.has_value()
-                ? lock_wptr(inheritance.value().framebuffer.value())->handle()
-                : nullptr,
+                    .framebuffer =
+                    inheritance.value().framebuffer.has_value()
+                    ? lock_wptr(
+                        inheritance.value().framebuffer.value()
+                    )->handle()
+                    : nullptr,
 
-                .occlusionQueryEnable =
-                inheritance.value().occlusion_query_enable,
+                    .occlusionQueryEnable =
+                    inheritance.value().occlusion_query_enable,
 
-                .queryFlags = inheritance.value().query_flags,
-                .pipelineStatistics = inheritance.value().pipeline_statistics
-            };
+                    .queryFlags = inheritance.value().query_flags,
+
+                    .pipelineStatistics =
+                    inheritance.value().pipeline_statistics
+                };
+            }
+
+            VkCommandBufferBeginInfo begin_info{};
+            begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            begin_info.pNext = nullptr;
+            begin_info.flags = flags;
+            begin_info.pInheritanceInfo =
+                inheritance.has_value() ? &vk_inheritance : nullptr;
+
+            VkResult vk_result = vkBeginCommandBuffer(handle(), &begin_info);
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
         }
-
-        VkCommandBufferBeginInfo begin_info{};
-        begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        begin_info.pNext = nullptr;
-        begin_info.flags = flags;
-        begin_info.pInheritanceInfo =
-            inheritance.has_value() ? &vk_inheritance : nullptr;
-
-        VkResult vk_result = vkBeginCommandBuffer(handle(), &begin_info);
-        if (vk_result != VK_SUCCESS)
+        catch (const Error& e)
         {
             throw Error(
-                "failed to begin recording a command buffer",
-                vk_result,
-                false
+                "failed to begin recording a command buffer: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
     }
@@ -3958,33 +4148,40 @@ namespace bv
         const CommandPoolConfig& config
     )
     {
-        CommandPoolPtr pool = std::make_shared<CommandPool_public_ctor>(
-            device,
-            config
-        );
+        try
+        {
+            CommandPoolPtr pool = std::make_shared<CommandPool_public_ctor>(
+                device,
+                config
+            );
 
-        VkCommandPoolCreateInfo create_info{
-            .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = pool->config().flags,
-            .queueFamilyIndex = pool->config().queue_family_index
-        };
+            VkCommandPoolCreateInfo create_info{
+                .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = pool->config().flags,
+                .queueFamilyIndex = pool->config().queue_family_index
+            };
 
-        VkResult vk_result = vkCreateCommandPool(
-            device->handle(),
-            &create_info,
-            lock_wptr(device->context())->vk_allocator_ptr(),
-            &pool->_handle
-        );
-        if (vk_result != VK_SUCCESS)
+            VkResult vk_result = vkCreateCommandPool(
+                device->handle(),
+                &create_info,
+                lock_wptr(device->context())->vk_allocator_ptr(),
+                &pool->_handle
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return pool;
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to create command pool",
-                vk_result,
-                false
+                "failed to create command pool: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-        return pool;
     }
 
     CommandBufferPtr CommandPool::allocate_buffer(
@@ -3992,32 +4189,39 @@ namespace bv
         VkCommandBufferLevel level
     )
     {
-        VkCommandBufferAllocateInfo alloc_info{
-            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-            .pNext = nullptr,
-            .commandPool = pool->handle(),
-            .level = level,
-            .commandBufferCount = 1
-        };
-
-        VkCommandBuffer vk_command_buffer;
-        VkResult vk_result = vkAllocateCommandBuffers(
-            lock_wptr(pool->device())->handle(),
-            &alloc_info,
-            &vk_command_buffer
-        );
-        if (vk_result != VK_SUCCESS)
+        try
         {
-            throw Error(
-                "failed to allocate command buffer",
-                vk_result,
-                false
+            VkCommandBufferAllocateInfo alloc_info{
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+                .pNext = nullptr,
+                .commandPool = pool->handle(),
+                .level = level,
+                .commandBufferCount = 1
+            };
+
+            VkCommandBuffer vk_command_buffer;
+            VkResult vk_result = vkAllocateCommandBuffers(
+                lock_wptr(pool->device())->handle(),
+                &alloc_info,
+                &vk_command_buffer
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return std::make_shared<CommandBuffer_public_ctor>(
+                pool,
+                vk_command_buffer
             );
         }
-        return (CommandBufferPtr)std::make_shared<CommandBuffer_public_ctor>(
-            pool,
-            vk_command_buffer
-        );
+        catch (const Error& e)
+        {
+            throw Error(
+                "failed to allocate command buffer: " + e.to_string(),
+                e.vk_result(),
+                true
+            );
+        }
     }
 
     std::vector<CommandBufferPtr> CommandPool::allocate_buffers(
@@ -4031,38 +4235,46 @@ namespace bv
             return {};
         }
 
-        VkCommandBufferAllocateInfo alloc_info{
-            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-            .pNext = nullptr,
-            .commandPool = pool->handle(),
-            .level = level,
-            .commandBufferCount = count
-        };
+        try
+        {
+            VkCommandBufferAllocateInfo alloc_info{
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+                .pNext = nullptr,
+                .commandPool = pool->handle(),
+                .level = level,
+                .commandBufferCount = count
+            };
 
-        std::vector<VkCommandBuffer> vk_command_buffers(count);
-        VkResult vk_result = vkAllocateCommandBuffers(
-            lock_wptr(pool->device())->handle(),
-            &alloc_info,
-            vk_command_buffers.data()
-        );
-        if (vk_result != VK_SUCCESS)
+            std::vector<VkCommandBuffer> vk_command_buffers(count);
+            VkResult vk_result = vkAllocateCommandBuffers(
+                lock_wptr(pool->device())->handle(),
+                &alloc_info,
+                vk_command_buffers.data()
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+
+            std::vector<CommandBufferPtr> command_buffers(count);
+            for (size_t i = 0; i < count; i++)
+            {
+                command_buffers[i] =
+                    std::make_shared<CommandBuffer_public_ctor>(
+                        pool,
+                        vk_command_buffers[i]
+                    );
+            }
+            return command_buffers;
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to allocate command buffer(s)",
-                vk_result,
-                false
+                "failed to allocate command buffer(s): " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-
-        std::vector<CommandBufferPtr> command_buffers(count);
-        for (size_t i = 0; i < count; i++)
-        {
-            command_buffers[i] = std::make_shared<CommandBuffer_public_ctor>(
-                pool,
-                vk_command_buffers[i]
-            );
-        }
-        return command_buffers;
     }
 
     CommandPool::~CommandPool()
@@ -4089,29 +4301,36 @@ namespace bv
 
     SemaphorePtr Semaphore::create(const DevicePtr& device)
     {
-        SemaphorePtr sema = std::make_shared<Semaphore_public_ctor>(device);
+        try
+        {
+            SemaphorePtr sema = std::make_shared<Semaphore_public_ctor>(device);
 
-        VkSemaphoreCreateInfo  create_info{
-            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = 0
-        };
+            VkSemaphoreCreateInfo  create_info{
+                .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = 0
+            };
 
-        VkResult vk_result = vkCreateSemaphore(
-            device->handle(),
-            &create_info,
-            lock_wptr(device->context())->vk_allocator_ptr(),
-            &sema->_handle
-        );
-        if (vk_result != VK_SUCCESS)
+            VkResult vk_result = vkCreateSemaphore(
+                device->handle(),
+                &create_info,
+                lock_wptr(device->context())->vk_allocator_ptr(),
+                &sema->_handle
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return sema;
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to create semaphore",
-                vk_result,
-                false
+                "failed to create semaphore: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-        return sema;
     }
 
     Semaphore::~Semaphore()
@@ -4138,46 +4357,60 @@ namespace bv
         VkFenceCreateFlags flags
     )
     {
-        FencePtr fence = std::make_shared<Fence_public_ctor>(device);
+        try
+        {
+            FencePtr fence = std::make_shared<Fence_public_ctor>(device);
 
-        VkFenceCreateInfo create_info{
-            .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = flags
-        };
+            VkFenceCreateInfo create_info{
+                .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = flags
+            };
 
-        VkResult vk_result = vkCreateFence(
-            device->handle(),
-            &create_info,
-            lock_wptr(device->context())->vk_allocator_ptr(),
-            &fence->_handle
-        );
-        if (vk_result != VK_SUCCESS)
+            VkResult vk_result = vkCreateFence(
+                device->handle(),
+                &create_info,
+                lock_wptr(device->context())->vk_allocator_ptr(),
+                &fence->_handle
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return fence;
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to create fence",
-                vk_result,
-                false
+                "failed to create fence: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-        return fence;
     }
 
     void Fence::wait(uint64_t timeout)
     {
-        VkResult vk_result = vkWaitForFences(
-            lock_wptr(device())->handle(),
-            1,
-            &_handle,
-            VK_TRUE,
-            timeout
-        );
-        if (vk_result != VK_SUCCESS)
+        try
+        {
+            VkResult vk_result = vkWaitForFences(
+                lock_wptr(device())->handle(),
+                1,
+                &_handle,
+                VK_TRUE,
+                timeout
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to wait for fence to become signaled",
-                vk_result,
-                false
+                "failed to wait for fence to become signaled: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
     }
@@ -4193,65 +4426,87 @@ namespace bv
             return;
         }
 
-        std::vector<VkFence> vk_fences(fences.size());
-        for (size_t i = 0; i < fences.size(); i++)
+        try
         {
-            vk_fences[i] = fences[i]->handle();
-        }
+            std::vector<VkFence> vk_fences(fences.size());
+            for (size_t i = 0; i < fences.size(); i++)
+            {
+                vk_fences[i] = fences[i]->handle();
+            }
 
-        VkResult vk_result = vkWaitForFences(
-            lock_wptr(fences[0]->device())->handle(),
-            vk_fences.size(),
-            vk_fences.data(),
-            wait_all,
-            timeout
-        );
-        if (vk_result != VK_SUCCESS)
+            VkResult vk_result = vkWaitForFences(
+                lock_wptr(fences[0]->device())->handle(),
+                vk_fences.size(),
+                vk_fences.data(),
+                wait_all,
+                timeout
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to wait for fence(s) to become signaled",
-                vk_result,
-                false
+                "failed to wait for fence(s) to become signaled: "
+                + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
     }
 
     void Fence::reset()
     {
-        VkResult vk_result = vkResetFences(
-            lock_wptr(device())->handle(),
-            1,
-            &_handle
-        );
-        if (vk_result != VK_SUCCESS)
+        try
+        {
+            VkResult vk_result = vkResetFences(
+                lock_wptr(device())->handle(),
+                1,
+                &_handle
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to reset fence",
-                vk_result,
-                false
+                "failed to reset fence: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
     }
 
     bool Fence::is_signaled() const
     {
-        VkResult vk_result = vkGetFenceStatus(
-            lock_wptr(device())->handle(),
-            handle()
-        );
-        if (vk_result == VK_SUCCESS)
+        try
         {
-            return true;
+            VkResult vk_result = vkGetFenceStatus(
+                lock_wptr(device())->handle(),
+                handle()
+            );
+            if (vk_result == VK_SUCCESS)
+            {
+                return true;
+            }
+            else if (vk_result == VK_NOT_READY)
+            {
+                return false;
+            }
+            throw Error(vk_result);
         }
-        else if (vk_result == VK_NOT_READY)
+        catch (const Error& e)
         {
-            return false;
+            throw Error(
+                "failed to get fence status: " + e.to_string(),
+                e.vk_result(),
+                true
+            );
         }
-        throw Error(
-            "failed to get fence status",
-            vk_result,
-            false
-        );
     }
 
     Fence::~Fence()
@@ -4278,51 +4533,58 @@ namespace bv
         const BufferConfig& config
     )
     {
-        BufferPtr buf = std::make_shared<Buffer_public_ctor>(
-            device,
-            config
-        );
+        try
+        {
+            BufferPtr buf = std::make_shared<Buffer_public_ctor>(
+                device,
+                config
+            );
 
-        VkBufferCreateInfo create_info{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = buf->config().flags,
-            .size = buf->config().size,
-            .usage = buf->config().usage,
-            .sharingMode = buf->config().sharing_mode,
+            VkBufferCreateInfo create_info{
+                .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = buf->config().flags,
+                .size = buf->config().size,
+                .usage = buf->config().usage,
+                .sharingMode = buf->config().sharing_mode,
 
-            .queueFamilyIndexCount =
-            (uint32_t)buf->config().queue_family_indices.size(),
+                .queueFamilyIndexCount =
+                (uint32_t)buf->config().queue_family_indices.size(),
 
-            .pQueueFamilyIndices = buf->config().queue_family_indices.data()
-        };
+                .pQueueFamilyIndices = buf->config().queue_family_indices.data()
+            };
 
-        VkResult vk_result = vkCreateBuffer(
-            device->handle(),
-            &create_info,
-            lock_wptr(device->context())->vk_allocator_ptr(),
-            &buf->_handle
-        );
-        if (vk_result != VK_SUCCESS)
+            VkResult vk_result = vkCreateBuffer(
+                device->handle(),
+                &create_info,
+                lock_wptr(device->context())->vk_allocator_ptr(),
+                &buf->_handle
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+
+            VkMemoryRequirements vk_mem_requirements;
+            vkGetBufferMemoryRequirements(
+                device->handle(),
+                buf->handle(),
+                &vk_mem_requirements
+            );
+            buf->_memory_requirements = MemoryRequirements_from_vk(
+                vk_mem_requirements
+            );
+
+            return buf;
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to create buffer",
-                vk_result,
-                false
+                "failed to create buffer: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-
-        VkMemoryRequirements vk_mem_requirements;
-        vkGetBufferMemoryRequirements(
-            device->handle(),
-            buf->handle(),
-            &vk_mem_requirements
-        );
-        buf->_memory_requirements = MemoryRequirements_from_vk(
-            vk_mem_requirements
-        );
-
-        return buf;
     }
 
     void Buffer::bind_memory(
@@ -4330,18 +4592,25 @@ namespace bv
         VkDeviceSize memory_offset
     )
     {
-        VkResult vk_result = vkBindBufferMemory(
-            lock_wptr(device())->handle(),
-            handle(),
-            memory->handle(),
-            memory_offset
-        );
-        if (vk_result != VK_SUCCESS)
+        try
+        {
+            VkResult vk_result = vkBindBufferMemory(
+                lock_wptr(device())->handle(),
+                handle(),
+                memory->handle(),
+                memory_offset
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to bind buffer memory",
-                vk_result,
-                false
+                "failed to bind buffer memory: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
     }
@@ -4370,56 +4639,70 @@ namespace bv
         const DeviceMemoryConfig& config
     )
     {
-        DeviceMemoryPtr mem = std::make_shared<DeviceMemory_public_ctor>(
-            device,
-            config
-        );
+        try
+        {
+            DeviceMemoryPtr mem = std::make_shared<DeviceMemory_public_ctor>(
+                device,
+                config
+            );
 
-        VkMemoryAllocateInfo allocate_info{
-            .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-            .pNext = nullptr,
-            .allocationSize = mem->config().allocation_size,
-            .memoryTypeIndex = mem->config().memory_type_index
-        };
+            VkMemoryAllocateInfo allocate_info{
+                .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+                .pNext = nullptr,
+                .allocationSize = mem->config().allocation_size,
+                .memoryTypeIndex = mem->config().memory_type_index
+            };
 
-        VkResult vk_result = vkAllocateMemory(
-            device->handle(),
-            &allocate_info,
-            lock_wptr(device->context())->vk_allocator_ptr(),
-            &mem->_handle
-        );
-        if (vk_result != VK_SUCCESS)
+            VkResult vk_result = vkAllocateMemory(
+                device->handle(),
+                &allocate_info,
+                lock_wptr(device->context())->vk_allocator_ptr(),
+                &mem->_handle
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return mem;
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to allocate device memory",
-                vk_result,
-                false
+                "failed to allocate device memory: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-        return mem;
     }
 
     void* DeviceMemory::map(VkDeviceSize offset, VkDeviceSize size)
     {
-        void* p;
-        VkResult vk_result = vkMapMemory(
-            lock_wptr(device())->handle(),
-            handle(),
-            offset,
-            size,
-            0,
-            &p
-        );
-        if (vk_result != VK_SUCCESS)
+        try
         {
-            unmap();
+            void* p;
+            VkResult vk_result = vkMapMemory(
+                lock_wptr(device())->handle(),
+                handle(),
+                offset,
+                size,
+                0,
+                &p
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                unmap();
+                throw Error(vk_result);
+            }
+            return p;
+        }
+        catch (const Error& e)
+        {
             throw Error(
-                "failed to map device memory",
-                vk_result,
-                false
+                "failed to map device memory: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-        return p;
     }
 
     void DeviceMemory::unmap()
@@ -4436,25 +4719,32 @@ namespace bv
         VkDeviceSize size
     )
     {
-        VkMappedMemoryRange vk_mapped_range{
-            .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
-            .pNext = nullptr,
-            .memory = handle(),
-            .offset = offset,
-            .size = size
-        };
+        try
+        {
+            VkMappedMemoryRange vk_mapped_range{
+                .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
+                .pNext = nullptr,
+                .memory = handle(),
+                .offset = offset,
+                .size = size
+            };
 
-        VkResult vk_result = vkFlushMappedMemoryRanges(
-            lock_wptr(device())->handle(),
-            1,
-            &vk_mapped_range
-        );
-        if (vk_result != VK_SUCCESS)
+            VkResult vk_result = vkFlushMappedMemoryRanges(
+                lock_wptr(device())->handle(),
+                1,
+                &vk_mapped_range
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to flush mapped device memory range",
-                vk_result,
-                false
+                "failed to flush mapped device memory range: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
     }
@@ -4464,61 +4754,54 @@ namespace bv
         VkDeviceSize size
     )
     {
-        VkMappedMemoryRange vk_mapped_range{
-            .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
-            .pNext = nullptr,
-            .memory = handle(),
-            .offset = offset,
-            .size = size
-        };
+        try
+        {
+            VkMappedMemoryRange vk_mapped_range{
+                .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
+                .pNext = nullptr,
+                .memory = handle(),
+                .offset = offset,
+                .size = size
+            };
 
-        VkResult vk_result = vkInvalidateMappedMemoryRanges(
-            lock_wptr(device())->handle(),
-            1,
-            &vk_mapped_range
-        );
-        if (vk_result != VK_SUCCESS)
+            VkResult vk_result = vkInvalidateMappedMemoryRanges(
+                lock_wptr(device())->handle(),
+                1,
+                &vk_mapped_range
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to invalidate mapped device memory range",
-                vk_result,
-                false
+                "failed to invalidate mapped device memory range: "
+                + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
     }
 
     void DeviceMemory::upload(void* data, VkDeviceSize data_size)
     {
-        if (data_size > config().allocation_size)
-        {
-            throw Error(
-                "failed to upload data to device memory: data is too big"
-            );
-        }
-
-        void* mapped = nullptr;
         try
         {
-            mapped = map(0, config().allocation_size);
-        }
-        catch (const Error& e)
-        {
-            throw Error(
-                "failed to upload data to device memory: " + e.to_string(),
-                e.vk_result(),
-                true
+            if (data_size > config().allocation_size)
+            {
+                throw Error("data is too big");
+            }
+
+            void* mapped = map(0, config().allocation_size);
+            std::copy(
+                (uint8_t*)data,
+                (uint8_t*)data + data_size,
+                (uint8_t*)mapped
             );
-        }
-
-        std::copy(
-            (uint8_t*)data,
-            (uint8_t*)data + data_size,
-            (uint8_t*)mapped
-        );
-
-        try
-        {
             flush_mapped_range(0, VK_WHOLE_SIZE);
+            unmap();
         }
         catch (const Error& e)
         {
@@ -4528,8 +4811,6 @@ namespace bv
                 true
             );
         }
-
-        unmap();
     }
 
     DeviceMemory::~DeviceMemory()
@@ -4565,39 +4846,47 @@ namespace bv
             return;
         }
 
-        std::vector<VkWriteDescriptorSet> vk_writes(writes.size());
-        std::vector<std::vector<VkDescriptorImageInfo>> wastes_vk_image_infos(
-            writes.size()
-        );
-        std::vector<std::vector<VkDescriptorBufferInfo>> wastes_vk_buffer_infos(
-            writes.size()
-        );
-        std::vector<std::vector<VkBufferView>> wastes_vk_texel_buffer_views(
-            writes.size()
-        );
-        for (size_t i = 0; i < writes.size(); i++)
+        try
         {
-            vk_writes[i] = WriteDescriptorSet_to_vk(
-                writes[i],
-                wastes_vk_image_infos[i],
-                wastes_vk_buffer_infos[i],
-                wastes_vk_texel_buffer_views[i]
+            std::vector<VkWriteDescriptorSet> vk_writes(writes.size());
+            std::vector<std::vector<VkDescriptorImageInfo>>
+                wastes_vk_image_infos(writes.size());
+            std::vector<std::vector<VkDescriptorBufferInfo>>
+                wastes_vk_buffer_infos(writes.size());
+            std::vector<std::vector<VkBufferView>>
+                wastes_vk_texel_buffer_views(writes.size());
+            for (size_t i = 0; i < writes.size(); i++)
+            {
+                vk_writes[i] = WriteDescriptorSet_to_vk(
+                    writes[i],
+                    wastes_vk_image_infos[i],
+                    wastes_vk_buffer_infos[i],
+                    wastes_vk_texel_buffer_views[i]
+                );
+            }
+
+            std::vector<VkCopyDescriptorSet> vk_copies(copies.size());
+            for (size_t i = 0; i < copies.size(); i++)
+            {
+                vk_copies[i] = CopyDescriptorSet_to_vk(copies[i]);
+            }
+
+            vkUpdateDescriptorSets(
+                device->handle(),
+                (uint32_t)vk_writes.size(),
+                vk_writes.data(),
+                (uint32_t)vk_copies.size(),
+                vk_copies.data()
             );
         }
-
-        std::vector<VkCopyDescriptorSet> vk_copies(copies.size());
-        for (size_t i = 0; i < copies.size(); i++)
+        catch (const Error& e)
         {
-            vk_copies[i] = CopyDescriptorSet_to_vk(copies[i]);
+            throw Error(
+                "failed to update descriptor sets: " + e.to_string(),
+                e.vk_result(),
+                true
+            );
         }
-
-        vkUpdateDescriptorSets(
-            device->handle(),
-            (uint32_t)vk_writes.size(),
-            vk_writes.data(),
-            (uint32_t)vk_copies.size(),
-            vk_copies.data()
-        );
     }
 
     DescriptorSet::~DescriptorSet()
@@ -4628,45 +4917,53 @@ namespace bv
         const DescriptorPoolConfig& config
     )
     {
-        DescriptorPoolPtr pool = std::make_shared<DescriptorPool_public_ctor>(
-            device,
-            config
-        );
-
-        std::vector<VkDescriptorPoolSize> vk_pool_sizes(
-            pool->config().pool_sizes.size()
-        );
-        for (size_t i = 0; i < pool->config().pool_sizes.size(); i++)
+        try
         {
-            vk_pool_sizes[i] = DescriptorPoolSize_to_vk(
-                pool->config().pool_sizes[i]
+            DescriptorPoolPtr pool =
+                std::make_shared<DescriptorPool_public_ctor>(
+                    device,
+                    config
+                );
+
+            std::vector<VkDescriptorPoolSize> vk_pool_sizes(
+                pool->config().pool_sizes.size()
             );
+            for (size_t i = 0; i < pool->config().pool_sizes.size(); i++)
+            {
+                vk_pool_sizes[i] = DescriptorPoolSize_to_vk(
+                    pool->config().pool_sizes[i]
+                );
+            }
+
+            VkDescriptorPoolCreateInfo create_info{
+                .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = pool->config().flags,
+                .maxSets = pool->config().max_sets,
+                .poolSizeCount = (uint32_t)vk_pool_sizes.size(),
+                .pPoolSizes = vk_pool_sizes.data()
+            };
+
+            VkResult vk_result = vkCreateDescriptorPool(
+                device->handle(),
+                &create_info,
+                lock_wptr(device->context())->vk_allocator_ptr(),
+                &pool->_handle
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return pool;
         }
-
-        VkDescriptorPoolCreateInfo create_info{
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = pool->config().flags,
-            .maxSets = pool->config().max_sets,
-            .poolSizeCount = (uint32_t)vk_pool_sizes.size(),
-            .pPoolSizes = vk_pool_sizes.data()
-        };
-
-        VkResult vk_result = vkCreateDescriptorPool(
-            device->handle(),
-            &create_info,
-            lock_wptr(device->context())->vk_allocator_ptr(),
-            &pool->_handle
-        );
-        if (vk_result != VK_SUCCESS)
+        catch (const Error& e)
         {
             throw Error(
-                "failed to create descriptor pool",
-                vk_result,
-                false
+                "failed to create descriptor pool: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-        return pool;
     }
 
     DescriptorSetPtr DescriptorPool::allocate_set(
@@ -4674,34 +4971,41 @@ namespace bv
         const DescriptorSetLayoutPtr& set_layout
     )
     {
-        VkDescriptorSetLayout vk_set_layout = set_layout->handle();
-
-        VkDescriptorSetAllocateInfo alloc_info{
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-            .pNext = nullptr,
-            .descriptorPool = pool->handle(),
-            .descriptorSetCount = 1,
-            .pSetLayouts = &vk_set_layout
-        };
-
-        VkDescriptorSet vk_set;
-        VkResult vk_result = vkAllocateDescriptorSets(
-            lock_wptr(pool->device())->handle(),
-            &alloc_info,
-            &vk_set
-        );
-        if (vk_result != VK_SUCCESS)
+        try
         {
-            throw Error(
-                "failed to allocate descriptor set",
-                vk_result,
-                false
+            VkDescriptorSetLayout vk_set_layout = set_layout->handle();
+
+            VkDescriptorSetAllocateInfo alloc_info{
+                .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+                .pNext = nullptr,
+                .descriptorPool = pool->handle(),
+                .descriptorSetCount = 1,
+                .pSetLayouts = &vk_set_layout
+            };
+
+            VkDescriptorSet vk_set;
+            VkResult vk_result = vkAllocateDescriptorSets(
+                lock_wptr(pool->device())->handle(),
+                &alloc_info,
+                &vk_set
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return std::make_shared<DescriptorSet_public_ctor>(
+                pool,
+                vk_set
             );
         }
-        return (DescriptorSetPtr)std::make_shared<DescriptorSet_public_ctor>(
-            pool,
-            vk_set
-        );
+        catch (const Error& e)
+        {
+            throw Error(
+                "failed to allocate descriptor set: " + e.to_string(),
+                e.vk_result(),
+                true
+            );
+        }
     }
 
     std::vector<DescriptorSetPtr> DescriptorPool::allocate_sets(
@@ -4715,44 +5019,53 @@ namespace bv
             return {};
         }
 
-        std::vector<VkDescriptorSetLayout> vk_set_layouts(set_layouts.size());
-        for (size_t i = 0; i < set_layouts.size(); i++)
+        try
         {
-            vk_set_layouts[i] = set_layouts[i]->handle();
+            std::vector<VkDescriptorSetLayout>vk_set_layouts(
+                set_layouts.size()
+            );
+            for (size_t i = 0; i < set_layouts.size(); i++)
+            {
+                vk_set_layouts[i] = set_layouts[i]->handle();
+            }
+
+            VkDescriptorSetAllocateInfo alloc_info{
+                .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+                .pNext = nullptr,
+                .descriptorPool = pool->handle(),
+                .descriptorSetCount = count,
+                .pSetLayouts = vk_set_layouts.data()
+            };
+
+            std::vector<VkDescriptorSet> vk_sets(count);
+            VkResult vk_result = vkAllocateDescriptorSets(
+                lock_wptr(pool->device())->handle(),
+                &alloc_info,
+                vk_sets.data()
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+
+            std::vector<DescriptorSetPtr> sets(count);
+            for (size_t i = 0; i < count; i++)
+            {
+                sets[i] = std::make_shared<DescriptorSet_public_ctor>(
+                    pool,
+                    vk_sets[i]
+                );
+            }
+            return sets;
         }
-
-        VkDescriptorSetAllocateInfo alloc_info{
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-            .pNext = nullptr,
-            .descriptorPool = pool->handle(),
-            .descriptorSetCount = count,
-            .pSetLayouts = vk_set_layouts.data()
-        };
-
-        std::vector<VkDescriptorSet> vk_sets(count);
-        VkResult vk_result = vkAllocateDescriptorSets(
-            lock_wptr(pool->device())->handle(),
-            &alloc_info,
-            vk_sets.data()
-        );
-        if (vk_result != VK_SUCCESS)
+        catch (const Error& e)
         {
             throw Error(
-                "failed to allocate descriptor set(s)",
-                vk_result,
-                false
+                "failed to allocate descriptor set(s): " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-
-        std::vector<DescriptorSetPtr> sets(count);
-        for (size_t i = 0; i < count; i++)
-        {
-            sets[i] = std::make_shared<DescriptorSet_public_ctor>(
-                pool,
-                vk_sets[i]
-            );
-        }
-        return sets;
     }
 
     DescriptorPool::~DescriptorPool()
@@ -4783,37 +5096,44 @@ namespace bv
         const BufferViewConfig& config
     )
     {
-        BufferViewPtr view = std::make_shared<BufferView_public_ctor>(
-            device,
-            buffer,
-            config
-        );
+        try
+        {
+            BufferViewPtr view = std::make_shared<BufferView_public_ctor>(
+                device,
+                buffer,
+                config
+            );
 
-        VkBufferViewCreateInfo create_info{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = 0,
-            .buffer = lock_wptr(view->buffer())->handle(),
-            .format = view->config().format,
-            .offset = view->config().offset,
-            .range = view->config().range
-        };
+            VkBufferViewCreateInfo create_info{
+                .sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = 0,
+                .buffer = lock_wptr(view->buffer())->handle(),
+                .format = view->config().format,
+                .offset = view->config().offset,
+                .range = view->config().range
+            };
 
-        VkResult vk_result = vkCreateBufferView(
-            device->handle(),
-            &create_info,
-            lock_wptr(device->context())->vk_allocator_ptr(),
-            &view->_handle
-        );
-        if (vk_result != VK_SUCCESS)
+            VkResult vk_result = vkCreateBufferView(
+                device->handle(),
+                &create_info,
+                lock_wptr(device->context())->vk_allocator_ptr(),
+                &view->_handle
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return view;
+        }
+        catch (const Error& e)
         {
             throw Error(
-                "failed to create buffer view",
-                vk_result,
-                false
+                "failed to create buffer view: " + e.to_string(),
+                e.vk_result(),
+                true
             );
         }
-        return view;
     }
 
     BufferView::~BufferView()
