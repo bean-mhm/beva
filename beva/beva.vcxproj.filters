@@ -24,10 +24,13 @@
     <ClCompile Include="src\lib\glm\glm.cppm">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\app.cpp">
+    <ClCompile Include="src\demos\02_textured_model.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\lib\beva\beva.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\demos\01_first_triangle.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -902,7 +905,7 @@
     <ClInclude Include="src\lib\glm\vector_relational.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\app.hpp">
+    <ClInclude Include="src\demos\02_textured_model.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\lib\beva\beva.hpp">
@@ -912,6 +915,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\lib\tiny_obj_loader\tiny_obj_loader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\demos\01_first_triangle.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

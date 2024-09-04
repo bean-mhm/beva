@@ -1,4 +1,4 @@
-#include "app.hpp"
+#include "02_textured_model.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -16,7 +16,7 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader/tiny_obj_loader.h"
 
-namespace beva_demo
+namespace beva_demo_02_textured_model
 {
 
     static std::vector<uint8_t> read_file(const std::string& filename);
@@ -124,19 +124,14 @@ namespace beva_demo
 
     void App::cleanup()
     {
-        cleanup_swapchain();
-
-        texture_sampler = nullptr;
-        texture_imgview = nullptr;
-        texture_img = nullptr;
-        texture_img_mem = nullptr;
-
-        uniform_bufs.clear();
-        uniform_bufs_mem.clear();
+        fences_in_flight.clear();
+        semaphs_render_finished.clear();
+        semaphs_image_available.clear();
 
         descriptor_pool = nullptr;
 
-        descriptor_set_layout = nullptr;
+        uniform_bufs.clear();
+        uniform_bufs_mem.clear();
 
         index_buf = nullptr;
         index_buf_mem = nullptr;
@@ -144,17 +139,25 @@ namespace beva_demo
         vertex_buf = nullptr;
         vertex_buf_mem = nullptr;
 
-        graphics_pipeline = nullptr;
-        pipeline_layout = nullptr;
+        indices.clear();
+        vertices.clear();
 
-        render_pass = nullptr;
+        texture_sampler = nullptr;
+        texture_imgview = nullptr;
+        texture_img = nullptr;
+        texture_img_mem = nullptr;
 
-        fences_in_flight.clear();
-        semaphs_render_finished.clear();
-        semaphs_image_available.clear();
+        cleanup_swapchain();
 
         transient_cmd_pool = nullptr;
         cmd_pool = nullptr;
+
+        graphics_pipeline = nullptr;
+        pipeline_layout = nullptr;
+
+        descriptor_set_layout = nullptr;
+
+        render_pass = nullptr;
 
         device = nullptr;
         surface = nullptr;
@@ -176,6 +179,7 @@ namespace beva_demo
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
         window = glfwCreateWindow(
             INITIAL_WIDTH,
@@ -374,50 +378,29 @@ namespace beva_demo
             );
         }
 
-        if (DEFAULT_PHYSICAL_DEVICE_IDX < 0)
+        int32_t idx;
+        while (true)
         {
-            glfwSetWindowTitle(
-                window,
-                "pick a physical device within the command line"
-            );
-
-            int32_t idx;
-            while (true)
+            std::string s_idx;
+            std::getline(std::cin, s_idx);
+            try
             {
-                std::string s_idx;
-                std::getline(std::cin, s_idx);
-                try
+                idx = std::stoi(s_idx);
+                if (idx < 0 || idx >= supported_physical_devices.size())
                 {
-                    idx = std::stoi(s_idx);
-                    if (idx < 0 || idx >= supported_physical_devices.size())
-                    {
-                        throw std::exception();
-                    }
-                    break;
+                    throw std::exception();
                 }
-                catch (const std::exception&)
-                {
-                    std::cout << "enter a valid physical device index\n";
-                }
+                break;
             }
-            physical_device = supported_physical_devices[idx];
+            catch (const std::exception&)
+            {
+                std::cout << "enter a valid physical device index\n";
+            }
+        }
+        std::cout << '\n';
 
-            glfwSetWindowTitle(window, TITLE);
-        }
-        else if (DEFAULT_PHYSICAL_DEVICE_IDX >= 0
-            && DEFAULT_PHYSICAL_DEVICE_IDX < supported_physical_devices.size())
-        {
-            physical_device =
-                supported_physical_devices[DEFAULT_PHYSICAL_DEVICE_IDX];
-
-            std::cout
-                << "default physical device was chosen at index "
-                << DEFAULT_PHYSICAL_DEVICE_IDX << '\n';
-        }
-        else
-        {
-            throw std::exception("default physical device index is invalid");
-        }
+        physical_device = supported_physical_devices[idx];
+        glfwShowWindow(window);
     }
 
     void App::create_logical_device()
@@ -686,8 +669,8 @@ namespace beva_demo
         // they are local variables because they're only needed until pipeline
         // creation.
 
-        auto vert_shader_code = read_file("./shaders/vert.spv");
-        auto frag_shader_code = read_file("./shaders/frag.spv");
+        auto vert_shader_code = read_file("./shaders/demo_02_vert.spv");
+        auto frag_shader_code = read_file("./shaders/demo_02_frag.spv");
 
         auto vert_shader_module = bv::ShaderModule::create(
             device,
@@ -1386,11 +1369,12 @@ namespace beva_demo
 
     void App::cleanup_swapchain()
     {
+        swapchain_framebufs.clear();
+
         depth_imgview = nullptr;
         depth_img = nullptr;
         depth_img_mem = nullptr;
 
-        swapchain_framebufs.clear();
         swapchain_imgviews.clear();
         swapchain = nullptr;
     }
@@ -1953,7 +1937,10 @@ namespace beva_demo
         vkCmdDrawIndexed(
             cmd_buf->handle(),
             (uint32_t)(indices.size()),
-            1, 0, 0, 0
+            1,
+            0,
+            0,
+            0
         );
 
         vkCmdEndRenderPass(cmd_buf->handle());

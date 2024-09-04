@@ -100,6 +100,7 @@ $(ProjectDir)shaders/compile.bat
       <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
       <OpenMPSupport>true</OpenMPSupport>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -123,14 +124,16 @@ $(ProjectDir)shaders/compile.bat
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\app.cpp" />
+    <ClCompile Include="src\demos\01_first_triangle.cpp" />
+    <ClCompile Include="src\demos\02_textured_model.cpp" />
     <ClCompile Include="src\lib\beva\beva.cpp" />
     <ClCompile Include="src\lib\glm\detail\glm.cpp" />
     <ClCompile Include="src\lib\glm\glm.cppm" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\app.hpp" />
+    <ClInclude Include="src\demos\01_first_triangle.hpp" />
+    <ClInclude Include="src\demos\02_textured_model.hpp" />
     <ClInclude Include="src\lib\beva\beva.hpp" />
     <ClInclude Include="src\lib\glfw\glfw3.h" />
     <ClInclude Include="src\lib\glfw\glfw3native.h" />

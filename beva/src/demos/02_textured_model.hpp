@@ -19,7 +19,7 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include <glm/gtx/hash.hpp>
 
-namespace beva_demo
+namespace beva_demo_02_textured_model
 {
 
     struct UniformBufferObject
@@ -45,9 +45,9 @@ namespace beva_demo
 }
 
 template<>
-struct std::hash<beva_demo::Vertex>
+struct std::hash<beva_demo_02_textured_model::Vertex>
 {
-    size_t operator()(const beva_demo::Vertex& v) const
+    size_t operator()(const beva_demo_02_textured_model::Vertex& v) const
     {
         return ((std::hash<glm::vec3>()(v.pos) ^
             (std::hash<glm::vec3>()(v.col) << 1)) >> 1) ^
@@ -55,7 +55,7 @@ struct std::hash<beva_demo::Vertex>
     }
 };
 
-namespace beva_demo
+namespace beva_demo_02_textured_model
 {
 
     class App
@@ -72,16 +72,16 @@ namespace beva_demo
         static constexpr bool DEBUG_MODE = true;
         static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
-        // if not negative, this skips asking the user to pick a physical
-        // device. this should only be used in development to make iteration
-        // faster.
-        static constexpr int32_t DEFAULT_PHYSICAL_DEVICE_IDX = 1;
-
         static constexpr const char* MODEL_PATH =
             "./models/korean_public_payphone_01.obj";
         static constexpr const char* TEXTURE_PATH
             = "./textures/korean_public_payphone_01_baked.png";
 
+        void init();
+        void main_loop();
+        void cleanup();
+
+    private:
         GLFWwindow* window;
         bv::ContextPtr context = nullptr;
         bv::DebugMessengerPtr debug_messenger = nullptr;
@@ -96,7 +96,6 @@ namespace beva_demo
         bv::DescriptorSetLayoutPtr descriptor_set_layout = nullptr;
         bv::PipelineLayoutPtr pipeline_layout = nullptr;
         bv::GraphicsPipelinePtr graphics_pipeline = nullptr;
-        std::vector<bv::FramebufferPtr> swapchain_framebufs;
 
         bv::CommandPoolPtr cmd_pool = nullptr;
         bv::CommandPoolPtr transient_cmd_pool = nullptr;
@@ -104,6 +103,8 @@ namespace beva_demo
         bv::ImagePtr depth_img = nullptr;
         bv::DeviceMemoryPtr depth_img_mem = nullptr;
         bv::ImageViewPtr depth_imgview = nullptr;
+
+        std::vector<bv::FramebufferPtr> swapchain_framebufs;
 
         uint32_t texture_mip_levels = 1;
         bv::ImagePtr texture_img = nullptr;
@@ -141,11 +142,6 @@ namespace beva_demo
 
         std::chrono::steady_clock::time_point start_time;
 
-        void init();
-        void main_loop();
-        void cleanup();
-
-    private:
         void init_window();
         void init_context();
         void setup_debug_messenger();
