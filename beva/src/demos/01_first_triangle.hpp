@@ -41,6 +41,11 @@ namespace beva_demo_01_first_triangle
         static constexpr bool DEBUG_MODE = true;
         static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
+        void init();
+        void main_loop();
+        void cleanup();
+
+    private:
         GLFWwindow* window;
         bv::ContextPtr context = nullptr;
         bv::DebugMessengerPtr debug_messenger = nullptr;
@@ -74,11 +79,6 @@ namespace beva_demo_01_first_triangle
         bool framebuf_resized = false;
         uint32_t frame_idx = 0;
 
-        void init();
-        void main_loop();
-        void cleanup();
-
-    private:
         void init_window();
         void init_context();
         void setup_debug_messenger();
