@@ -1,5 +1,10 @@
 #version 450
 
+// push constants
+layout(push_constant, std430) uniform pc {
+    layout(offset = 0) int enable_tint;
+};
+
 // uniforms
 layout(binding = 1) uniform sampler2D tex;
 
@@ -25,6 +30,12 @@ void main()
 {
     vec3 col = texture(tex, v_texcoord).rgb;
     col *= v_col;
+
+    // use push constant
+    if (enable_tint != 0)
+    {
+        col = mix(col, vec3(0, .1, .5), .1);
+    }
 
     out_col = vec4(view_transform(col), 1);
 }

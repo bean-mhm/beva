@@ -282,10 +282,11 @@ namespace beva_demo_02_textured_model
 
         void record_command_buffer(
             const bv::CommandBufferPtr& cmd_buf,
-            uint32_t img_idx
+            uint32_t img_idx,
+            float elapsed
         );
 
-        void update_uniform_buffer(uint32_t frame_idx);
+        void update_uniform_buffer(uint32_t frame_idx, float elapsed);
 
         friend void glfw_framebuf_resize_callback(
             GLFWwindow* window,

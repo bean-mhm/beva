@@ -8,8 +8,8 @@
 static const std::vector<std::string> demos{
     "first triangle",
 
-    "uniforms, textures, OBJ loading, depth buffer, mipmaps, multisampling, "
-    "instanced rendering"
+    "OBJ models, uniforms, textures, depth buffer, mipmaps, multisampling, "
+    "instanced rendering, push constants"
 };
 
 int main()

@@ -841,12 +841,18 @@ namespace beva_demo_02_textured_model
             VK_DYNAMIC_STATE_SCISSOR
         };
 
+        bv::PushConstantRange frag_push_constants{
+            .stage_flags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .offset = 0,
+            .size = 4
+        };
+
         pipeline_layout = bv::PipelineLayout::create(
             device,
             {
                 .flags = 0,
                 .set_layouts = { descriptor_set_layout },
-                .push_constant_ranges = {}
+                .push_constant_ranges = { frag_push_constants }
             }
         );
 
@@ -1443,12 +1449,16 @@ namespace beva_demo_02_textured_model
             }
         }
 
-        update_uniform_buffer(frame_idx);
+        const auto curr_time = std::chrono::high_resolution_clock::now();
+        const float elapsed =
+            std::chrono::duration<float>(curr_time - start_time).count();
+
+        update_uniform_buffer(frame_idx, elapsed);
 
         fences_in_flight[frame_idx]->reset();
 
         cmd_bufs[frame_idx]->reset(0);
-        record_command_buffer(cmd_bufs[frame_idx], img_idx);
+        record_command_buffer(cmd_bufs[frame_idx], img_idx, elapsed);
 
         graphics_queue->submit(
             { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT },
@@ -1999,7 +2009,8 @@ namespace beva_demo_02_textured_model
 
     void App::record_command_buffer(
         const bv::CommandBufferPtr& cmd_buf,
-        uint32_t img_idx
+        uint32_t img_idx,
+        float elapsed
     )
     {
         cmd_buf->begin(0);
@@ -2080,6 +2091,17 @@ namespace beva_demo_02_textured_model
             nullptr
         );
 
+        int32_t frag_push_constant_enable_tint =
+            (std::fmod(elapsed, 2.f) > 1.f) ? 0 : 1;
+        vkCmdPushConstants(
+            cmd_buf->handle(),
+            pipeline_layout->handle(),
+            VK_SHADER_STAGE_FRAGMENT_BIT,
+            0,
+            sizeof(frag_push_constant_enable_tint),
+            &frag_push_constant_enable_tint
+        );
+
         vkCmdDrawIndexed(
             cmd_buf->handle(),
             (uint32_t)(indices.size()),
@@ -2094,12 +2116,8 @@ namespace beva_demo_02_textured_model
         cmd_buf->end();
     }
 
-    void App::update_uniform_buffer(uint32_t frame_idx)
+    void App::update_uniform_buffer(uint32_t frame_idx, float elapsed)
     {
-        auto curr_time = std::chrono::high_resolution_clock::now();
-        float elapsed =
-            std::chrono::duration<float>(curr_time - start_time).count();
-
         UniformBufferObject ubo{};
 
         ubo.model = glm::rotate(
