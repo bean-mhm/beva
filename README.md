@@ -114,4 +114,5 @@ Note: beva requires C++20.
 
 # Demos
 
-Check out `beva/src/demos` to see how to use beva.
+Check out `beva/src/demos` to see how to use beva. If you build and run the
+solution in Visual Studio, you'll get asked to choose a demo to run.
