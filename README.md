@@ -112,5 +112,4 @@ Note: beva requires C++20.
 
 # Demos
 
-Check out `beva/src/app.hpp` and `app.cpp` to see how to render a basic scene
-with beva.
+Check out `beva/src/demos` to see how to use beva.
