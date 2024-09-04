@@ -27,15 +27,29 @@ namespace beva_demo_02_textured_model
         int height
     );
 
-    const bv::VertexInputBindingDescription Vertex::binding_description{
+    const bv::VertexInputBindingDescription Vertex::binding{
         .binding = 0,
         .stride = sizeof(Vertex),
         .input_rate = VK_VERTEX_INPUT_RATE_VERTEX
     };
 
-    const std::vector<bv::VertexInputAttributeDescription>
-        Vertex::attribute_descriptions
+    bool Vertex::operator==(const Vertex& other) const
     {
+        return
+            pos == other.pos
+            && texcoord == other.texcoord;
+    }
+
+    const bv::VertexInputBindingDescription Instance::binding{
+        .binding = 1,
+        .stride = sizeof(Instance),
+        .input_rate = VK_VERTEX_INPUT_RATE_INSTANCE
+    };
+
+    const std::vector<bv::VertexInputAttributeDescription>
+        attributes
+    {
+        // vertex attributes
         bv::VertexInputAttributeDescription{
             .location = 0,
             .binding = 0,
@@ -45,24 +59,30 @@ namespace beva_demo_02_textured_model
         bv::VertexInputAttributeDescription{
             .location = 1,
             .binding = 0,
-            .format = VK_FORMAT_R32G32B32_SFLOAT,
-            .offset = offsetof(Vertex, col)
-    },
-        bv::VertexInputAttributeDescription{
-            .location = 2,
-            .binding = 0,
             .format = VK_FORMAT_R32G32_SFLOAT,
             .offset = offsetof(Vertex, texcoord)
+    },
+
+        // instance attributes
+        bv::VertexInputAttributeDescription{
+            .location = 2,
+            .binding = 1,
+            .format = VK_FORMAT_R32G32B32_SFLOAT,
+            .offset = offsetof(Instance, pos_offset)
+    },
+        bv::VertexInputAttributeDescription{
+            .location = 3,
+            .binding = 1,
+            .format = VK_FORMAT_R32G32B32_SFLOAT,
+            .offset = offsetof(Instance, col)
     }
     };
 
-    bool Vertex::operator==(const Vertex& other) const
-    {
-        return
-            pos == other.pos
-            && col == other.col
-            && texcoord == other.texcoord;
-    }
+    static const std::vector<Instance> instances{
+        { .pos_offset = { 0.f, 0.f, 0.f }, .col = { 1.f, 1.f, 1.f } },
+        { .pos_offset = { .5f, 0.f, 0.f }, .col = { .8f, 1.f, .7f } },
+        { .pos_offset = { -.5f, 0.f, 0.f }, .col = { 1.f, .8f, .7f } }
+    };
 
     void App::run()
     {
@@ -101,6 +121,7 @@ namespace beva_demo_02_textured_model
         load_model();
         create_vertex_buffer();
         create_index_buffer();
+        create_instance_buffer();
         create_uniform_buffers();
         create_descriptor_pool();
         create_descriptor_sets();
@@ -133,6 +154,9 @@ namespace beva_demo_02_textured_model
 
         uniform_bufs.clear();
         uniform_bufs_mem.clear();
+
+        instance_buf = nullptr;
+        instance_buf_mem = nullptr;
 
         index_buf = nullptr;
         index_buf_mem = nullptr;
@@ -728,8 +752,8 @@ namespace beva_demo_02_textured_model
             });
 
         bv::VertexInputState vertex_input_state{
-            .binding_descriptions = { Vertex::binding_description },
-            .attribute_descriptions = Vertex::attribute_descriptions
+            .binding_descriptions = { Vertex::binding, Instance::binding },
+            .attribute_descriptions = attributes
         };
 
         bv::InputAssemblyState input_assembly_state{
@@ -1122,8 +1146,6 @@ namespace beva_demo_02_textured_model
                     attrib.vertices[3 * index.vertex_index + 2]
                 };
 
-                vert.col = { 1.f, 1.f, 1.f };
-
                 vert.texcoord = {
                     attrib.texcoords[2 * index.texcoord_index + 0],
                     1.f - attrib.texcoords[2 * index.texcoord_index + 1]
@@ -1219,6 +1241,44 @@ namespace beva_demo_02_textured_model
 
         auto cmd_buf = begin_single_time_commands(true);
         copy_buffer(cmd_buf, staging_buf, index_buf, size);
+        end_single_time_commands(cmd_buf);
+
+        staging_buf = nullptr;
+        staging_buf_mem = nullptr;
+    }
+
+    void App::create_instance_buffer()
+    {
+        VkDeviceSize size = sizeof(instances[0]) * instances.size();
+
+        bv::BufferPtr staging_buf;
+        bv::DeviceMemoryPtr staging_buf_mem;
+        create_buffer(
+            size,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+            | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+
+            staging_buf,
+            staging_buf_mem
+        );
+
+        staging_buf_mem->upload((void*)instances.data(), size);
+
+        create_buffer(
+            size,
+
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT
+            | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            instance_buf,
+            instance_buf_mem
+        );
+
+        auto cmd_buf = begin_single_time_commands(true);
+        copy_buffer(cmd_buf, staging_buf, instance_buf, size);
         end_single_time_commands(cmd_buf);
 
         staging_buf = nullptr;
@@ -1972,12 +2032,15 @@ namespace beva_demo_02_textured_model
             graphics_pipeline->handle()
         );
 
-        VkBuffer vk_vertex_bufs[] = { vertex_buf->handle() };
-        VkDeviceSize offsets[] = { 0 };
+        VkBuffer vk_vertex_bufs[]{
+            vertex_buf->handle(),
+            instance_buf->handle()
+        };
+        VkDeviceSize offsets[] = { 0, 0 };
         vkCmdBindVertexBuffers(
             cmd_buf->handle(),
             0,
-            1,
+            2,
             vk_vertex_bufs,
             offsets
         );
@@ -2020,7 +2083,7 @@ namespace beva_demo_02_textured_model
         vkCmdDrawIndexed(
             cmd_buf->handle(),
             (uint32_t)(indices.size()),
-            1,
+            (uint32_t)(instances.size()),
             0,
             0,
             0
@@ -2046,8 +2109,8 @@ namespace beva_demo_02_textured_model
         );
 
         ubo.view = glm::lookAt(
-            glm::vec3(0.f, -.9f, .8f),
-            glm::vec3(0.f, 0.f, .35f),
+            glm::vec3(0.f, -1.3f, .8f),
+            glm::vec3(0.f, 0.f, .3f),
             glm::vec3(0.f, 0.f, 1.f)
         );
 

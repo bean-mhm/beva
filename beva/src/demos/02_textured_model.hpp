@@ -32,14 +32,18 @@ namespace beva_demo_02_textured_model
     struct Vertex
     {
         glm::vec3 pos;
-        glm::vec3 col;
         glm::vec2 texcoord;
 
-        static const bv::VertexInputBindingDescription binding_description;
-        static const std::vector<bv::VertexInputAttributeDescription>
-            attribute_descriptions;
-
+        static const bv::VertexInputBindingDescription binding;
         bool operator==(const Vertex& other) const;
+    };
+
+    struct Instance
+    {
+        glm::vec3 pos_offset;
+        glm::vec3 col;
+
+        static const bv::VertexInputBindingDescription binding;
     };
 
 }
@@ -49,9 +53,8 @@ struct std::hash<beva_demo_02_textured_model::Vertex>
 {
     size_t operator()(const beva_demo_02_textured_model::Vertex& v) const
     {
-        return ((std::hash<glm::vec3>()(v.pos) ^
-            (std::hash<glm::vec3>()(v.col) << 1)) >> 1) ^
-            (std::hash<glm::vec2>()(v.texcoord) << 1);
+        return (std::hash<glm::vec3>()(v.pos) ^
+            (std::hash<glm::vec2>()(v.texcoord) << 1)) >> 1;
     }
 };
 
@@ -125,6 +128,9 @@ namespace beva_demo_02_textured_model
         bv::BufferPtr index_buf = nullptr;
         bv::DeviceMemoryPtr index_buf_mem = nullptr;
 
+        bv::BufferPtr instance_buf = nullptr;
+        bv::DeviceMemoryPtr instance_buf_mem = nullptr;
+
         std::vector<bv::BufferPtr> uniform_bufs;
         std::vector<bv::DeviceMemoryPtr> uniform_bufs_mem;
         std::vector<void*> uniform_bufs_mapped;
@@ -167,6 +173,7 @@ namespace beva_demo_02_textured_model
         void load_model();
         void create_vertex_buffer();
         void create_index_buffer();
+        void create_instance_buffer();
         void create_uniform_buffers();
         void create_descriptor_pool();
         void create_descriptor_sets();

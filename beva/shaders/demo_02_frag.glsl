@@ -1,10 +1,13 @@
 #version 450
 
+// uniforms
 layout(binding = 1) uniform sampler2D tex;
 
-layout(location = 0) in vec3 v_col;
-layout(location = 1) in vec2 v_texcoord;
+// output from vertex shader
+layout(location = 0) in vec2 v_texcoord;
+layout(location = 1) in vec3 v_col;
 
+// output from fragment shader
 layout(location = 0) out vec4 out_col;
 
 vec3 view_transform(vec3 col)
