@@ -7,7 +7,9 @@
 
 static const std::vector<std::string> demos{
     "first triangle",
-    "uniforms, textures, OBJ loading, depth buffer, mipmaps, MSAA"
+
+    "uniforms, textures, OBJ loading, depth buffer, mipmaps, multisampling, "
+    "instanced rendering"
 };
 
 int main()
