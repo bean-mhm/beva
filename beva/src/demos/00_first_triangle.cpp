@@ -1,4 +1,4 @@
-#include "01_first_triangle.hpp"
+#include "00_first_triangle.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -9,7 +9,7 @@
 #include <stdexcept>
 #include <cstdlib>
 
-namespace beva_demo_01_first_triangle
+namespace beva_demo_00_first_triangle
 {
 
     static std::vector<uint8_t> read_file(const std::string& filename);
@@ -601,8 +601,8 @@ namespace beva_demo_01_first_triangle
         // they are local variables because they're only needed until pipeline
         // creation.
 
-        auto vert_shader_code = read_file("./shaders/demo_01_vert.spv");
-        auto frag_shader_code = read_file("./shaders/demo_01_frag.spv");
+        auto vert_shader_code = read_file("./shaders/demo_00_vert.spv");
+        auto frag_shader_code = read_file("./shaders/demo_00_frag.spv");
 
         auto vert_shader_module = bv::ShaderModule::create(
             device,

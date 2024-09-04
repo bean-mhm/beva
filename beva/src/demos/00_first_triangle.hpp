@@ -14,7 +14,7 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "glm/glm.hpp"
 
-namespace beva_demo_01_first_triangle
+namespace beva_demo_00_first_triangle
 {
 
     struct Vertex

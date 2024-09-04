@@ -1,4 +1,4 @@
-#include "02_textured_model.hpp"
+#include "01_textured_model.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -16,7 +16,7 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader/tiny_obj_loader.h"
 
-namespace beva_demo_02_textured_model
+namespace beva_demo_01_textured_model
 {
 
     static std::vector<uint8_t> read_file(const std::string& filename);
@@ -721,8 +721,8 @@ namespace beva_demo_02_textured_model
         // they are local variables because they're only needed until pipeline
         // creation.
 
-        auto vert_shader_code = read_file("./shaders/demo_02_vert.spv");
-        auto frag_shader_code = read_file("./shaders/demo_02_frag.spv");
+        auto vert_shader_code = read_file("./shaders/demo_01_vert.spv");
+        auto frag_shader_code = read_file("./shaders/demo_01_frag.spv");
 
         auto vert_shader_module = bv::ShaderModule::create(
             device,

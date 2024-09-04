@@ -2,14 +2,14 @@
 #include <vector>
 #include <string>
 
-#include "demos/01_first_triangle.hpp"
-#include "demos/02_textured_model.hpp"
+#include "demos/00_first_triangle.hpp"
+#include "demos/01_textured_model.hpp"
 
 static const std::vector<std::string> demos{
     "first triangle",
 
-    "OBJ models, uniforms, textures, depth buffer, mipmaps, multisampling, "
-    "instanced rendering, push constants"
+    "textured model (OBJ loading, uniforms, textures, depth, mipmaps, "
+    "multisampling, instanced rendering, push constants)"
 };
 
 int main()
@@ -51,13 +51,13 @@ int main()
         {
         case 0:
         {
-            beva_demo_01_first_triangle::App app{};
+            beva_demo_00_first_triangle::App app{};
             app.run();
             break;
         }
         case 1:
         {
-            beva_demo_02_textured_model::App app{};
+            beva_demo_01_textured_model::App app{};
             app.run();
             break;
         }

@@ -19,7 +19,7 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include <glm/gtx/hash.hpp>
 
-namespace beva_demo_02_textured_model
+namespace beva_demo_01_textured_model
 {
 
     struct UniformBufferObject
@@ -49,16 +49,16 @@ namespace beva_demo_02_textured_model
 }
 
 template<>
-struct std::hash<beva_demo_02_textured_model::Vertex>
+struct std::hash<beva_demo_01_textured_model::Vertex>
 {
-    size_t operator()(const beva_demo_02_textured_model::Vertex& v) const
+    size_t operator()(const beva_demo_01_textured_model::Vertex& v) const
     {
         return (std::hash<glm::vec3>()(v.pos) ^
             (std::hash<glm::vec2>()(v.texcoord) << 1)) >> 1;
     }
 };
 
-namespace beva_demo_02_textured_model
+namespace beva_demo_01_textured_model
 {
 
     class App

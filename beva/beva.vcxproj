@@ -124,16 +124,16 @@ $(ProjectDir)shaders/compile.bat
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\demos\01_first_triangle.cpp" />
-    <ClCompile Include="src\demos\02_textured_model.cpp" />
+    <ClCompile Include="src\demos\00_first_triangle.cpp" />
+    <ClCompile Include="src\demos\01_textured_model.cpp" />
     <ClCompile Include="src\lib\beva\beva.cpp" />
     <ClCompile Include="src\lib\glm\detail\glm.cpp" />
     <ClCompile Include="src\lib\glm\glm.cppm" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\demos\01_first_triangle.hpp" />
-    <ClInclude Include="src\demos\02_textured_model.hpp" />
+    <ClInclude Include="src\demos\00_first_triangle.hpp" />
+    <ClInclude Include="src\demos\01_textured_model.hpp" />
     <ClInclude Include="src\lib\beva\beva.hpp" />
     <ClInclude Include="src\lib\glfw\glfw3.h" />
     <ClInclude Include="src\lib\glfw\glfw3native.h" />
