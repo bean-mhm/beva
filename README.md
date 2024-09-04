@@ -94,6 +94,8 @@ functions to see how to use them properly. For example, whether a
 `std::shared_ptr` field can be `nullptr` or must have a value, or in what
 conditions a `std::optional` field can actually be `std::nullopt`.
 
+beva is not tested enough to be called stable or ready for production at all.
+
 # Documentation
 
 I don't have time to write documentation but looking at the header, this page,
