@@ -47,6 +47,7 @@ namespace bv
     class DescriptorSet;
     class DescriptorPool;
     class BufferView;
+    class PipelineCache;
 
 #define _BV_DEFINE_SMART_PTR_TYPE_ALIASES(ClassName) \
     using ClassName##Ptr = std::shared_ptr<ClassName>; \
@@ -78,6 +79,7 @@ namespace bv
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(DescriptorSet);
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(DescriptorPool);
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(BufferView);
+    _BV_DEFINE_SMART_PTR_TYPE_ALIASES(PipelineCache);
 
 #pragma region data-only structs and enums
 
@@ -2409,7 +2411,8 @@ namespace bv
 
         static GraphicsPipelinePtr create(
             const DevicePtr& device,
-            const GraphicsPipelineConfig& config
+            const GraphicsPipelineConfig& config,
+            const PipelineCachePtr& cache = nullptr
         );
 
         constexpr const DeviceWPtr& device() const
@@ -2422,6 +2425,11 @@ namespace bv
             return _config;
         }
 
+        constexpr const PipelineCacheWPtr& cache() const
+        {
+            return _cache;
+        }
+
         constexpr VkPipeline handle() const
         {
             return _handle;
@@ -2432,12 +2440,14 @@ namespace bv
     protected:
         DeviceWPtr _device;
         GraphicsPipelineConfig _config;
+        PipelineCacheWPtr _cache;
 
         VkPipeline _handle = nullptr;
 
         GraphicsPipeline(
             const DevicePtr& device,
-            const GraphicsPipelineConfig& config
+            const GraphicsPipelineConfig& config,
+            const PipelineCachePtr& cache = nullptr
         );
 
     };
@@ -2935,6 +2945,53 @@ namespace bv
             const DevicePtr& device,
             const BufferPtr& buffer,
             const BufferViewConfig& config
+        );
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineCache.html
+    class PipelineCache
+    {
+    public:
+        PipelineCache() = delete;
+        PipelineCache(const PipelineCache& other) = delete;
+        PipelineCache(PipelineCache&& other) = default;
+
+        static PipelineCachePtr create(
+            const DevicePtr& device,
+            VkPipelineCacheCreateFlags flags,
+            const std::vector<uint8_t>& initial_data
+        );
+
+        constexpr const DeviceWPtr& device() const
+        {
+            return _device;
+        }
+
+        constexpr VkPipelineCacheCreateFlags flags() const
+        {
+            return _flags;
+        }
+
+        constexpr VkPipelineCache handle() const
+        {
+            return _handle;
+        }
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPipelineCacheData.html
+        std::vector<uint8_t> get_cache_data();
+
+        ~PipelineCache();
+
+    protected:
+        DeviceWPtr _device;
+        VkPipelineCacheCreateFlags _flags;
+
+        VkPipelineCache _handle = nullptr;
+
+        PipelineCache(
+            const DevicePtr& device,
+            VkPipelineCacheCreateFlags flags
         );
 
     };

@@ -41,6 +41,7 @@ namespace bv
     _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DescriptorSet);
     _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DescriptorPool);
     _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(BufferView);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(PipelineCache);
 
 #define _BV_LOCK_WPTR_OR_RETURN(wptr, locked_name) \
     if (wptr.expired()) \
@@ -3310,10 +3311,12 @@ namespace bv
                 device
             );
 
-            std::vector<uint8_t> code_aligned = code;
-            if (code_aligned.size() % 8 != 0)
+            std::vector<uint8_t> code_aligned;
+            bool needs_alignment = (code.size() % 8 != 0);
+            if (needs_alignment)
             {
-                for (size_t i = 0; i < 8 - (code_aligned.size() % 8); i++)
+                code_aligned = code;
+                for (size_t i = 0; i < 8 - (code.size() % 8); i++)
                 {
                     code_aligned.push_back(0);
                 }
@@ -3324,7 +3327,9 @@ namespace bv
                 .pNext = nullptr,
                 .flags = 0,
                 .codeSize = code.size(),
-                .pCode = reinterpret_cast<const uint32_t*>(code_aligned.data())
+                .pCode = reinterpret_cast<const uint32_t*>(
+                    needs_alignment ? code_aligned.data() : code.data()
+                    )
             };
 
             VkResult vk_result = vkCreateShaderModule(
@@ -3738,7 +3743,8 @@ namespace bv
 
     GraphicsPipelinePtr GraphicsPipeline::create(
         const DevicePtr& device,
-        const GraphicsPipelineConfig& config
+        const GraphicsPipelineConfig& config,
+        const PipelineCachePtr& cache
     )
     {
         try
@@ -3746,7 +3752,8 @@ namespace bv
             GraphicsPipelinePtr pipe =
                 std::make_shared<GraphicsPipeline_public_ctor>(
                     device,
-                    config
+                    config,
+                    cache
                 );
 
             std::vector<VkPipelineShaderStageCreateInfo> vk_stages(
@@ -3913,7 +3920,7 @@ namespace bv
 
             VkResult vk_result = vkCreateGraphicsPipelines(
                 device->handle(),
-                nullptr,
+                cache == nullptr ? nullptr : cache->handle(),
                 1,
                 &create_info,
                 lock_wptr(device->context())->vk_allocator_ptr(),
@@ -3952,9 +3959,10 @@ namespace bv
 
     GraphicsPipeline::GraphicsPipeline(
         const DevicePtr& device,
-        const GraphicsPipelineConfig& config
+        const GraphicsPipelineConfig& config,
+        const PipelineCachePtr& cache
     )
-        : _device(device), _config(config)
+        : _device(device), _config(config), _cache(cache)
     {}
 
     FramebufferPtr Framebuffer::create(
@@ -5159,6 +5167,110 @@ namespace bv
         : _device(device),
         _buffer(buffer),
         _config(config)
+    {}
+
+    PipelineCachePtr PipelineCache::create(
+        const DevicePtr& device,
+        VkPipelineCacheCreateFlags flags,
+        const std::vector<uint8_t>& initial_data
+    )
+    {
+        try
+        {
+            PipelineCachePtr cache =
+                std::make_shared<PipelineCache_public_ctor>(
+                    device,
+                    flags
+                );
+
+            VkPipelineCacheCreateInfo create_info{
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = cache->flags(),
+                .initialDataSize = initial_data.size(),
+                .pInitialData = initial_data.data()
+            };
+
+            VkResult vk_result = vkCreatePipelineCache(
+                device->handle(),
+                &create_info,
+                lock_wptr(device->context())->vk_allocator_ptr(),
+                &cache->_handle
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return cache;
+        }
+        catch (const Error& e)
+        {
+            throw Error(
+                "failed to create pipeline cache: " + e.to_string(),
+                e.vk_result(),
+                true
+            );
+        }
+    }
+
+    std::vector<uint8_t> PipelineCache::get_cache_data()
+    {
+        try
+        {
+            auto device_locked = lock_wptr(device());
+
+            size_t size;
+            vkGetPipelineCacheData(
+                device_locked->handle(),
+                handle(),
+                &size,
+                nullptr
+            );
+
+            std::vector<uint8_t> data(size);
+            VkResult vk_result = vkGetPipelineCacheData(
+                device_locked->handle(),
+                handle(),
+                &size,
+                data.data()
+            );
+            if (vk_result != VK_SUCCESS && vk_result != VK_INCOMPLETE)
+            {
+                throw Error(vk_result);
+            }
+
+            return data;
+        }
+        catch (const Error& e)
+        {
+            throw Error(
+                "failed to get pipeline cache data: " + e.to_string(),
+                e.vk_result(),
+                true
+            );
+        }
+    }
+
+    PipelineCache::~PipelineCache()
+    {
+        _BV_LOCK_WPTR_OR_RETURN(device(), device_locked);
+        _BV_LOCK_WPTR_OR_RETURN(
+            device_locked->context(),
+            context_locked
+        );
+
+        vkDestroyPipelineCache(
+            device_locked->handle(),
+            handle(),
+            context_locked->vk_allocator_ptr()
+        );
+    }
+
+    PipelineCache::PipelineCache(
+        const DevicePtr& device,
+        VkPipelineCacheCreateFlags flags
+    )
+        : _device(device), _flags(flags)
     {}
 
     std::string cstr_to_std(const char* cstr)
