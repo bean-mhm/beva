@@ -68,7 +68,8 @@ namespace beva_demo_01_textured_model
         void run();
 
     private:
-        static constexpr const char* TITLE = "beva demo: textured model";
+        static constexpr const char* TITLE =
+            "beva demo: textured model (baked lighting)";
         static constexpr int INITIAL_WIDTH = 960;
         static constexpr int INITIAL_HEIGHT = 720;
 

@@ -10,7 +10,7 @@
 static const std::vector<std::string> demos{
     "first triangle",
 
-    "textured model (baked): OBJ, uniforms, textures, depth, mipmaps, "
+    "textured model (baked lighting): OBJ, uniforms, textures, depth, mipmaps, "
     "multisampling, instanced rendering, push constants",
 
     "wave simulation with mouse interaction: compute shader, storage image, "
@@ -93,6 +93,7 @@ int main()
 
             std::cout << '\n';
             run_demo(idx);
+            std::cout << '\n';
         }
     }
     catch (const std::exception& e)

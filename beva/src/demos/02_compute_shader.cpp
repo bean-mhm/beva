@@ -270,11 +270,11 @@ namespace beva_demo_02_compute_shader
         );
         if (vk_result != VK_SUCCESS)
         {
-            throw std::runtime_error(bv::Error(
+            throw bv::Error(
                 "failed to create window surface",
                 vk_result,
                 false
-            ).to_string().c_str());
+            );
         }
         surface = bv::Surface::create(context, vk_surface);
     }
