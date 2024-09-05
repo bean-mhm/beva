@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <vector>
 #include <string>
@@ -201,7 +201,7 @@ namespace bv
 {
     VK_ERROR_FRAGMENTED_POOL,
     "VK_ERROR_FRAGMENTED_POOL: a pool allocation has failed due to "
-    "fragmentation of the pool’s memory. this must only be returned if no "
+    "fragmentation of the pool's memory. this must only be returned if no "
         "attempt to allocate host or device memory was made to accommodate the "
         "new allocation. this should be returned in preference to "
         "VK_ERROR_OUT_OF_POOL_MEMORY, but only if the implementation is "
@@ -330,7 +330,7 @@ namespace bv
     "VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT: an operation on a swapchain "
     "created with VK_FULL_SCREEN_EXCLUSIVE_APPLICATION_CONTROLLED_EXT failed "
         "as it did not have exclusive full-screen access. this may occur due "
-        "to implementation-dependent reasons, outside of the application’s "
+        "to implementation-dependent reasons, outside of the application's "
         "control."
 },
 {

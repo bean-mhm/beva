@@ -50,7 +50,9 @@ int main()
     {
         while (true)
         {
-            std::cout << "pick a demo by entering its index (q to quit):\n\n";
+            std::cout <<
+                "-------------------------------------------------------------"
+                "\n\npick a demo by entering its index (q to quit):\n\n";
             for (size_t i = 0; i < demos.size(); i++)
             {
                 std::cout << std::format(
