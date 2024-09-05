@@ -12,6 +12,10 @@ if not exist "%VS_OUT_DIR%shaders/" mkdir "%VS_OUT_DIR%shaders/"
 %GLSLC_PATH% -fshader-stage=vertex "%VS_PROJ_DIR%shaders/demo_01_vert.glsl" -o "%VS_OUT_DIR%shaders/demo_01_vert.spv"
 %GLSLC_PATH% -fshader-stage=fragment "%VS_PROJ_DIR%shaders/demo_01_frag.glsl" -o "%VS_OUT_DIR%shaders/demo_01_frag.spv"
 
+%GLSLC_PATH% -fshader-stage=vertex "%VS_PROJ_DIR%shaders/demo_02_vert.glsl" -o "%VS_OUT_DIR%shaders/demo_02_vert.spv"
+%GLSLC_PATH% -fshader-stage=fragment "%VS_PROJ_DIR%shaders/demo_02_frag.glsl" -o "%VS_OUT_DIR%shaders/demo_02_frag.spv"
+%GLSLC_PATH% -fshader-stage=compute "%VS_PROJ_DIR%shaders/demo_02_comp.glsl" -o "%VS_OUT_DIR%shaders/demo_02_comp.spv"
+
 echo finished compiling shaders
 
 pause>nul

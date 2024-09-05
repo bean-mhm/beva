@@ -33,6 +33,9 @@
     <ClCompile Include="src\demos\00_first_triangle.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\demos\02_compute_shader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\lib\glfw\glfw3.h">
@@ -918,6 +921,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\demos\00_first_triangle.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\demos\02_compute_shader.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

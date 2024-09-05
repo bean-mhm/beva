@@ -68,7 +68,7 @@ namespace beva_demo_01_textured_model
         void run();
 
     private:
-        static constexpr const char* TITLE = "beva demo";
+        static constexpr const char* TITLE = "beva demo: textured model";
         static constexpr int INITIAL_WIDTH = 960;
         static constexpr int INITIAL_HEIGHT = 720;
 
@@ -80,12 +80,14 @@ namespace beva_demo_01_textured_model
         static constexpr const char* TEXTURE_PATH
             = "./textures/korean_public_payphone_01_baked.png";
 
+        static constexpr VkFormat TEXTURE_FORMAT = VK_FORMAT_R8G8B8A8_SRGB;
+
         void init();
         void main_loop();
         void cleanup();
 
     private:
-        GLFWwindow* window;
+        GLFWwindow* window = nullptr;
         bv::ContextPtr context = nullptr;
         bv::DebugMessengerPtr debug_messenger = nullptr;
         bv::SurfacePtr surface = nullptr;

@@ -131,6 +131,7 @@ namespace beva_demo_01_textured_model
 
     void App::main_loop()
     {
+        start_time = std::chrono::high_resolution_clock::now();
         while (true)
         {
             glfwPollEvents();
@@ -344,7 +345,7 @@ namespace beva_demo_01_textured_model
             try
             {
                 auto format_props = pdev.fetch_image_format_properties(
-                    VK_FORMAT_R8G8B8A8_SRGB,
+                    TEXTURE_FORMAT,
                     VK_IMAGE_TYPE_2D,
                     VK_IMAGE_TILING_OPTIMAL,
 
@@ -1027,15 +1028,13 @@ namespace beva_demo_01_textured_model
         staging_buf_mem->upload((void*)pixels, size);
         stbi_image_free(pixels);
 
-        constexpr VkFormat texture_format = VK_FORMAT_R8G8B8A8_SRGB;
-
         // create image
         create_image(
             (uint32_t)texture_width,
             (uint32_t)texture_height,
             texture_mip_levels,
             VK_SAMPLE_COUNT_1_BIT,
-            texture_format,
+            TEXTURE_FORMAT,
             VK_IMAGE_TILING_OPTIMAL,
 
             VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
@@ -1083,7 +1082,7 @@ namespace beva_demo_01_textured_model
         // create image view
         texture_imgview = create_image_view(
             texture_img,
-            texture_img->config().format,
+            TEXTURE_FORMAT,
             VK_IMAGE_ASPECT_COLOR_BIT,
             texture_mip_levels
         );
@@ -2092,7 +2091,7 @@ namespace beva_demo_01_textured_model
         );
 
         int32_t frag_push_constant_enable_tint =
-            (std::fmod(elapsed, 2.f) > 1.f) ? 0 : 1;
+            (std::fmod(elapsed, 2.f) > 1.f) ? 1 : 0;
         vkCmdPushConstants(
             cmd_buf->handle(),
             pipeline_layout->handle(),

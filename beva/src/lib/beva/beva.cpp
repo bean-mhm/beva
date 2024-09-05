@@ -31,6 +31,7 @@ namespace bv
     _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(PipelineLayout);
     _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(RenderPass);
     _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(GraphicsPipeline);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(ComputePipeline);
     _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Framebuffer);
     _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(CommandBuffer);
     _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(CommandPool);
@@ -1662,7 +1663,9 @@ namespace bv
     )
     {
         return VkDescriptorImageInfo{
-            .sampler = lock_wptr(info.sampler)->handle(),
+            .sampler = info.sampler.has_value()
+            ? lock_wptr(info.sampler.value())->handle()
+            : nullptr,
 
             .imageView = info.image_view.has_value()
             ? lock_wptr(info.image_view.value())->handle()
@@ -3960,6 +3963,93 @@ namespace bv
     GraphicsPipeline::GraphicsPipeline(
         const DevicePtr& device,
         const GraphicsPipelineConfig& config,
+        const PipelineCachePtr& cache
+    )
+        : _device(device), _config(config), _cache(cache)
+    {}
+
+    ComputePipelinePtr ComputePipeline::create(
+        const DevicePtr& device,
+        const ComputePipelineConfig& config,
+        const PipelineCachePtr& cache
+    )
+    {
+        try
+        {
+            ComputePipelinePtr pipe =
+                std::make_shared<ComputePipeline_public_ctor>(
+                    device,
+                    config,
+                    cache
+                );
+
+            VkSpecializationInfo waste_vk_specialization_info;
+            std::vector<VkSpecializationMapEntry> waste_vk_map_entries;
+            std::vector<uint8_t> waste_data;
+            VkPipelineShaderStageCreateInfo vk_stage = ShaderStage_to_vk(
+                pipe->config().stage,
+                waste_vk_specialization_info,
+                waste_vk_map_entries,
+                waste_data
+            );
+
+            VkComputePipelineCreateInfo create_info{
+                .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = pipe->config().flags,
+                .stage = vk_stage,
+                .layout = lock_wptr(pipe->config().layout)->handle(),
+
+                .basePipelineHandle =
+                pipe->config().base_pipeline.has_value()
+                ? lock_wptr(pipe->config().base_pipeline.value())->handle()
+                : nullptr,
+
+                .basePipelineIndex = -1
+            };
+
+            VkResult vk_result = vkCreateComputePipelines(
+                device->handle(),
+                cache == nullptr ? nullptr : cache->handle(),
+                1,
+                &create_info,
+                lock_wptr(device->context())->vk_allocator_ptr(),
+                &pipe->_handle
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return pipe;
+        }
+        catch (const Error& e)
+        {
+            throw Error(
+                "failed to create compute pipeline: " + e.to_string(),
+                e.vk_result(),
+                true
+            );
+        }
+    }
+
+    ComputePipeline::~ComputePipeline()
+    {
+        _BV_LOCK_WPTR_OR_RETURN(device(), device_locked);
+        _BV_LOCK_WPTR_OR_RETURN(
+            device_locked->context(),
+            context_locked
+        );
+
+        vkDestroyPipeline(
+            device_locked->handle(),
+            handle(),
+            context_locked->vk_allocator_ptr()
+        );
+    }
+
+    ComputePipeline::ComputePipeline(
+        const DevicePtr& device,
+        const ComputePipelineConfig& config,
         const PipelineCachePtr& cache
     )
         : _device(device), _config(config), _cache(cache)

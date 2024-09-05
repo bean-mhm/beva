@@ -1,4 +1,4 @@
-#include "00_first_triangle.hpp"
+#include "02_compute_shader.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -8,8 +8,11 @@
 #include <algorithm>
 #include <stdexcept>
 #include <cstdlib>
+#include <cmath>
 
-namespace beva_demo_00_first_triangle
+#define IDIV_CEIL(a, b) (((a) + (b) - 1) / (b))
+
+namespace beva_demo_02_compute_shader
 {
 
     static std::vector<uint8_t> read_file(const std::string& filename);
@@ -38,15 +41,18 @@ namespace beva_demo_00_first_triangle
         bv::VertexInputAttributeDescription{
             .location = 1,
             .binding = 0,
-            .format = VK_FORMAT_R32G32B32_SFLOAT,
-            .offset = offsetof(Vertex, col)
+            .format = VK_FORMAT_R32G32_SFLOAT,
+            .offset = offsetof(Vertex, texcoord)
     }
     };
 
     static const std::vector<Vertex> vertices{
-        { .pos = { -.5f, .5f }, .col = { 0.f, 1.f, 0.f } },
-        { .pos = { .5f, .5f }, .col = { 0.f, 0.f, 1.f } },
-        { .pos = { 0.f, -.5f }, .col = { 1.f, 0.f, 0.f } }
+        { .pos = { -1.f, 1.f }, .texcoord = { 0.f, 1.f } }, // bl
+        { .pos = { 1.f, 1.f }, .texcoord = { 1.f, 1.f } }, // br
+        { .pos = { 1.f, -1.f }, .texcoord = { 1.f, 0.f } }, // tr
+        { .pos = { -1.f, 1.f }, .texcoord = { 0.f, 1.f } }, // bl
+        { .pos = { 1.f, -1.f }, .texcoord = { 1.f, 0.f } }, // tr
+        { .pos = { -1.f, -1.f }, .texcoord = { 0.f, 0.f } }, // tl
     };
 
     void App::run()
@@ -65,6 +71,8 @@ namespace beva_demo_00_first_triangle
 
     void App::init()
     {
+        start_time = std::chrono::high_resolution_clock::now();
+
         init_window();
         init_context();
         setup_debug_messenger();
@@ -72,17 +80,32 @@ namespace beva_demo_00_first_triangle
         pick_physical_device();
         create_logical_device();
         create_swapchain();
+
         create_render_pass();
-        create_swapchain_framebuffers();
+        create_graphics_descriptor_set_layout();
         create_graphics_pipeline();
+
+        create_compute_descriptor_set_layout();
+        create_compute_pipeline();
+
         create_command_pools();
+        create_swapchain_framebuffers();
+        create_storage_images();
         create_vertex_buffer();
+
+        create_graphics_descriptor_pool();
+        create_graphics_descriptor_sets();
+
+        create_compute_descriptor_pool();
+        create_compute_descriptor_sets();
+
         create_command_buffers();
         create_sync_objects();
     }
 
     void App::main_loop()
     {
+        start_time = std::chrono::high_resolution_clock::now();
         while (true)
         {
             glfwPollEvents();
@@ -102,18 +125,30 @@ namespace beva_demo_00_first_triangle
         semaphs_render_finished.clear();
         semaphs_image_available.clear();
 
+        compute_descriptor_pool = nullptr;
+        graphics_descriptor_pool = nullptr;
+
         vertex_buf = nullptr;
         vertex_buf_mem = nullptr;
+
+        storage_imgviews.clear();
+        storage_imgs.clear();
+        storage_imgs_mem.clear();
+
+        cleanup_swapchain();
 
         transient_cmd_pool = nullptr;
         cmd_pool = nullptr;
 
+        compute_pipeline = nullptr;
+        compute_pipeline_layout = nullptr;
+        compute_descriptor_set_layout = nullptr;
+
         graphics_pipeline = nullptr;
-        pipeline_layout = nullptr;
+        graphics_pipeline_layout = nullptr;
+        graphics_descriptor_set_layout = nullptr;
 
         render_pass = nullptr;
-
-        cleanup_swapchain();
 
         device = nullptr;
         surface = nullptr;
@@ -251,10 +286,18 @@ namespace beva_demo_00_first_triangle
         std::vector<bv::PhysicalDevice> supported_physical_devices;
         for (const auto& pdev : all_physical_devices)
         {
-            if (!pdev.queue_family_indices().graphics.has_value())
+            bool has_graphics_compute_family = false;
+            for (const auto& family : pdev.queue_families())
             {
-                continue;
+                if ((family.queue_flags & VK_QUEUE_GRAPHICS_BIT)
+                    && (family.queue_flags & VK_QUEUE_COMPUTE_BIT))
+                {
+                    has_graphics_compute_family = true;
+                    break;
+                }
             }
+            if (!has_graphics_compute_family) continue;
+
             if (!pdev.queue_family_indices().presentation.has_value())
             {
                 continue;
@@ -275,13 +318,10 @@ namespace beva_demo_00_first_triangle
             try
             {
                 auto format_props = pdev.fetch_image_format_properties(
-                    VK_FORMAT_R8G8B8A8_SRGB,
+                    SIM_IMAGE_FORMAT,
                     VK_IMAGE_TYPE_2D,
                     VK_IMAGE_TILING_OPTIMAL,
-
-                    VK_IMAGE_USAGE_TRANSFER_DST_BIT
-                    | VK_IMAGE_USAGE_SAMPLED_BIT,
-
+                    VK_IMAGE_USAGE_STORAGE_BIT,
                     0
                 );
             }
@@ -356,19 +396,28 @@ namespace beva_demo_00_first_triangle
         std::cout << '\n';
 
         physical_device = supported_physical_devices[idx];
+
         glfwShowWindow(window);
     }
 
     void App::create_logical_device()
     {
-        graphics_family_idx =
-            physical_device->queue_family_indices().graphics.value();
+        const auto& families = physical_device.value().queue_families();
+        for (uint32_t i = 0; i < families.size(); i++)
+        {
+            if ((families[i].queue_flags & VK_QUEUE_GRAPHICS_BIT)
+                && (families[i].queue_flags & VK_QUEUE_COMPUTE_BIT))
+            {
+                graphics_compute_family_idx = i;
+                break;
+            }
+        }
 
         presentation_family_idx =
             physical_device->queue_family_indices().presentation.value();
 
         std::set<uint32_t> unique_queue_family_indices = {
-            graphics_family_idx,
+            graphics_compute_family_idx,
             presentation_family_idx
         };
 
@@ -396,8 +445,8 @@ namespace beva_demo_00_first_triangle
             }
         );
 
-        graphics_queue =
-            bv::Device::retrieve_queue(device, graphics_family_idx, 0);
+        graphics_compute_queue =
+            bv::Device::retrieve_queue(device, graphics_compute_family_idx, 0);
 
         presentation_queue =
             bv::Device::retrieve_queue(device, presentation_family_idx, 0);
@@ -465,11 +514,11 @@ namespace beva_demo_00_first_triangle
 
         VkSharingMode image_sharing_mode;
         std::vector<uint32_t> queue_family_indices;
-        if (graphics_family_idx != presentation_family_idx)
+        if (graphics_compute_family_idx != presentation_family_idx)
         {
             image_sharing_mode = VK_SHARING_MODE_CONCURRENT;
             queue_family_indices = {
-                graphics_family_idx,
+                graphics_compute_family_idx,
                 presentation_family_idx
             };
         }
@@ -505,23 +554,11 @@ namespace beva_demo_00_first_triangle
         swapchain_imgviews.clear();
         for (size_t i = 0; i < swapchain->images().size(); i++)
         {
-            bv::ImageSubresourceRange subresource_range{
-                .aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .base_mip_level = 0,
-                .level_count = 1,
-                .base_array_layer = 0,
-                .layer_count = 1
-            };
-            swapchain_imgviews.push_back(bv::ImageView::create(
-                device,
+            swapchain_imgviews.push_back(create_image_view(
                 swapchain->images()[i],
-                {
-                    .flags = 0,
-                    .view_type = VK_IMAGE_VIEW_TYPE_2D,
-                    .format = surface_format.format,
-                    .components = {},
-                    .subresource_range = subresource_range
-                }
+                surface_format.format,
+                VK_IMAGE_ASPECT_COLOR_BIT,
+                1
             ));
         }
     }
@@ -576,23 +613,23 @@ namespace beva_demo_00_first_triangle
         );
     }
 
-    void App::create_swapchain_framebuffers()
+    void App::create_graphics_descriptor_set_layout()
     {
-        swapchain_framebufs.clear();
-        for (size_t i = 0; i < swapchain_imgviews.size(); i++)
-        {
-            swapchain_framebufs.push_back(bv::Framebuffer::create(
-                device,
-                {
-                    .flags = 0,
-                    .render_pass = render_pass,
-                    .attachments = { swapchain_imgviews[i] },
-                    .width = swapchain->config().image_extent.width,
-                    .height = swapchain->config().image_extent.height,
-                    .layers = 1
-                }
-            ));
-        }
+        bv::DescriptorSetLayoutBinding fragment_img_binding{
+            .binding = 0,
+            .descriptor_type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+            .descriptor_count = 1,
+            .stage_flags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .immutable_samplers = {}
+        };
+
+        graphics_descriptor_set_layout = bv::DescriptorSetLayout::create(
+            device,
+            {
+                .flags = 0,
+                .bindings = { fragment_img_binding }
+            }
+        );
     }
 
     void App::create_graphics_pipeline()
@@ -601,8 +638,8 @@ namespace beva_demo_00_first_triangle
         // they are local variables because they're only needed until pipeline
         // creation.
 
-        auto vert_shader_code = read_file("./shaders/demo_00_vert.spv");
-        auto frag_shader_code = read_file("./shaders/demo_00_frag.spv");
+        auto vert_shader_code = read_file("./shaders/demo_02_vert.spv");
+        auto frag_shader_code = read_file("./shaders/demo_02_frag.spv");
 
         auto vert_shader_module = bv::ShaderModule::create(
             device,
@@ -682,6 +719,19 @@ namespace beva_demo_00_first_triangle
             .alpha_to_one_enable = false
         };
 
+        bv::DepthStencilState depth_stencil_state{
+            .flags = 0,
+            .depth_test_enable = true,
+            .depth_write_enable = true,
+            .depth_compare_op = VK_COMPARE_OP_LESS,
+            .depth_bounds_test_enable = false,
+            .stencil_test_enable = false,
+            .front = {},
+            .back = {},
+            .min_depth_bounds = 0.f,
+            .max_depth_bounds = 1.f
+        };
+
         bv::ColorBlendAttachment color_blend_attachment{
             .blend_enable = false,
             .src_color_blend_factor = VK_BLEND_FACTOR_ONE,
@@ -708,9 +758,13 @@ namespace beva_demo_00_first_triangle
             VK_DYNAMIC_STATE_SCISSOR
         };
 
-        pipeline_layout = bv::PipelineLayout::create(
+        graphics_pipeline_layout = bv::PipelineLayout::create(
             device,
-            { .flags = 0, .set_layouts = {}, .push_constant_ranges = {} }
+            {
+                .flags = 0,
+                .set_layouts = { graphics_descriptor_set_layout },
+                .push_constant_ranges = {}
+            }
         );
 
         graphics_pipeline = bv::GraphicsPipeline::create(
@@ -724,10 +778,10 @@ namespace beva_demo_00_first_triangle
                 .viewport_state = viewport_state,
                 .rasterization_state = rasterization_state,
                 .multisample_state = multisample_state,
-                .depth_stencil_state = std::nullopt,
+                .depth_stencil_state = depth_stencil_state,
                 .color_blend_state = color_blend_state,
                 .dynamic_states = dynamic_states,
-                .layout = pipeline_layout,
+                .layout = graphics_pipeline_layout,
                 .render_pass = render_pass,
                 .subpass_index = 0,
                 .base_pipeline = std::nullopt
@@ -738,22 +792,219 @@ namespace beva_demo_00_first_triangle
         frag_shader_module = nullptr;
     }
 
+    void App::create_compute_descriptor_set_layout()
+    {
+        bv::DescriptorSetLayoutBinding compute_input_img_binding{
+            .binding = 0,
+            .descriptor_type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+            .descriptor_count = 1,
+            .stage_flags = VK_SHADER_STAGE_COMPUTE_BIT,
+            .immutable_samplers = {}
+        };
+        bv::DescriptorSetLayoutBinding compute_output_img_binding{
+            .binding = 1,
+            .descriptor_type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+            .descriptor_count = 1,
+            .stage_flags = VK_SHADER_STAGE_COMPUTE_BIT,
+            .immutable_samplers = {}
+        };
+
+        compute_descriptor_set_layout = bv::DescriptorSetLayout::create(
+            device,
+            {
+                .flags = 0,
+                .bindings = {
+                compute_input_img_binding,
+                compute_output_img_binding
+            }
+            }
+        );
+    }
+
+    void App::create_compute_pipeline()
+    {
+        auto shader_module = bv::ShaderModule::create(
+            device,
+            std::move(read_file("./shaders/demo_02_comp.spv"))
+        );
+
+        std::vector<bv::SpecializationMapEntry> map_entries{
+            {
+                .constant_id = 0,
+                .offset = 0,
+                .size = 4
+            },
+            {
+                .constant_id = 1,
+                .offset = 4,
+                .size = 4
+            },
+            {
+                .constant_id = 2,
+                .offset = 8,
+                .size = 4
+            }
+        };
+
+        const auto& limits = physical_device->properties().limits;
+        compute_local_size = {
+            std::clamp(limits.max_compute_work_group_size[0], 1u, 64u),
+            std::clamp(limits.max_compute_work_group_size[1], 1u, 64u),
+            1
+        };
+        while (
+            compute_local_size.x
+            * compute_local_size.y
+            * compute_local_size.z > limits.max_compute_work_group_invocations)
+        {
+            compute_local_size.x = std::max(1u, compute_local_size.x / 2u);
+            compute_local_size.y = std::max(1u, compute_local_size.y / 2u);
+            compute_local_size.z = std::max(1u, compute_local_size.z / 2u);
+
+            if (limits.max_compute_work_group_invocations < 1) break;
+        }
+
+        bv::SpecializationInfo specialization_info{
+            .map_entries = map_entries,
+            .data = std::vector<uint8_t>(sizeof(compute_local_size))
+        };
+        std::copy(
+            &compute_local_size,
+            &compute_local_size + 1,
+            reinterpret_cast<glm::uvec3*>(specialization_info.data.data())
+        );
+
+        bv::ShaderStage shader_stage{
+            .flags = {},
+            .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+            .module = shader_module,
+            .entry_point = "main",
+            .specialization_info = specialization_info
+        };
+
+        bv::PushConstantRange push_constants{
+            .stage_flags = VK_SHADER_STAGE_COMPUTE_BIT,
+            .offset = 0,
+            .size = sizeof(ComputeShaderPushConstants)
+        };
+
+        compute_pipeline_layout = bv::PipelineLayout::create(
+            device,
+            {
+                .flags = 0,
+                .set_layouts = { compute_descriptor_set_layout },
+                .push_constant_ranges = { push_constants }
+            }
+        );
+
+        compute_pipeline = bv::ComputePipeline::create(
+            device,
+            {
+                .flags = 0,
+                .stage = shader_stage,
+                .layout = compute_pipeline_layout,
+                .base_pipeline = std::nullopt
+            }
+        );
+
+        shader_module = nullptr;
+    }
+
     void App::create_command_pools()
     {
         cmd_pool = bv::CommandPool::create(
             device,
             {
                 .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-                .queue_family_index = graphics_family_idx
+                .queue_family_index = graphics_compute_family_idx
             }
         );
         transient_cmd_pool = bv::CommandPool::create(
             device,
             {
                 .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
-                .queue_family_index = graphics_family_idx
+                .queue_family_index = graphics_compute_family_idx
             }
         );
+    }
+
+    void App::create_swapchain_framebuffers()
+    {
+        swapchain_framebufs.clear();
+        for (size_t i = 0; i < swapchain_imgviews.size(); i++)
+        {
+            swapchain_framebufs.push_back(bv::Framebuffer::create(
+                device,
+                {
+                    .flags = 0,
+                    .render_pass = render_pass,
+                    .attachments = { swapchain_imgviews[i] },
+                    .width = swapchain->config().image_extent.width,
+                    .height = swapchain->config().image_extent.height,
+                    .layers = 1
+                }
+            ));
+        }
+    }
+
+    void App::create_storage_images()
+    {
+        storage_imgs.resize(MAX_FRAMES_IN_FLIGHT);
+        storage_imgs_mem.resize(MAX_FRAMES_IN_FLIGHT);
+        storage_imgviews.resize(MAX_FRAMES_IN_FLIGHT);
+
+        auto cmd_buf = begin_single_time_commands(true);
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        {
+            create_image(
+                SIM_RESOLUTION,
+                SIM_RESOLUTION,
+                1,
+                VK_SAMPLE_COUNT_1_BIT,
+                SIM_IMAGE_FORMAT,
+                VK_IMAGE_TILING_OPTIMAL,
+                VK_IMAGE_USAGE_STORAGE_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                storage_imgs[i],
+                storage_imgs_mem[i]
+            );
+            storage_imgviews[i] = create_image_view(
+                storage_imgs[i],
+                SIM_IMAGE_FORMAT,
+                VK_IMAGE_ASPECT_COLOR_BIT,
+                1
+            );
+
+            // transition layout to general
+            VkImageMemoryBarrier barrier{
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = nullptr,
+                .srcAccessMask = 0,
+                .dstAccessMask = 0,
+                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = storage_imgs[i]->handle(),
+                .subresourceRange = VkImageSubresourceRange{
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+            }
+            };
+            vkCmdPipelineBarrier(
+                cmd_buf->handle(),
+                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                0,
+                0, nullptr,
+                0, nullptr,
+                1, &barrier
+            );
+        }
+        end_single_time_commands(cmd_buf);
     }
 
     void App::create_vertex_buffer()
@@ -792,6 +1043,130 @@ namespace beva_demo_00_first_triangle
 
         staging_buf = nullptr;
         staging_buf_mem = nullptr;
+    }
+
+    void App::create_graphics_descriptor_pool()
+    {
+        std::vector<bv::DescriptorPoolSize> pool_sizes;
+        pool_sizes.push_back({
+            .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+            .descriptor_count = MAX_FRAMES_IN_FLIGHT
+            });
+
+        graphics_descriptor_pool = bv::DescriptorPool::create(
+            device,
+            {
+                .flags = 0,
+                .max_sets = MAX_FRAMES_IN_FLIGHT,
+                .pool_sizes = pool_sizes
+            }
+        );
+    }
+
+    void App::create_graphics_descriptor_sets()
+    {
+        graphics_descriptor_sets = bv::DescriptorPool::allocate_sets(
+            graphics_descriptor_pool,
+            MAX_FRAMES_IN_FLIGHT,
+            std::vector<bv::DescriptorSetLayoutPtr>(
+                MAX_FRAMES_IN_FLIGHT,
+                graphics_descriptor_set_layout
+            )
+        );
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        {
+            bv::DescriptorImageInfo img_info{
+                .sampler = std::nullopt,
+                .image_view = storage_imgviews[i],
+                .image_layout = VK_IMAGE_LAYOUT_GENERAL
+            };
+
+            std::vector<bv::WriteDescriptorSet> descriptor_writes;
+            descriptor_writes.push_back({
+                .dst_set = graphics_descriptor_sets[i],
+                .dst_binding = 0,
+                .dst_array_element = 0,
+                .descriptor_count = 1,
+                .descriptor_type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+                .image_infos = { img_info },
+                .buffer_infos = {},
+                .texel_buffer_views = {}
+                });
+            bv::DescriptorSet::update_sets(device, descriptor_writes, {});
+        }
+    }
+
+    void App::create_compute_descriptor_pool()
+    {
+        std::vector<bv::DescriptorPoolSize> pool_sizes;
+        pool_sizes.push_back({
+            .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+            .descriptor_count = MAX_FRAMES_IN_FLIGHT
+            });
+        pool_sizes.push_back({
+            .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+            .descriptor_count = MAX_FRAMES_IN_FLIGHT
+            });
+
+        compute_descriptor_pool = bv::DescriptorPool::create(
+            device,
+            {
+                .flags = 0,
+                .max_sets = MAX_FRAMES_IN_FLIGHT,
+                .pool_sizes = pool_sizes
+            }
+        );
+    }
+
+    void App::create_compute_descriptor_sets()
+    {
+        compute_descriptor_sets = bv::DescriptorPool::allocate_sets(
+            compute_descriptor_pool,
+            MAX_FRAMES_IN_FLIGHT,
+            std::vector<bv::DescriptorSetLayoutPtr>(
+                MAX_FRAMES_IN_FLIGHT,
+                compute_descriptor_set_layout
+            )
+        );
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        {
+            bv::DescriptorImageInfo input_img_info{
+                .sampler = std::nullopt,
+                .image_view = storage_imgviews[(i - 1) % MAX_FRAMES_IN_FLIGHT],
+                .image_layout = VK_IMAGE_LAYOUT_GENERAL
+            };
+
+            bv::DescriptorImageInfo output_img_info{
+                .sampler = std::nullopt,
+                .image_view = storage_imgviews[i],
+                .image_layout = VK_IMAGE_LAYOUT_GENERAL
+            };
+
+            std::vector<bv::WriteDescriptorSet> descriptor_writes;
+            descriptor_writes.push_back({
+                .dst_set = compute_descriptor_sets[i],
+                .dst_binding = 0,
+                .dst_array_element = 0,
+                .descriptor_count = 1,
+                .descriptor_type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+                .image_infos = { input_img_info },
+                .buffer_infos = {},
+                .texel_buffer_views = {}
+                });
+            descriptor_writes.push_back({
+                .dst_set = compute_descriptor_sets[i],
+                .dst_binding = 1,
+                .dst_array_element = 0,
+                .descriptor_count = 1,
+                .descriptor_type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+                .image_infos = { output_img_info },
+                .buffer_infos = {},
+                .texel_buffer_views = {}
+                });
+            bv::DescriptorSet::update_sets(device, descriptor_writes, {});
+        }
     }
 
     void App::create_command_buffers()
@@ -848,12 +1223,16 @@ namespace beva_demo_00_first_triangle
             }
         }
 
+        const auto curr_time = std::chrono::high_resolution_clock::now();
+        const float elapsed =
+            std::chrono::duration<float>(curr_time - start_time).count();
+
         fences_in_flight[frame_idx]->reset();
 
         cmd_bufs[frame_idx]->reset(0);
-        record_command_buffer(cmd_bufs[frame_idx], img_idx);
+        record_command_buffer(cmd_bufs[frame_idx], img_idx, elapsed);
 
-        graphics_queue->submit(
+        graphics_compute_queue->submit(
             { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT },
             { semaphs_image_available[frame_idx] },
             { cmd_bufs[frame_idx] },
@@ -888,6 +1267,7 @@ namespace beva_demo_00_first_triangle
         }
 
         frame_idx = (frame_idx + 1) % MAX_FRAMES_IN_FLIGHT;
+        global_frame_idx++;
     }
 
     void App::cleanup_swapchain()
@@ -933,10 +1313,10 @@ namespace beva_demo_00_first_triangle
     )
     {
         cmd_buf->end();
-        graphics_queue->submit({}, {}, { cmd_buf }, {}, fence);
+        graphics_compute_queue->submit({}, {}, { cmd_buf }, {}, fence);
         if (fence == nullptr)
         {
-            graphics_queue->wait_idle();
+            graphics_compute_queue->wait_idle();
         }
         cmd_buf = nullptr;
     }
@@ -959,6 +1339,106 @@ namespace beva_demo_00_first_triangle
             }
         }
         throw std::runtime_error("failed to find a suitable memory type");
+    }
+
+    VkFormat App::find_depth_format()
+    {
+        auto format = physical_device->find_supported_image_format(
+            {
+                VK_FORMAT_D32_SFLOAT,
+                VK_FORMAT_D32_SFLOAT_S8_UINT,
+                VK_FORMAT_D24_UNORM_S8_UINT
+            },
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+        );
+        if (!format.has_value())
+        {
+            throw std::runtime_error("failed to find a supported depth format");
+        }
+        return format.value();
+    }
+
+    void App::create_image(
+        uint32_t width,
+        uint32_t height,
+        uint32_t mip_levels,
+        VkSampleCountFlagBits num_samples,
+        VkFormat format,
+        VkImageTiling tiling,
+        VkImageUsageFlags usage,
+        VkMemoryPropertyFlags memory_properties,
+        bv::ImagePtr& out_image,
+        bv::DeviceMemoryPtr& out_image_memory
+    )
+    {
+        // create image
+        bv::Extent3d extent{
+            .width = width,
+            .height = height,
+            .depth = 1
+        };
+        out_image = bv::Image::create(
+            device,
+            {
+                .flags = 0,
+                .image_type = VK_IMAGE_TYPE_2D,
+                .format = format,
+                .extent = extent,
+                .mip_levels = mip_levels,
+                .array_layers = 1,
+                .samples = num_samples,
+                .tiling = tiling,
+                .usage = usage,
+                .sharing_mode = VK_SHARING_MODE_EXCLUSIVE,
+                .queue_family_indices = {},
+                .initial_layout = VK_IMAGE_LAYOUT_UNDEFINED
+            }
+        );
+
+        // create memory
+        uint32_t memory_type_idx = find_memory_type_idx(
+            out_image->memory_requirements().memory_type_bits,
+            memory_properties
+        );
+        out_image_memory = bv::DeviceMemory::allocate(
+            device,
+            {
+                .allocation_size = out_image->memory_requirements().size,
+                .memory_type_index = memory_type_idx
+            }
+        );
+
+        // bind memory
+        out_image->bind_memory(out_image_memory, 0);
+    }
+
+    bv::ImageViewPtr App::create_image_view(
+        const bv::ImagePtr& image,
+        VkFormat format,
+        VkImageAspectFlags aspect_flags,
+        uint32_t mip_levels
+    )
+    {
+        bv::ImageSubresourceRange subresource_range{
+            .aspect_mask = aspect_flags,
+            .base_mip_level = 0,
+            .level_count = mip_levels,
+            .base_array_layer = 0,
+            .layer_count = 1
+        };
+
+        return bv::ImageView::create(
+            device,
+            image,
+            {
+                .flags = 0,
+                .view_type = VK_IMAGE_VIEW_TYPE_2D,
+                .format = format,
+                .components = {},
+                .subresource_range = subresource_range
+            }
+        );
     }
 
     void App::create_buffer(
@@ -1021,13 +1501,65 @@ namespace beva_demo_00_first_triangle
 
     void App::record_command_buffer(
         const bv::CommandBufferPtr& cmd_buf,
-        uint32_t img_idx
+        uint32_t img_idx,
+        float elapsed
     )
     {
         cmd_buf->begin(0);
 
+        vkCmdBindPipeline(
+            cmd_buf->handle(),
+            VK_PIPELINE_BIND_POINT_COMPUTE,
+            compute_pipeline->handle()
+        );
+
+        auto vk_descriptor_set = compute_descriptor_sets[frame_idx]->handle();
+        vkCmdBindDescriptorSets(
+            cmd_buf->handle(),
+            VK_PIPELINE_BIND_POINT_COMPUTE,
+            compute_pipeline_layout->handle(),
+            0,
+            1,
+            &vk_descriptor_set,
+            0,
+            0
+        );
+
+        glm::ivec2 mouse_icoord{ -1, -1 };
+        if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
+        {
+            double xpos, ypos;
+            glfwGetCursorPos(window, &xpos, &ypos);
+
+            auto extent = swapchain->config().image_extent;
+            mouse_icoord = {
+                int32_t((double)SIM_RESOLUTION * xpos / (double)extent.width),
+                int32_t((double)SIM_RESOLUTION * ypos / (double)extent.height)
+            };
+        }
+
+        ComputeShaderPushConstants compute_push_constants{
+            .emitter_icoord = mouse_icoord,
+            .global_frame_idx = (uint32_t)global_frame_idx
+        };
+        vkCmdPushConstants(
+            cmd_buf->handle(),
+            compute_pipeline_layout->handle(),
+            VK_SHADER_STAGE_COMPUTE_BIT,
+            0,
+            sizeof(compute_push_constants),
+            &compute_push_constants
+        );
+
+        vkCmdDispatch(
+            cmd_buf->handle(),
+            IDIV_CEIL(SIM_RESOLUTION, compute_local_size.x),
+            IDIV_CEIL(SIM_RESOLUTION, compute_local_size.y),
+            1
+        );
+
         VkClearValue clear_val;
-        clear_val.color = { { .15f, .16f, .2f, 1.f } };
+        clear_val.color = { { 0.f, 0.f, 0.f, 1.f } };
 
         VkRenderPassBeginInfo render_pass_info{
             .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -1053,14 +1585,14 @@ namespace beva_demo_00_first_triangle
             graphics_pipeline->handle()
         );
 
-        VkBuffer vk_vertex_bufs[] = { vertex_buf->handle() };
-        VkDeviceSize offsets[] = { 0 };
+        VkBuffer vk_vertex_buf = vertex_buf->handle();
+        VkDeviceSize offset = 0;
         vkCmdBindVertexBuffers(
             cmd_buf->handle(),
             0,
             1,
-            vk_vertex_bufs,
-            offsets
+            &vk_vertex_buf,
+            &offset
         );
 
         VkViewport viewport{
@@ -1079,9 +1611,21 @@ namespace beva_demo_00_first_triangle
         };
         vkCmdSetScissor(cmd_buf->handle(), 0, 1, &scissor);
 
+        vk_descriptor_set = graphics_descriptor_sets[frame_idx]->handle();
+        vkCmdBindDescriptorSets(
+            cmd_buf->handle(),
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            graphics_pipeline_layout->handle(),
+            0,
+            1,
+            &vk_descriptor_set,
+            0,
+            nullptr
+        );
+
         vkCmdDraw(
             cmd_buf->handle(),
-            (uint32_t)(vertices.size()),
+            (uint32_t)vertices.size(),
             1,
             0,
             0

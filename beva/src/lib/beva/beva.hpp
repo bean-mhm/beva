@@ -37,6 +37,7 @@ namespace bv
     class PipelineLayout;
     class RenderPass;
     class GraphicsPipeline;
+    class ComputePipeline;
     class Framebuffer;
     class CommandBuffer;
     class CommandPool;
@@ -69,6 +70,7 @@ namespace bv
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(PipelineLayout);
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(RenderPass);
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(GraphicsPipeline);
+    _BV_DEFINE_SMART_PTR_TYPE_ALIASES(ComputePipeline);
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(Framebuffer);
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(CommandBuffer);
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(CommandPool);
@@ -1297,6 +1299,15 @@ namespace bv
         std::optional<GraphicsPipelineWPtr> base_pipeline;
     };
 
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkComputePipelineCreateInfo.html
+    struct ComputePipelineConfig
+    {
+        VkPipelineCreateFlags flags;
+        ShaderStage stage;
+        PipelineLayoutWPtr layout;
+        std::optional<GraphicsPipelineWPtr> base_pipeline;
+    };
+
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFramebufferCreateInfo.html
     struct FramebufferConfig
     {
@@ -1406,7 +1417,7 @@ namespace bv
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDescriptorImageInfo.html
     struct DescriptorImageInfo
     {
-        SamplerWPtr sampler;
+        std::optional<SamplerWPtr> sampler;
         std::optional<ImageViewWPtr> image_view;
         VkImageLayout image_layout;
     };
@@ -2447,6 +2458,58 @@ namespace bv
         GraphicsPipeline(
             const DevicePtr& device,
             const GraphicsPipelineConfig& config,
+            const PipelineCachePtr& cache = nullptr
+        );
+
+    };
+
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipeline.html
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateComputePipelines.html
+    class ComputePipeline
+    {
+    public:
+        ComputePipeline() = delete;
+        ComputePipeline(const ComputePipeline& other) = delete;
+        ComputePipeline(ComputePipeline&& other) = default;
+
+        static ComputePipelinePtr create(
+            const DevicePtr& device,
+            const ComputePipelineConfig& config,
+            const PipelineCachePtr& cache = nullptr
+        );
+
+        constexpr const DeviceWPtr& device() const
+        {
+            return _device;
+        }
+
+        constexpr const ComputePipelineConfig& config() const
+        {
+            return _config;
+        }
+
+        constexpr const PipelineCacheWPtr& cache() const
+        {
+            return _cache;
+        }
+
+        constexpr VkPipeline handle() const
+        {
+            return _handle;
+        }
+
+        ~ComputePipeline();
+
+    protected:
+        DeviceWPtr _device;
+        ComputePipelineConfig _config;
+        PipelineCacheWPtr _cache;
+
+        VkPipeline _handle = nullptr;
+
+        ComputePipeline(
+            const DevicePtr& device,
+            const ComputePipelineConfig& config,
             const PipelineCachePtr& cache = nullptr
         );
 
