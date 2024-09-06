@@ -3063,6 +3063,14 @@ namespace bv
 
 #pragma region helper functions
 
+    // zero out a vector's capacity to actually free the memory
+    template<typename T>
+    void clear(std::vector<T>& vec)
+    {
+        vec.clear();
+        std::vector<T>().swap(vec);
+    }
+
     template<size_t size, typename T>
     std::array<T, size> raw_arr_to_std(const T* raw_arr)
     {

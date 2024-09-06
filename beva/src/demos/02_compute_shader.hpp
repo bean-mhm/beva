@@ -12,11 +12,7 @@
 #include "beva/beva.hpp"
 
 #define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#define GLM_ENABLE_EXPERIMENTAL
 #include "glm/glm.hpp"
-#include "glm/gtc/matrix_transform.hpp"
-#include <glm/gtx/hash.hpp>
 
 namespace beva_demo_02_compute_shader
 {
@@ -50,7 +46,7 @@ namespace beva_demo_02_compute_shader
 
     private:
         static constexpr const char* TITLE =
-            "beva demo: wave simulation with mouse interaction";
+            "beva demo: wave simulation";
         static constexpr int INITIAL_WIDTH = 720;
         static constexpr int INITIAL_HEIGHT = 720;
 

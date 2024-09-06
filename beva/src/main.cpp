@@ -6,6 +6,7 @@
 #include "demos/00_first_triangle.hpp"
 #include "demos/01_textured_model.hpp"
 #include "demos/02_compute_shader.hpp"
+#include "demos/03_deferred_rendering.hpp"
 
 static const std::vector<std::string> demos{
     "first triangle",
@@ -13,8 +14,9 @@ static const std::vector<std::string> demos{
     "textured model (baked lighting): OBJ, uniforms, textures, depth, mipmaps, "
     "multisampling, instanced rendering, push constants",
 
-    "wave simulation with mouse interaction: compute shader, storage image, "
-    "specialization constants"
+    "wave simulation: compute shader, storage image, specialization constants",
+
+    "deferred rendering: G-buffer, point lights, FXAA, filmic color transform"
 };
 
 void run_demo(int32_t idx)
@@ -36,6 +38,12 @@ void run_demo(int32_t idx)
     case 2:
     {
         beva_demo_02_compute_shader::App app{};
+        app.run();
+        break;
+    }
+    case 3:
+    {
+        beva_demo_03_deferred_rendering::App app{};
         app.run();
         break;
     }

@@ -71,6 +71,10 @@ namespace beva_demo_02_compute_shader
 
     void App::init()
     {
+        std::cout <<
+            "controls:\n"
+            "[Drag Mouse]: draw waves\n\n";
+
         start_time = std::chrono::high_resolution_clock::now();
 
         init_window();
@@ -121,9 +125,9 @@ namespace beva_demo_02_compute_shader
 
     void App::cleanup()
     {
-        fences_in_flight.clear();
-        semaphs_render_finished.clear();
-        semaphs_image_available.clear();
+        bv::clear(fences_in_flight);
+        bv::clear(semaphs_render_finished);
+        bv::clear(semaphs_image_available);
 
         compute_descriptor_pool = nullptr;
         graphics_descriptor_pool = nullptr;
@@ -131,9 +135,9 @@ namespace beva_demo_02_compute_shader
         vertex_buf = nullptr;
         vertex_buf_mem = nullptr;
 
-        storage_imgviews.clear();
-        storage_imgs.clear();
-        storage_imgs_mem.clear();
+        bv::clear(storage_imgviews);
+        bv::clear(storage_imgs);
+        bv::clear(storage_imgs_mem);
 
         cleanup_swapchain();
 
@@ -551,7 +555,7 @@ namespace beva_demo_02_compute_shader
         );
 
         // create swapchain image views
-        swapchain_imgviews.clear();
+        bv::clear(swapchain_imgviews);
         for (size_t i = 0; i < swapchain->images().size(); i++)
         {
             swapchain_imgviews.push_back(create_image_view(
@@ -930,7 +934,7 @@ namespace beva_demo_02_compute_shader
 
     void App::create_swapchain_framebuffers()
     {
-        swapchain_framebufs.clear();
+        bv::clear(swapchain_framebufs);
         for (size_t i = 0; i < swapchain_imgviews.size(); i++)
         {
             swapchain_framebufs.push_back(bv::Framebuffer::create(
@@ -1180,9 +1184,9 @@ namespace beva_demo_02_compute_shader
 
     void App::create_sync_objects()
     {
-        semaphs_image_available.clear();
-        semaphs_render_finished.clear();
-        fences_in_flight.clear();
+        bv::clear(semaphs_image_available);
+        bv::clear(semaphs_render_finished);
+        bv::clear(fences_in_flight);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
@@ -1272,8 +1276,8 @@ namespace beva_demo_02_compute_shader
 
     void App::cleanup_swapchain()
     {
-        swapchain_framebufs.clear();
-        swapchain_imgviews.clear();
+        bv::clear(swapchain_framebufs);
+        bv::clear(swapchain_imgviews);
         swapchain = nullptr;
     }
 

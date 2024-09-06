@@ -147,14 +147,14 @@ namespace beva_demo_01_textured_model
 
     void App::cleanup()
     {
-        fences_in_flight.clear();
-        semaphs_render_finished.clear();
-        semaphs_image_available.clear();
+        bv::clear(fences_in_flight);
+        bv::clear(semaphs_render_finished);
+        bv::clear(semaphs_image_available);
 
         descriptor_pool = nullptr;
 
-        uniform_bufs.clear();
-        uniform_bufs_mem.clear();
+        bv::clear(uniform_bufs);
+        bv::clear(uniform_bufs_mem);
 
         instance_buf = nullptr;
         instance_buf_mem = nullptr;
@@ -165,8 +165,8 @@ namespace beva_demo_01_textured_model
         vertex_buf = nullptr;
         vertex_buf_mem = nullptr;
 
-        indices.clear();
-        vertices.clear();
+        bv::clear(indices);
+        bv::clear(vertices);
 
         texture_sampler = nullptr;
         texture_imgview = nullptr;
@@ -575,7 +575,7 @@ namespace beva_demo_01_textured_model
         );
 
         // create swapchain image views
-        swapchain_imgviews.clear();
+        bv::clear(swapchain_imgviews);
         for (size_t i = 0; i < swapchain->images().size(); i++)
         {
             swapchain_imgviews.push_back(create_image_view(
@@ -960,7 +960,7 @@ namespace beva_demo_01_textured_model
 
     void App::create_swapchain_framebuffers()
     {
-        swapchain_framebufs.clear();
+        bv::clear(swapchain_framebufs);
         for (size_t i = 0; i < swapchain_imgviews.size(); i++)
         {
             std::vector<bv::ImageViewWPtr> attachments{
@@ -1136,8 +1136,8 @@ namespace beva_demo_01_textured_model
             throw std::runtime_error(("failed to load model: " + err).c_str());
         }
 
-        vertices.clear();
-        indices.clear();
+        bv::clear(vertices);
+        bv::clear(indices);
         std::unordered_map<Vertex, uint32_t> unique_vertices{};
         for (const auto& shape : shapes)
         {
@@ -1294,10 +1294,10 @@ namespace beva_demo_01_textured_model
     {
         VkDeviceSize size = sizeof(UniformBufferObject);
 
-        uniform_bufs.clear();
+        bv::clear(uniform_bufs);
         uniform_bufs.resize(MAX_FRAMES_IN_FLIGHT);
 
-        uniform_bufs_mem.clear();
+        bv::clear(uniform_bufs_mem);
         uniform_bufs_mem.resize(MAX_FRAMES_IN_FLIGHT);
 
         uniform_bufs_mapped.resize(MAX_FRAMES_IN_FLIGHT);
@@ -1405,9 +1405,9 @@ namespace beva_demo_01_textured_model
 
     void App::create_sync_objects()
     {
-        semaphs_image_available.clear();
-        semaphs_render_finished.clear();
-        fences_in_flight.clear();
+        bv::clear(semaphs_image_available);
+        bv::clear(semaphs_render_finished);
+        bv::clear(fences_in_flight);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
@@ -1498,7 +1498,7 @@ namespace beva_demo_01_textured_model
 
     void App::cleanup_swapchain()
     {
-        swapchain_framebufs.clear();
+        bv::clear(swapchain_framebufs);
 
         depth_imgview = nullptr;
         depth_img = nullptr;
@@ -1508,7 +1508,7 @@ namespace beva_demo_01_textured_model
         color_img = nullptr;
         color_img_mem = nullptr;
 
-        swapchain_imgviews.clear();
+        bv::clear(swapchain_imgviews);
         swapchain = nullptr;
     }
 

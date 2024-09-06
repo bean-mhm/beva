@@ -98,9 +98,9 @@ namespace beva_demo_00_first_triangle
 
     void App::cleanup()
     {
-        fences_in_flight.clear();
-        semaphs_render_finished.clear();
-        semaphs_image_available.clear();
+        bv::clear(fences_in_flight);
+        bv::clear(semaphs_render_finished);
+        bv::clear(semaphs_image_available);
 
         vertex_buf = nullptr;
         vertex_buf_mem = nullptr;
@@ -502,7 +502,7 @@ namespace beva_demo_00_first_triangle
         );
 
         // create swapchain image views
-        swapchain_imgviews.clear();
+        bv::clear(swapchain_imgviews);
         for (size_t i = 0; i < swapchain->images().size(); i++)
         {
             bv::ImageSubresourceRange subresource_range{
@@ -578,7 +578,7 @@ namespace beva_demo_00_first_triangle
 
     void App::create_swapchain_framebuffers()
     {
-        swapchain_framebufs.clear();
+        bv::clear(swapchain_framebufs);
         for (size_t i = 0; i < swapchain_imgviews.size(); i++)
         {
             swapchain_framebufs.push_back(bv::Framebuffer::create(
@@ -805,9 +805,9 @@ namespace beva_demo_00_first_triangle
 
     void App::create_sync_objects()
     {
-        semaphs_image_available.clear();
-        semaphs_render_finished.clear();
-        fences_in_flight.clear();
+        bv::clear(semaphs_image_available);
+        bv::clear(semaphs_render_finished);
+        bv::clear(fences_in_flight);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
@@ -892,8 +892,8 @@ namespace beva_demo_00_first_triangle
 
     void App::cleanup_swapchain()
     {
-        swapchain_framebufs.clear();
-        swapchain_imgviews.clear();
+        bv::clear(swapchain_framebufs);
+        bv::clear(swapchain_imgviews);
         swapchain = nullptr;
     }
 

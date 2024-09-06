@@ -36,6 +36,9 @@
     <ClCompile Include="src\demos\02_compute_shader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\demos\03_deferred_rendering.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\lib\glfw\glfw3.h">
@@ -924,6 +927,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\demos\02_compute_shader.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\demos\03_deferred_rendering.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
