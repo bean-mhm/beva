@@ -5112,13 +5112,21 @@ namespace bv
         const std::vector<DescriptorSetLayoutPtr>& set_layouts
     )
     {
-        if (count < 1)
-        {
-            return {};
-        }
-
         try
         {
+            if (count != set_layouts.size())
+            {
+                throw Error(
+                    "there should be the same number of descriptor set layouts "
+                    "as the number of sets to create"
+                );
+            }
+
+            if (count < 1)
+            {
+                return {};
+            }
+
             std::vector<VkDescriptorSetLayout>vk_set_layouts(
                 set_layouts.size()
             );

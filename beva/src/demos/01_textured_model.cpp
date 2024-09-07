@@ -46,7 +46,7 @@ namespace beva_demo_01_textured_model
         .input_rate = VK_VERTEX_INPUT_RATE_INSTANCE
     };
 
-    const std::vector<bv::VertexInputAttributeDescription>
+    static const std::vector<bv::VertexInputAttributeDescription>
         attributes
     {
         // vertex attributes

@@ -26,7 +26,7 @@ namespace beva_demo_00_first_triangle
         .input_rate = VK_VERTEX_INPUT_RATE_VERTEX
     };
 
-    const std::vector<bv::VertexInputAttributeDescription>
+    static const std::vector<bv::VertexInputAttributeDescription>
         attributes
     {
         bv::VertexInputAttributeDescription{

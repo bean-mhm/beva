@@ -32,29 +32,38 @@ namespace beva_demo_03_deferred_rendering
     };
     constexpr int32_t RenderMode_count = 5;
 
-    struct UniformBufferObject
+    struct GBufferUBO
     {
         alignas(16) glm::mat4 model;
         alignas(16) glm::mat4 view;
         alignas(16) glm::mat4 proj;
     };
 
-    struct Vertex
+    struct GBufferVertex
     {
         glm::vec3 pos;
         glm::vec3 normal;
         glm::vec2 texcoord;
 
         static const bv::VertexInputBindingDescription binding;
-        bool operator==(const Vertex& other) const;
+        bool operator==(const GBufferVertex& other) const;
+    };
+
+    struct DeferredVertex
+    {
+        glm::vec2 pos;
+        glm::vec2 texcoord;
+
+        static const bv::VertexInputBindingDescription binding;
     };
 
 }
 
 template<>
-struct std::hash<beva_demo_03_deferred_rendering::Vertex>
+struct std::hash<beva_demo_03_deferred_rendering::GBufferVertex>
 {
-    size_t operator()(const beva_demo_03_deferred_rendering::Vertex& v) const
+    size_t operator()(const beva_demo_03_deferred_rendering::GBufferVertex& v)
+        const
     {
         return ((std::hash<glm::vec3>()(v.pos) ^
             (std::hash<glm::vec3>()(v.normal) << 1)) >> 1) ^
@@ -64,6 +73,67 @@ struct std::hash<beva_demo_03_deferred_rendering::Vertex>
 
 namespace beva_demo_03_deferred_rendering
 {
+
+    class App;
+
+    // G buffer recreatable stuff
+    struct GBufferDynamics
+    {
+        // alpha = metallic
+        static constexpr VkFormat DIFFUSE_METALLIC_GBUF_FORMAT =
+            VK_FORMAT_R8G8B8A8_UNORM;
+
+        // rg = normal in spherical coords, b = roughnees, a = is lit?
+        static constexpr VkFormat NORMAL_ROUGHNESS_GBUF_FORMAT =
+            VK_FORMAT_R16G16B16A16_UNORM;
+
+        bv::ImagePtr diffuse_metallic_img = nullptr;
+        bv::DeviceMemoryPtr diffuse_metallic_mem = nullptr;
+        bv::ImageViewPtr diffuse_metallic_view = nullptr;
+        bv::SamplerPtr diffuse_metallic_sampler = nullptr;
+
+        bv::ImagePtr normal_roughness_img = nullptr;
+        bv::DeviceMemoryPtr normal_roughness_mem = nullptr;
+        bv::ImageViewPtr normal_roughness_view = nullptr;
+        bv::SamplerPtr normal_roughness_sampler = nullptr;
+
+        bv::ImagePtr depth_img = nullptr;
+        bv::DeviceMemoryPtr depth_img_mem = nullptr;
+        bv::ImageViewPtr depth_imgview = nullptr;
+        bv::SamplerPtr depth_sampler = nullptr;
+
+        bv::RenderPassPtr render_pass = nullptr;
+        bv::FramebufferPtr framebuf = nullptr;
+
+        GBufferDynamics(App& app);
+        ~GBufferDynamics();
+
+        void recreate(App& app);
+
+    private:
+        void init(App& app);
+        void cleanup();
+
+    };
+
+    struct GBuffer
+    {
+        std::vector<bv::BufferPtr> uniform_bufs;
+        std::vector<bv::DeviceMemoryPtr> uniform_bufs_mem;
+        std::vector<void*> uniform_bufs_mapped;
+
+        bv::DescriptorSetLayoutPtr descriptor_set_layout = nullptr;
+        bv::PipelineLayoutPtr pipeline_layout = nullptr;
+        bv::GraphicsPipelinePtr graphics_pipeline = nullptr;
+
+        bv::DescriptorPoolPtr descriptor_pool = nullptr;
+        std::vector<bv::DescriptorSetPtr> descriptor_sets;
+
+        GBufferDynamics dynamics;
+
+        GBuffer(App& app);
+        ~GBuffer();
+    };
 
     class App
     {
@@ -94,9 +164,9 @@ namespace beva_demo_03_deferred_rendering
 
         // alpha = metallic
         static constexpr VkFormat DIFFUSE_METALLIC_TEX_FORMAT =
-            VK_FORMAT_R8G8B8A8_SRGB;
+            VK_FORMAT_R8G8B8A8_UNORM;
 
-        // rg = normal, b = roughnees
+        // rg = normal map XY (Z will be calculated), b = roughnees
         static constexpr VkFormat NORMAL_ROUGHNESS_TEX_FORMAT =
             VK_FORMAT_R16G16B16A16_UNORM;
 
@@ -113,34 +183,29 @@ namespace beva_demo_03_deferred_rendering
         bv::DevicePtr device = nullptr;
         bv::QueuePtr graphics_queue = nullptr;
         bv::QueuePtr presentation_queue = nullptr;
+        bv::CommandPoolPtr cmd_pool = nullptr;
+        bv::CommandPoolPtr transient_cmd_pool = nullptr;
 
         bv::RenderPassPtr render_pass = nullptr;
         bv::DescriptorSetLayoutPtr descriptor_set_layout = nullptr;
         bv::PipelineLayoutPtr pipeline_layout = nullptr;
         bv::GraphicsPipelinePtr graphics_pipeline = nullptr;
 
-        bv::CommandPoolPtr cmd_pool = nullptr;
-        bv::CommandPoolPtr transient_cmd_pool = nullptr;
-
-        bv::ImagePtr depth_img = nullptr;
-        bv::DeviceMemoryPtr depth_img_mem = nullptr;
-        bv::ImageViewPtr depth_imgview = nullptr;
-
         bv::SwapchainPtr swapchain = nullptr;
         std::vector<bv::ImageViewPtr> swapchain_imgviews;
         std::vector<bv::FramebufferPtr> swapchain_framebufs;
 
-        bv::ImagePtr diffuse_metallic_img = nullptr;
-        bv::DeviceMemoryPtr diffuse_metallic_mem = nullptr;
-        bv::ImageViewPtr diffuse_metallic_view = nullptr;
-        bv::SamplerPtr diffuse_metallic_sampler = nullptr;
+        bv::ImagePtr tex_diffuse_metallic_img = nullptr;
+        bv::DeviceMemoryPtr tex_diffuse_metallic_mem = nullptr;
+        bv::ImageViewPtr tex_diffuse_metallic_view = nullptr;
+        bv::SamplerPtr tex_diffuse_metallic_sampler = nullptr;
 
-        bv::ImagePtr normal_roughness_img = nullptr;
-        bv::DeviceMemoryPtr normal_roughness_mem = nullptr;
-        bv::ImageViewPtr normal_roughness_view = nullptr;
-        bv::SamplerPtr normal_roughness_sampler = nullptr;
+        bv::ImagePtr tex_normal_roughness_img = nullptr;
+        bv::DeviceMemoryPtr tex_normal_roughness_mem = nullptr;
+        bv::ImageViewPtr tex_normal_roughness_view = nullptr;
+        bv::SamplerPtr tex_normal_roughness_sampler = nullptr;
 
-        std::vector<Vertex> vertices;
+        std::vector<GBufferVertex> vertices;
         std::vector<uint32_t> indices;
 
         bv::BufferPtr vertex_buf = nullptr;
@@ -149,9 +214,8 @@ namespace beva_demo_03_deferred_rendering
         bv::BufferPtr index_buf = nullptr;
         bv::DeviceMemoryPtr index_buf_mem = nullptr;
 
-        std::vector<bv::BufferPtr> uniform_bufs;
-        std::vector<bv::DeviceMemoryPtr> uniform_bufs_mem;
-        std::vector<void*> uniform_bufs_mapped;
+        bv::BufferPtr quad_vertex_buf = nullptr;
+        bv::DeviceMemoryPtr quad_vertex_buf_mem = nullptr;
 
         bv::DescriptorPoolPtr descriptor_pool = nullptr;
         std::vector<bv::DescriptorSetPtr> descriptor_sets;
@@ -161,6 +225,8 @@ namespace beva_demo_03_deferred_rendering
         std::vector<bv::SemaphorePtr> semaphs_image_available;
         std::vector<bv::SemaphorePtr> semaphs_render_finished;
         std::vector<bv::FencePtr> fences_in_flight;
+
+        std::shared_ptr<GBuffer> gbuf = nullptr;
 
         uint32_t graphics_family_idx = 0;
         uint32_t presentation_family_idx = 0;
@@ -193,18 +259,20 @@ namespace beva_demo_03_deferred_rendering
         void create_surface();
         void pick_physical_device();
         void create_logical_device();
+        void create_command_pools();
         void create_swapchain();
         void create_render_pass();
         void create_descriptor_set_layout();
         void create_graphics_pipeline();
-        void create_command_pools();
-        void create_depth_resources();
         void create_swapchain_framebuffers();
         void load_textures();
         void load_model();
+
+        void create_gbuffer();
+
         void create_vertex_buffer();
         void create_index_buffer();
-        void create_uniform_buffers();
+        void create_quad_vertex_buffer();
         void create_descriptor_pool();
         void create_descriptor_sets();
         void create_command_buffers();
@@ -252,10 +320,10 @@ namespace beva_demo_03_deferred_rendering
             bv::DeviceMemoryPtr& out_image_memory
         );
 
-        // when new_layout is VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, the
-        // vertex_shader argument defines whether dstStageMask should be set to
-        // VK_PIPELINE_STAGE_VERTEX_SHADER_BIT or
-        // VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, otherwise it's ignored.
+        // when one of old_layout or new_layout is
+        // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, the vertex_shader argument
+        // defines whether said shader is the vertex shader or the fragment
+        // shader.
         void transition_image_layout(
             const bv::CommandBufferPtr& cmd_buf,
             const bv::ImagePtr& image,
@@ -309,6 +377,9 @@ namespace beva_demo_03_deferred_rendering
         friend void glfw_key_callback(
             GLFWwindow* window, int key, int scancode, int action, int mods
         );
+
+        friend struct GBufferDynamics;
+        friend struct GBuffer;
 
     };
 

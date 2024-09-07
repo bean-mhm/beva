@@ -29,7 +29,7 @@ namespace beva_demo_02_compute_shader
         .input_rate = VK_VERTEX_INPUT_RATE_VERTEX
     };
 
-    const std::vector<bv::VertexInputAttributeDescription>
+    static const std::vector<bv::VertexInputAttributeDescription>
         attributes
     {
         bv::VertexInputAttributeDescription{
@@ -52,7 +52,7 @@ namespace beva_demo_02_compute_shader
         { .pos = { 1.f, -1.f }, .texcoord = { 1.f, 0.f } }, // tr
         { .pos = { -1.f, 1.f }, .texcoord = { 0.f, 1.f } }, // bl
         { .pos = { 1.f, -1.f }, .texcoord = { 1.f, 0.f } }, // tr
-        { .pos = { -1.f, -1.f }, .texcoord = { 0.f, 0.f } }, // tl
+        { .pos = { -1.f, -1.f }, .texcoord = { 0.f, 0.f } } // tl
     };
 
     void App::run()

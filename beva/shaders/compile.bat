@@ -16,8 +16,10 @@ if not exist "%VS_OUT_DIR%shaders/" mkdir "%VS_OUT_DIR%shaders/"
 %GLSLC_PATH% -fshader-stage=fragment "%VS_PROJ_DIR%shaders/demo_02_frag.glsl" -o "%VS_OUT_DIR%shaders/demo_02_frag.spv"
 %GLSLC_PATH% -fshader-stage=compute "%VS_PROJ_DIR%shaders/demo_02_comp.glsl" -o "%VS_OUT_DIR%shaders/demo_02_comp.spv"
 
-%GLSLC_PATH% -fshader-stage=vertex "%VS_PROJ_DIR%shaders/demo_03_vert.glsl" -o "%VS_OUT_DIR%shaders/demo_03_vert.spv"
-%GLSLC_PATH% -fshader-stage=fragment "%VS_PROJ_DIR%shaders/demo_03_frag.glsl" -o "%VS_OUT_DIR%shaders/demo_03_frag.spv"
+%GLSLC_PATH% -fshader-stage=vertex "%VS_PROJ_DIR%shaders/demo_03_gbuf_vert.glsl" -o "%VS_OUT_DIR%shaders/demo_03_gbuf_vert.spv"
+%GLSLC_PATH% -fshader-stage=fragment "%VS_PROJ_DIR%shaders/demo_03_gbuf_frag.glsl" -o "%VS_OUT_DIR%shaders/demo_03_gbuf_frag.spv"
+%GLSLC_PATH% -fshader-stage=vertex "%VS_PROJ_DIR%shaders/demo_03_def_vert.glsl" -o "%VS_OUT_DIR%shaders/demo_03_def_vert.spv"
+%GLSLC_PATH% -fshader-stage=fragment "%VS_PROJ_DIR%shaders/demo_03_def_frag.glsl" -o "%VS_OUT_DIR%shaders/demo_03_def_frag.spv"
 
 echo finished compiling shaders
 
