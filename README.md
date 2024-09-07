@@ -116,3 +116,8 @@ Note: beva requires C++20.
 
 Check out `beva/src/demos` to see how to use beva. If you build and run the
 solution in Visual Studio, you'll get asked to choose a demo to run.
+
+The demos don't necessarily follow the best practices for making larger
+applications. Buffer and image memory management is very naive, and the code
+could certainly be rewritten to be much more organized, but these demos are just
+there to show how beva can be used.
