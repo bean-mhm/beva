@@ -22,6 +22,9 @@
 namespace beva_demo_03_deferred_rendering
 {
 
+    static constexpr float DEPTH_NEAR = .01f;
+    static constexpr float DEPTH_FAR = 10.f;
+
     enum class RenderMode : int32_t
     {
         Lit,
@@ -32,31 +35,6 @@ namespace beva_demo_03_deferred_rendering
         PositionDerived
     };
     constexpr int32_t RenderMode_count = 6;
-
-    struct GBufferUBO
-    {
-        alignas(16) glm::mat4 model;
-        alignas(16) glm::mat4 view;
-        alignas(16) glm::mat4 proj;
-    };
-
-    struct GBufferVertex
-    {
-        glm::vec3 pos;
-        glm::vec3 normal;
-        glm::vec2 texcoord;
-
-        static const bv::VertexInputBindingDescription binding;
-        bool operator==(const GBufferVertex& other) const;
-    };
-
-    struct DeferredVertex
-    {
-        glm::vec2 pos;
-        glm::vec2 texcoord;
-
-        static const bv::VertexInputBindingDescription binding;
-    };
 
     enum class LightType : int32_t
     {
@@ -81,10 +59,32 @@ namespace beva_demo_03_deferred_rendering
         );
     };
 
-    static constexpr float DEPTH_NEAR = .01f;
-    static constexpr float DEPTH_FAR = 10.f;
+    struct GeometryPassUniforms
+    {
+        alignas(16) glm::mat4 model;
+        alignas(16) glm::mat4 view;
+        alignas(16) glm::mat4 proj;
+    };
 
-    struct DeferredPushConstants
+    struct GeometryPassVertex
+    {
+        glm::vec3 pos;
+        glm::vec3 normal;
+        glm::vec2 texcoord;
+
+        static const bv::VertexInputBindingDescription binding;
+        bool operator==(const GeometryPassVertex& other) const;
+    };
+
+    struct LightingPassVertex
+    {
+        glm::vec2 pos;
+        glm::vec2 texcoord;
+
+        static const bv::VertexInputBindingDescription binding;
+    };
+
+    struct LightingPassFragPushConstants
     {
         glm::mat4 inv_view_proj{ 1 };
         glm::vec3 cam_pos{ 0.f, -.9f, .35f };
@@ -96,9 +96,9 @@ namespace beva_demo_03_deferred_rendering
 }
 
 template<>
-struct std::hash<beva_demo_03_deferred_rendering::GBufferVertex>
+struct std::hash<beva_demo_03_deferred_rendering::GeometryPassVertex>
 {
-    size_t operator()(const beva_demo_03_deferred_rendering::GBufferVertex& v)
+    size_t operator()(const beva_demo_03_deferred_rendering::GeometryPassVertex& v)
         const
     {
         return ((std::hash<glm::vec3>()(v.pos) ^
@@ -112,8 +112,7 @@ namespace beva_demo_03_deferred_rendering
 
     class App;
 
-    // G buffer recreatable stuff
-    struct GBufferDynamics
+    struct GeometryPassRecreatables
     {
         // alpha = metallic
         static constexpr VkFormat DIFFUSE_METALLIC_GBUF_FORMAT =
@@ -141,18 +140,18 @@ namespace beva_demo_03_deferred_rendering
         bv::RenderPassPtr render_pass = nullptr;
         bv::FramebufferPtr framebuf = nullptr;
 
-        GBufferDynamics(App& app);
-        ~GBufferDynamics();
-
-        void recreate(App& app);
+        GeometryPassRecreatables(App& app);
+        ~GeometryPassRecreatables();
 
     private:
         void init(App& app);
         void cleanup();
 
+        friend struct GeometryPass;
+
     };
 
-    struct GBuffer
+    struct GeometryPass
     {
         std::vector<bv::BufferPtr> uniform_bufs;
         std::vector<bv::DeviceMemoryPtr> uniform_bufs_mem;
@@ -165,10 +164,57 @@ namespace beva_demo_03_deferred_rendering
         bv::DescriptorPoolPtr descriptor_pool = nullptr;
         std::vector<bv::DescriptorSetPtr> descriptor_sets;
 
-        GBufferDynamics dynamics;
+        GeometryPassRecreatables recreatables;
 
-        GBuffer(App& app);
-        ~GBuffer();
+        GeometryPass(App& app);
+        ~GeometryPass();
+
+        void recreate(App& app);
+    };
+
+    struct LightingPassRecreatables
+    {
+        bv::RenderPassPtr render_pass = nullptr;
+        std::vector<bv::FramebufferPtr> swapchain_framebufs;
+
+        LightingPassRecreatables(App& app);
+        ~LightingPassRecreatables();
+
+    private:
+        void init(App& app);
+        void cleanup();
+
+        friend struct LightingPass;
+
+    };
+
+    struct LightingPass
+    {
+        std::array<Light, 4> lights;
+
+        std::vector<bv::BufferPtr> light_bufs;
+        std::vector<bv::DeviceMemoryPtr> light_bufs_mem;
+        std::vector<void*> light_bufs_mapped;
+
+        bv::DescriptorSetLayoutPtr descriptor_set_layout = nullptr;
+        bv::PipelineLayoutPtr pipeline_layout = nullptr;
+        bv::GraphicsPipelinePtr graphics_pipeline = nullptr;
+
+        bv::DescriptorPoolPtr descriptor_pool = nullptr;
+        std::vector<bv::DescriptorSetPtr> descriptor_sets;
+
+        LightingPassRecreatables recreatables;
+
+        LightingPassFragPushConstants frag_push_constants;
+
+        LightingPass(App& app);
+        ~LightingPass();
+
+        void recreate(App& app);
+
+    private:
+        void recreate_descriptor_sets(App& app);
+
     };
 
     class App
@@ -222,14 +268,8 @@ namespace beva_demo_03_deferred_rendering
         bv::CommandPoolPtr cmd_pool = nullptr;
         bv::CommandPoolPtr transient_cmd_pool = nullptr;
 
-        bv::RenderPassPtr render_pass = nullptr;
-        bv::DescriptorSetLayoutPtr descriptor_set_layout = nullptr;
-        bv::PipelineLayoutPtr pipeline_layout = nullptr;
-        bv::GraphicsPipelinePtr graphics_pipeline = nullptr;
-
         bv::SwapchainPtr swapchain = nullptr;
         std::vector<bv::ImageViewPtr> swapchain_imgviews;
-        std::vector<bv::FramebufferPtr> swapchain_framebufs;
 
         bv::ImagePtr tex_diffuse_metallic_img = nullptr;
         bv::DeviceMemoryPtr tex_diffuse_metallic_mem = nullptr;
@@ -241,7 +281,7 @@ namespace beva_demo_03_deferred_rendering
         bv::ImageViewPtr tex_normal_roughness_view = nullptr;
         bv::SamplerPtr tex_normal_roughness_sampler = nullptr;
 
-        std::vector<GBufferVertex> vertices;
+        std::vector<GeometryPassVertex> vertices;
         std::vector<uint32_t> indices;
 
         bv::BufferPtr vertex_buf = nullptr;
@@ -253,20 +293,15 @@ namespace beva_demo_03_deferred_rendering
         bv::BufferPtr quad_vertex_buf = nullptr;
         bv::DeviceMemoryPtr quad_vertex_buf_mem = nullptr;
 
-        std::vector<bv::BufferPtr> light_bufs;
-        std::vector<bv::DeviceMemoryPtr> light_bufs_mem;
-        std::vector<void*> light_bufs_mapped;
-
-        bv::DescriptorPoolPtr descriptor_pool = nullptr;
-        std::vector<bv::DescriptorSetPtr> descriptor_sets;
+        // geometry and lighting pass structs
+        std::shared_ptr<GeometryPass> gpass = nullptr;
+        std::shared_ptr<LightingPass> lpass = nullptr;
 
         // "per frame" stuff (as in frames in flight)
         std::vector<bv::CommandBufferPtr> cmd_bufs;
         std::vector<bv::SemaphorePtr> semaphs_image_available;
         std::vector<bv::SemaphorePtr> semaphs_render_finished;
         std::vector<bv::FencePtr> fences_in_flight;
-
-        std::shared_ptr<GBuffer> gbuf = nullptr;
 
         uint32_t graphics_family_idx = 0;
         uint32_t presentation_family_idx = 0;
@@ -285,10 +320,6 @@ namespace beva_demo_03_deferred_rendering
         bool mouse_down = false;
         bool drag_mode = false;
 
-        DeferredPushConstants push_constants;
-
-        std::array<Light, 4> lights;
-
         glm::vec2 cam_dir_spherical{
             glm::pi<float>() / 2.f + glm::radians(4.f),
             glm::pi<float>() / 2.f
@@ -302,22 +333,16 @@ namespace beva_demo_03_deferred_rendering
         void create_logical_device();
         void create_command_pools();
         void create_swapchain();
-        void create_render_pass();
-        void create_descriptor_set_layout();
-        void create_graphics_pipeline();
-        void create_swapchain_framebuffers();
+
         void load_textures();
         void load_model();
-
-        void create_gbuffer();
 
         void create_vertex_buffer();
         void create_index_buffer();
         void create_quad_vertex_buffer();
-        void create_light_buffers();
 
-        void create_descriptor_pool();
-        void create_descriptor_sets();
+        void create_passes();
+
         void create_command_buffers();
         void create_sync_objects();
 
@@ -422,8 +447,10 @@ namespace beva_demo_03_deferred_rendering
             GLFWwindow* window, int key, int scancode, int action, int mods
         );
 
-        friend struct GBufferDynamics;
-        friend struct GBuffer;
+        friend struct GeometryPassRecreatables;
+        friend struct GeometryPass;
+        friend struct LightingPassRecreatables;
+        friend struct LightingPass;
 
     };
 
