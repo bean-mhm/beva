@@ -113,6 +113,15 @@ namespace beva_demo_03_deferred_rendering
         { .pos = { -1.f, -1.f }, .texcoord = { 0.f, 0.f } } // tl
     };
 
+    Light::Light(
+        LightType type,
+        const glm::vec3& col,
+        const glm::vec3& pos_or_dir
+    )
+        : data0(col, (float)(int32_t)type),
+        data1(pos_or_dir, 0.f)
+    {}
+
     GBufferDynamics::GBufferDynamics(App& app)
     {
         init(app);
@@ -774,6 +783,8 @@ namespace beva_demo_03_deferred_rendering
         create_vertex_buffer();
         create_index_buffer();
         create_quad_vertex_buffer();
+        create_light_buffers();
+
         create_descriptor_pool();
         create_descriptor_sets();
         create_command_buffers();
@@ -810,6 +821,7 @@ namespace beva_demo_03_deferred_rendering
             cursor_pos = new_cursor_pos;
 
             glfwPollEvents();
+            update_lights();
             update_camera();
             draw_frame();
 
@@ -831,6 +843,9 @@ namespace beva_demo_03_deferred_rendering
         bv::clear(semaphs_image_available);
 
         descriptor_pool = nullptr;
+
+        bv::clear(light_bufs);
+        bv::clear(light_bufs_mem);
 
         quad_vertex_buf = nullptr;
         quad_vertex_buf_mem = nullptr;
@@ -1261,7 +1276,7 @@ namespace beva_demo_03_deferred_rendering
             .initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
             .final_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
         };
-        
+
         bv::AttachmentReference color_attachment_ref{
             .attachment = 0,
             .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
@@ -1324,6 +1339,14 @@ namespace beva_demo_03_deferred_rendering
             .immutable_samplers = {}
         };
 
+        bv::DescriptorSetLayoutBinding light_buf_layout_binding{
+            .binding = 3,
+            .descriptor_type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .descriptor_count = 1,
+            .stage_flags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .immutable_samplers = {}
+        };
+
         descriptor_set_layout = bv::DescriptorSetLayout::create(
             device,
             {
@@ -1331,7 +1354,8 @@ namespace beva_demo_03_deferred_rendering
                 .bindings = {
                 sampler0_layout_binding,
                 sampler1_layout_binding,
-                sampler2_layout_binding
+                sampler2_layout_binding,
+                light_buf_layout_binding
             }
             }
         );
@@ -1458,7 +1482,7 @@ namespace beva_demo_03_deferred_rendering
         bv::PushConstantRange frag_push_constants{
             .stage_flags = VK_SHADER_STAGE_FRAGMENT_BIT,
             .offset = 0,
-            .size = sizeof(push_constant_render_mode)
+            .size = sizeof(push_constants)
         };
 
         pipeline_layout = bv::PipelineLayout::create(
@@ -1973,12 +1997,42 @@ namespace beva_demo_03_deferred_rendering
         staging_buf_mem = nullptr;
     }
 
+    void App::create_light_buffers()
+    {
+        VkDeviceSize size = sizeof(lights[0]) * lights.size();
+
+        bv::clear(light_bufs);
+        light_bufs.resize(MAX_FRAMES_IN_FLIGHT);
+
+        bv::clear(light_bufs_mem);
+        light_bufs_mem.resize(MAX_FRAMES_IN_FLIGHT);
+
+        light_bufs_mapped.resize(App::MAX_FRAMES_IN_FLIGHT);
+
+        for (size_t i = 0; i < App::MAX_FRAMES_IN_FLIGHT; i++)
+        {
+            create_buffer(
+                size,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+                light_bufs[i],
+                light_bufs_mem[i]
+            );
+
+            light_bufs_mapped[i] = light_bufs_mem[i]->map(0, size);
+        }
+    }
+
     void App::create_descriptor_pool()
     {
         std::vector<bv::DescriptorPoolSize> pool_sizes;
         pool_sizes.push_back({
             .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .descriptor_count = 3 * MAX_FRAMES_IN_FLIGHT
+            });
+        pool_sizes.push_back({
+            .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .descriptor_count = MAX_FRAMES_IN_FLIGHT
             });
 
         descriptor_pool = bv::DescriptorPool::create(
@@ -2023,6 +2077,12 @@ namespace beva_demo_03_deferred_rendering
                 .image_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
             };
 
+            bv::DescriptorBufferInfo light_buffer_info{
+                .buffer = light_bufs[i],
+                .offset = 0,
+                .range = sizeof(lights[0]) * lights.size()
+            };
+
             std::vector<bv::WriteDescriptorSet> descriptor_writes;
 
             descriptor_writes.push_back({
@@ -2055,6 +2115,17 @@ namespace beva_demo_03_deferred_rendering
                 .descriptor_type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 .image_infos = { sampler2_image_info },
                 .buffer_infos = {},
+                .texel_buffer_views = {}
+                });
+
+            descriptor_writes.push_back({
+                .dst_set = descriptor_sets[i],
+                .dst_binding = 3,
+                .dst_array_element = 0,
+                .descriptor_count = 1,
+                .descriptor_type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                .image_infos = {},
+                .buffer_infos = { light_buffer_info },
                 .texel_buffer_views = {}
                 });
 
@@ -2091,6 +2162,53 @@ namespace beva_demo_03_deferred_rendering
     void App::create_gbuffer()
     {
         gbuf = std::make_shared<GBuffer>(*this);
+    }
+
+    void App::update_lights()
+    {
+        if (light_bufs[frame_idx] == nullptr)
+            return;
+
+        const float angle_offset = 35.f * scene_time + 95.f;
+
+        float ang = glm::radians(90.f + angle_offset);
+        lights[0] = Light(
+            LightType::Directional,
+            { .8f, .7f, .6f },
+            glm::normalize(glm::vec3(std::cos(ang), std::sin(ang), 1.2f))
+        );
+
+        ang = glm::radians(-18.f + angle_offset);
+        float dist = 1.25f;
+        lights[1] = Light(
+            LightType::Point,
+            { .5f, .3f, .15f },
+            { dist * std::cos(ang), dist * std::sin(ang), .6f }
+        );
+
+        ang = glm::radians(198.f + angle_offset);
+        dist = 1.25f;
+        lights[2] = Light(
+            LightType::Point,
+            { .15f, .3f, .5f },
+            { dist * std::cos(ang), dist * std::sin(ang), .3f }
+        );
+
+        lights[3] = Light(
+            LightType::Ambient,
+            { .015f, .015f, .02f },
+            {}
+        );
+
+        std::copy(
+            lights.data(),
+            lights.data() + lights.size(),
+            (Light*)light_bufs_mapped[frame_idx]
+        );
+        light_bufs_mem[frame_idx]->flush_mapped_range(
+            0,
+            sizeof(lights[0]) * lights.size()
+        );
     }
 
     void App::update_camera()
@@ -2143,7 +2261,7 @@ namespace beva_demo_03_deferred_rendering
             vel *= .3f;
 
         // move
-        cam_pos += delta_time * vel;
+        push_constants.cam_pos += delta_time * vel;
     }
 
     void App::draw_frame()
@@ -2789,8 +2907,8 @@ namespace beva_demo_03_deferred_rendering
             pipeline_layout->handle(),
             VK_SHADER_STAGE_FRAGMENT_BIT,
             0,
-            sizeof(push_constant_render_mode),
-            &push_constant_render_mode
+            sizeof(push_constants),
+            &push_constants
         );
 
         vkCmdDraw(
@@ -2813,8 +2931,8 @@ namespace beva_demo_03_deferred_rendering
         ubo.model = glm::mat4(1);
 
         ubo.view = glm::lookAt(
-            cam_pos,
-            cam_pos + spherical_to_cartesian(cam_dir_spherical),
+            push_constants.cam_pos,
+            push_constants.cam_pos + spherical_to_cartesian(cam_dir_spherical),
             glm::vec3(0, 0, 1)
         );
 
@@ -2822,8 +2940,8 @@ namespace beva_demo_03_deferred_rendering
         ubo.proj = glm::perspective(
             glm::radians(60.f),
             (float)sc_extent.width / (float)sc_extent.height,
-            .01f,
-            10.f
+            DEPTH_NEAR,
+            DEPTH_FAR
         );
         ubo.proj[1][1] *= -1.f;
 
@@ -2832,6 +2950,9 @@ namespace beva_demo_03_deferred_rendering
             &ubo + 1,
             (GBufferUBO*)gbuf->uniform_bufs_mapped[frame_idx]
         );
+
+        // also update deferred frag shader's push constants
+        push_constants.inv_view_proj = glm::inverse(ubo.proj * ubo.view);
     }
 
     static float elapsed_since(const std::chrono::steady_clock::time_point& t)
@@ -2918,12 +3039,12 @@ namespace beva_demo_03_deferred_rendering
 
         App& app = *(App*)(glfwGetWindowUserPointer(window));
 
-        app.push_constant_render_mode = (RenderMode)
-            (((int32_t)app.push_constant_render_mode + 1)
+        app.push_constants.render_mode = (RenderMode)
+            (((int32_t)app.push_constants.render_mode + 1)
                 % RenderMode_count);
 
         std::string new_title = App::TITLE;
-        switch (app.push_constant_render_mode)
+        switch (app.push_constants.render_mode)
         {
         case RenderMode::Lit:
         {
@@ -2940,6 +3061,9 @@ namespace beva_demo_03_deferred_rendering
             break;
         case RenderMode::Depth:
             new_title += " (render mode: depth)";
+            break;
+        case RenderMode::PositionDerived:
+            new_title += " (render mode: position (derived))";
             break;
         default:
             break;

@@ -28,9 +28,10 @@ namespace beva_demo_03_deferred_rendering
         Diffuse,
         Normal,
         MetallicRoughness,
-        Depth
+        Depth,
+        PositionDerived
     };
-    constexpr int32_t RenderMode_count = 5;
+    constexpr int32_t RenderMode_count = 6;
 
     struct GBufferUBO
     {
@@ -55,6 +56,41 @@ namespace beva_demo_03_deferred_rendering
         glm::vec2 texcoord;
 
         static const bv::VertexInputBindingDescription binding;
+    };
+
+    enum class LightType : int32_t
+    {
+        Ambient,
+        Point,
+        Directional
+    };
+
+    struct Light
+    {
+        // xyz = col, w = type
+        glm::vec4 data0{ 0.f };
+
+        // xyz = pos_or_dir, w = useless
+        glm::vec4 data1{ 0.f };
+
+        Light() = default;
+        Light(
+            LightType type,
+            const glm::vec3& col,
+            const glm::vec3& pos_or_dir
+        );
+    };
+
+    static constexpr float DEPTH_NEAR = .01f;
+    static constexpr float DEPTH_FAR = 10.f;
+
+    struct DeferredPushConstants
+    {
+        glm::mat4 inv_view_proj{ 1 };
+        glm::vec3 cam_pos{ 0.f, -.9f, .35f };
+        float z_near = DEPTH_NEAR;
+        float z_far = DEPTH_FAR;
+        RenderMode render_mode = RenderMode::Lit;
     };
 
 }
@@ -144,8 +180,8 @@ namespace beva_demo_03_deferred_rendering
     private:
         static constexpr const char* TITLE =
             "beva demo: deferred lighting";
-        static constexpr int INITIAL_WIDTH = 960;
-        static constexpr int INITIAL_HEIGHT = 720;
+        static constexpr int INITIAL_WIDTH = 1024;
+        static constexpr int INITIAL_HEIGHT = 768;
 
         static constexpr bool DEBUG_MODE = true;
         static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
@@ -217,6 +253,10 @@ namespace beva_demo_03_deferred_rendering
         bv::BufferPtr quad_vertex_buf = nullptr;
         bv::DeviceMemoryPtr quad_vertex_buf_mem = nullptr;
 
+        std::vector<bv::BufferPtr> light_bufs;
+        std::vector<bv::DeviceMemoryPtr> light_bufs_mem;
+        std::vector<void*> light_bufs_mapped;
+
         bv::DescriptorPoolPtr descriptor_pool = nullptr;
         std::vector<bv::DescriptorSetPtr> descriptor_sets;
 
@@ -245,9 +285,10 @@ namespace beva_demo_03_deferred_rendering
         bool mouse_down = false;
         bool drag_mode = false;
 
-        RenderMode push_constant_render_mode = RenderMode::Lit;
+        DeferredPushConstants push_constants;
 
-        glm::vec3 cam_pos{ 0.f, -.9f, .35f };
+        std::array<Light, 4> lights;
+
         glm::vec2 cam_dir_spherical{
             glm::pi<float>() / 2.f + glm::radians(4.f),
             glm::pi<float>() / 2.f
@@ -273,11 +314,14 @@ namespace beva_demo_03_deferred_rendering
         void create_vertex_buffer();
         void create_index_buffer();
         void create_quad_vertex_buffer();
+        void create_light_buffers();
+
         void create_descriptor_pool();
         void create_descriptor_sets();
         void create_command_buffers();
         void create_sync_objects();
 
+        void update_lights();
         void update_camera();
         void draw_frame();
 
