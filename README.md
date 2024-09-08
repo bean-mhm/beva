@@ -94,7 +94,8 @@ functions to see how to use them properly. For example, whether a
 `std::shared_ptr` field can be `nullptr` or must have a value, or in what
 conditions a `std::optional` field can actually be `std::nullopt`.
 
-beva is not tested enough to be called stable or ready for production at all.
+beva is not tested enough to be called stable or ready for production at all. It
+is just a fun side project at most.
 
 # Documentation
 
@@ -115,9 +116,57 @@ Note: beva requires C++20.
 # Demos
 
 Check out `beva/src/demos` to see how to use beva. If you build and run the
-solution in Visual Studio, you'll get asked to choose a demo to run.
+project in Visual Studio, you'll get asked to choose a demo to run.
 
-The demos don't necessarily follow the best practices for making larger
+## 00: First Triangle
+![beva demo](images/demo-00.png)
+
+This demo implements the very basics needed to draw a triangle to the screen.
+Devices, swapchains, vertex buffers, that sort of stuff.
+
+## 01: Textured Model (Baked Lighting)
+![beva demo](images/demo-01.png)
+
+This demo builds on top of the first one and implements uniform buffers,
+textures, depth buffering, mipmaps, multisampling, instanced rendering, and push
+constants. It uses an external library to load an OBJ model. The model is from
+[PolyHaven.com](https://polyhaven.com).
+
+## 02: Wave Simulation
+![beva demo](images/demo-02.png)
+
+This demo uses a compute shader to drive a wave simulation. It uses shader
+storage images for the simulation and specialization constants to send
+local invocation sizes to the compute shader at runtime without recompiling it.
+
+## 03: Deferred Rendering
+![beva demo](images/demo-03.png)
+
+Being the most complex of them all, this one uses what's called a G-Buffer to
+only render what's essential for lighting. This is different for every
+application, but in this case the G-Buffer contains two images with the
+following data:
+1. **Diffuse-metallic:** This image stores diffuse color data in the first three
+channels and metalness in the fourth one.
+2. **Normal-roughness:** This one stores the world-space normal in the first two
+channels using spherical coordinates and the roughness value in the third
+channel. The fourth channel is simply a toggle that defines whether the pixel
+should be lit or it is unlit (like the background, or an emissive surface).
+
+The geometry pass is what renders to the G-Buffer. A lighting pass then draws a
+full-screen quad and samples the the G-Buffer images to render a properly lit
+scene. It uses a shader storage buffer object (SSBO) to read and use an array of
+lights updated from the CPU. Finally, a post processing pass samples the output
+from the lighting pass to apply FXAA-like antialiasing and some post processing.
+
+Deferred rendering is most useful when you have a lot of lights, or a lot of
+overdraw such that the lighting calculations for a pixel get completely
+discarded as another one is drawn on top of it. None of these are a problem is
+the extremely simple "scene" in this demo, though.
+
+## Note
+
+These demos don't necessarily follow the best practices for making larger
 applications. Buffer and image memory management is very naive, and the code
-could certainly be rewritten to be much more organized, but these demos are just
-there to show how beva can be used.
+could certainly be rewritten to be much more organized. These are just there to
+show you how beva can be used.
