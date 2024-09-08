@@ -795,7 +795,7 @@ vec2 get_final_tangent(vec2 coord)
     vec2 tangent = figure_out_tangent2(gl_FragCoord.xy);
 
     vec2 grad = fetch_gradient(gl_FragCoord.xy);
-    return tangent * step(.0005, dot(grad, grad));
+    return tangent * step(.0003, dot(grad, grad));
 }
 
 // keep following the tangent on both sides and average out the
@@ -826,18 +826,18 @@ vec3 fxaa2(vec2 coord)
 {
     vec2 tang = get_final_tangent(coord);
     float tang_len_sq = dot(tang, tang);
-    if (tang_len_sq < 0.0002)
+    if (tang_len_sq < .01)
     {
         return fetch(coord);
     }
     tang /= sqrt(tang_len_sq);
 
     vec3 col = vec3(0);
-    for (int i = -10; i <= 10; i++)
+    for (int i = -5; i <= 5; i++)
     {
         col += fetch(coord + .5 * float(i) * tang);
     }
-    col /= 21.;
+    col /= 11.;
     return col;
 }
 

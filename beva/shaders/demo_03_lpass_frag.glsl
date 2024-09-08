@@ -65,7 +65,17 @@ float linearize_depth(float d)
     return z_near * z_far / (z_far + d * (z_near - z_far));
 }
 
+float safe_div(float a, float b)
+{
+    if (abs(b) < .001)
+    {
+        return a / (sign(b) * 1000.);
+    }
+    return a / b;
+}
+
 // https://github.com/pboechat/cook_torrance/blob/d139082e8d97c3722eb63be1c73bcff021b755f2/application/shaders/cook_torrance_textured.fs.glsl#L21
+// slightly modified to remove NaNs
 vec3 cook_torrance(
     vec3 materialDiffuseColor,
 	vec3 materialSpecularColor,
@@ -76,36 +86,38 @@ vec3 cook_torrance(
     float roughness
 )
 {
-	float NdotL = max(0., dot(normal, lightDir));
-	float Rs = 0.0;
-	if (NdotL > 0.) 
+	float NdotL = max(.0001, dot(normal, lightDir));
+	float Rs = 0.;
+	if (NdotL > .0001001) 
 	{
 		vec3 H = normalize(lightDir + viewDir);
-		float NdotH = max(0., dot(normal, H));
-		float NdotV = max(0., dot(normal, viewDir));
-		float VdotH = max(0., dot(lightDir, H));
+		float NdotH = max(.0001, dot(normal, H));
+		float NdotV = max(.0001, dot(normal, viewDir));
+		float VdotH = max(.0001, dot(lightDir, H));
 
 		// Fresnel reflectance
-        const float F0 = 0.8;
-		float F = pow(1.0 - VdotH, 5.0);
-		F *= (1.0 - F0);
+        const float F0 = .8;
+		float F = pow(1. - VdotH, 5.);
+		F *= (1. - F0);
 		F += F0;
 
 		// Microfacet distribution by Beckmann
 		float m_squared = roughness * roughness;
-		float r1 = 1.0 / (4.0 * m_squared * pow(NdotH, 4.0));
-		float r2 = (NdotH * NdotH - 1.0) / (m_squared * NdotH * NdotH);
+		float r1 = safe_div(1., 4. * m_squared * pow(NdotH, 4.));
+		float r2 = safe_div(NdotH * NdotH - 1., m_squared * NdotH * NdotH);
 		float D = r1 * exp(r2);
 
 		// Geometric shadowing
-		float two_NdotH = 2.0 * NdotH;
+		float two_NdotH = 2. * NdotH;
 		float g1 = (two_NdotH * NdotV) / VdotH;
 		float g2 = (two_NdotH * NdotL) / VdotH;
-		float G = min(1.0, min(g1, g2));
+		float G = min(1., min(g1, g2));
 
 		Rs = (F * D * G) / (PI * NdotL * NdotV);
 	}
-	return materialDiffuseColor * lightColor * NdotL + lightColor * materialSpecularColor * Rs;
+	return
+        (materialDiffuseColor * lightColor * NdotL)
+        + (lightColor * materialSpecularColor * Rs);
 }
 
 void main()
