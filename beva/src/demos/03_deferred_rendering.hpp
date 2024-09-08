@@ -76,7 +76,7 @@ namespace beva_demo_03_deferred_rendering
         bool operator==(const GeometryPassVertex& other) const;
     };
 
-    struct LightingPassVertex
+    struct FlatVertex
     {
         glm::vec2 pos;
         glm::vec2 texcoord;
@@ -91,6 +91,12 @@ namespace beva_demo_03_deferred_rendering
         float z_near = DEPTH_NEAR;
         float z_far = DEPTH_FAR;
         RenderMode render_mode = RenderMode::Lit;
+    };
+
+    struct FxaaPassFragPushConstants
+    {
+        int32_t do_nothing = 0;
+        uint32_t global_frame_idx = 0;
     };
 
 }
@@ -118,7 +124,7 @@ namespace beva_demo_03_deferred_rendering
         static constexpr VkFormat DIFFUSE_METALLIC_GBUF_FORMAT =
             VK_FORMAT_R8G8B8A8_UNORM;
 
-        // rg = normal in spherical coords, b = roughnees, a = is lit?
+        // rg = normal in spherical coords, b = roughnees, a = pixel is lit?
         static constexpr VkFormat NORMAL_ROUGHNESS_GBUF_FORMAT =
             VK_FORMAT_R16G16B16A16_UNORM;
 
@@ -174,8 +180,16 @@ namespace beva_demo_03_deferred_rendering
 
     struct LightingPassRecreatables
     {
+        static constexpr VkFormat LPASS_COLOR_FORMAT =
+            VK_FORMAT_R16G16B16A16_SFLOAT;
+
+        bv::ImagePtr color_img = nullptr;
+        bv::DeviceMemoryPtr color_img_mem = nullptr;
+        bv::ImageViewPtr color_imgview = nullptr;
+        bv::SamplerPtr color_img_sampler = nullptr;
+
         bv::RenderPassPtr render_pass = nullptr;
-        std::vector<bv::FramebufferPtr> swapchain_framebufs;
+        bv::FramebufferPtr framebuf;
 
         LightingPassRecreatables(App& app);
         ~LightingPassRecreatables();
@@ -209,6 +223,45 @@ namespace beva_demo_03_deferred_rendering
 
         LightingPass(App& app);
         ~LightingPass();
+
+        void recreate(App& app);
+
+    private:
+        void recreate_descriptor_sets(App& app);
+
+    };
+
+    struct FxaaPassRecreatables
+    {
+        bv::RenderPassPtr render_pass = nullptr;
+        std::vector<bv::FramebufferPtr> swapchain_framebufs;
+
+        FxaaPassRecreatables(App& app);
+        ~FxaaPassRecreatables();
+
+    private:
+        void init(App& app);
+        void cleanup();
+
+        friend struct FxaaPass;
+
+    };
+
+    struct FxaaPass
+    {
+        bv::DescriptorSetLayoutPtr descriptor_set_layout = nullptr;
+        bv::PipelineLayoutPtr pipeline_layout = nullptr;
+        bv::GraphicsPipelinePtr graphics_pipeline = nullptr;
+
+        bv::DescriptorPoolPtr descriptor_pool = nullptr;
+        std::vector<bv::DescriptorSetPtr> descriptor_sets;
+
+        FxaaPassRecreatables recreatables;
+
+        FxaaPassFragPushConstants frag_push_constants;
+
+        FxaaPass(App& app);
+        ~FxaaPass();
 
         void recreate(App& app);
 
@@ -293,9 +346,10 @@ namespace beva_demo_03_deferred_rendering
         bv::BufferPtr quad_vertex_buf = nullptr;
         bv::DeviceMemoryPtr quad_vertex_buf_mem = nullptr;
 
-        // geometry and lighting pass structs
+        // geometry pass, lighting pass, and FXAA (+ post processing) pass
         std::shared_ptr<GeometryPass> gpass = nullptr;
         std::shared_ptr<LightingPass> lpass = nullptr;
+        std::shared_ptr<FxaaPass> fxaa_pass;
 
         // "per frame" stuff (as in frames in flight)
         std::vector<bv::CommandBufferPtr> cmd_bufs;
@@ -308,6 +362,7 @@ namespace beva_demo_03_deferred_rendering
 
         bool framebuf_resized = false;
         uint32_t frame_idx = 0;
+        uint64_t global_frame_idx = 0;
 
         std::chrono::steady_clock::time_point start_time;
         std::chrono::steady_clock::time_point frame_start_time;
@@ -451,6 +506,8 @@ namespace beva_demo_03_deferred_rendering
         friend struct GeometryPass;
         friend struct LightingPassRecreatables;
         friend struct LightingPass;
+        friend struct FxaaPassRecreatables;
+        friend struct FxaaPass;
 
     };
 

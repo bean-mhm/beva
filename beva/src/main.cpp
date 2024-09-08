@@ -16,8 +16,8 @@ static const std::vector<std::string> demos{
 
     "wave simulation: compute shader, storage image, specialization constants",
 
-    "deferred rendering: G-buffer, SSBO lights, PBR (almost), filmic color "
-    "transform"
+    "deferred rendering: G-buffer, SSBO lights, PBR (almost), FXAA, post "
+    "processing, filmic color transform"
 };
 
 void run_demo(int32_t idx)

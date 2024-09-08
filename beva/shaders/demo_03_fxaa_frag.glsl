@@ -1,41 +1,13 @@
 #version 450
 
-const int RENDER_MODE_LIT = 0;
-const int RENDER_MODE_DIFFUSE = 1;
-const int RENDER_MODE_NORMAL = 2;
-const int RENDER_MODE_METALLIC_ROUGHNESS = 3;
-const int RENDER_MODE_DEPTH = 4;
-const int RENDER_MODE_POSITION_DERIVED = 5;
-
 // push constants
 layout(push_constant, std430) uniform pc {
-    layout(offset = 0) mat4 inv_view_proj;
-    layout(offset = 64) vec3 cam_pos;
-    layout(offset = 76) float z_near;
-    layout(offset = 80) float z_far;
-    layout(offset = 84) int render_mode;
-};
-
-const float LIGHT_TYPE_AMBIENT = 0.;
-const float LIGHT_TYPE_POINT = 1.;
-const float LIGHT_TYPE_DIRECTIONAL = 2.;
-
-struct Light
-{
-    // xyz = col, w = type
-    vec4 data0;
-
-    // xyz = pos_or_dir, w = useless
-    vec4 data1;
+    layout(offset = 0) int do_nothing;
+    layout(offset = 4) uint global_frame_idx;
 };
 
 // uniforms
-layout(binding = 0) uniform sampler2D diffuse_metallic;
-layout(binding = 1) uniform sampler2D normal_roughness;
-layout(binding = 2) uniform sampler2D depth_sampler;
-layout(std430, binding = 3) readonly buffer LightBuf {
-   Light lights[];
-};
+layout(binding = 0) uniform sampler2D lpass_color;
 
 // output from vertex shader
 layout(location = 0) in vec2 v_texcoord;
@@ -674,26 +646,31 @@ vec3 flim_transform(vec3 col, float exposure, bool convert_to_srgb)
 
 
 
-const float PI = 3.141592653589793238462643383;
-const float TAU = 6.283185307179586476925286767;
-const float PI_OVER_2 = 1.570796326794896619231321692;
-const float INV_PI = .318309886183790671537767527;
-const float INV_TAU = .159154943091895335768883763;
-
-// xyz = r, theta, phi
-// https://gist.github.com/overdev/d0acea5729d43086b4841efb8f27c8e2
-vec3 spherical_to_cartesian(vec3 s)
+// https://www.shadertoy.com/view/WttXWX
+// bias: 0.020888578919738908 = minimal theoretic limit
+uint triple32(uint x)
 {
-    return s.x * vec3(
-        cos(s.z) * sin(s.y),
-        sin(s.z) * sin(s.y),
-        cos(s.y)
-    );
+    x ^= x >> 17;
+    x *= 0xed5ad4bbU;
+    x ^= x >> 11;
+    x *= 0xac4c1b51U;
+    x ^= x >> 15;
+    x *= 0x31848babU;
+    x ^= x >> 14;
+    return x;
 }
 
-float linearize_depth(float d)
+// https://www.shadertoy.com/view/WttXWX
+float hash(uvec2 v)
 {
-    return z_near * z_far / (z_far + d * (z_near - z_far));
+    return float(triple32(v.x + triple32(v.y))) / float(0xffffffffU);
+}
+
+// ASC CDL color grading
+// https://en.wikipedia.org/wiki/ASC_CDL
+vec3 asc_cdl(vec3 col, vec3 slope, vec3 offset, vec3 power)
+{
+    return pow(max(col, 0.) * slope + offset, power);
 }
 
 vec3 native_view_transform(vec3 col)
@@ -707,144 +684,197 @@ vec3 native_view_transform(vec3 col)
     return col;
 }
 
-// https://github.com/pboechat/cook_torrance/blob/d139082e8d97c3722eb63be1c73bcff021b755f2/application/shaders/cook_torrance_textured.fs.glsl#L21
-vec3 cook_torrance(
-    vec3 materialDiffuseColor,
-	vec3 materialSpecularColor,
-	vec3 normal,
-	vec3 lightDir,
-	vec3 viewDir,
-	vec3 lightColor,
-    float roughness
-)
+
+
+// FXAA-like algorithms
+// source: https://www.shadertoy.com/view/XcBBWW
+// (modified)
+/*--------------------------------------------------------*/
+
+float lum(vec3 col)
 {
-	float NdotL = max(0., dot(normal, lightDir));
-	float Rs = 0.0;
-	if (NdotL > 0.) 
-	{
-		vec3 H = normalize(lightDir + viewDir);
-		float NdotH = max(0., dot(normal, H));
-		float NdotV = max(0., dot(normal, viewDir));
-		float VdotH = max(0., dot(lightDir, H));
-
-		// Fresnel reflectance
-        const float F0 = 0.8;
-		float F = pow(1.0 - VdotH, 5.0);
-		F *= (1.0 - F0);
-		F += F0;
-
-		// Microfacet distribution by Beckmann
-		float m_squared = roughness * roughness;
-		float r1 = 1.0 / (4.0 * m_squared * pow(NdotH, 4.0));
-		float r2 = (NdotH * NdotH - 1.0) / (m_squared * NdotH * NdotH);
-		float D = r1 * exp(r2);
-
-		// Geometric shadowing
-		float two_NdotH = 2.0 * NdotH;
-		float g1 = (two_NdotH * NdotV) / VdotH;
-		float g2 = (two_NdotH * NdotL) / VdotH;
-		float G = min(1.0, min(g1, g2));
-
-		Rs = (F * D * G) / (PI * NdotL * NdotV);
-	}
-	return materialDiffuseColor * lightColor * NdotL + lightColor * materialSpecularColor * Rs;
+    return dot(col, vec3(.3, .5, .2));
 }
+
+vec3 fetch(vec2 coord)
+{
+    return texture(lpass_color, coord / vec2(textureSize(lpass_color, 0))).rgb;
+}
+
+vec2 fetch_gradient(vec2 coord)
+{
+    return vec2(
+        lum(fetch(coord + vec2(.5, 0))) - lum(fetch(coord + vec2(-.5, 0))),
+        lum(fetch(coord + vec2(0, .5))) - lum(fetch(coord + vec2(0, -.5)))
+    );
+}
+
+vec2 figure_out_tangent2(vec2 coord)
+{
+    float lum_center = lum(fetch(coord));
+    float min_lum_diff = 1e9;
+    vec2 dir_with_lowest_lum_diff = vec2(1, 0);
+    
+    vec2 dir = vec2(1, 0);
+    float lum_moved = lum(fetch(coord + dir));
+    float lum_diff = abs(lum_moved - lum_center);
+    if (lum_diff < min_lum_diff)
+    {
+        min_lum_diff = lum_diff;
+        dir_with_lowest_lum_diff = dir;
+    }
+    
+    dir = vec2(1, 1);
+    lum_moved = lum(fetch(coord + dir));
+    lum_diff = abs(lum_moved - lum_center);
+    if (lum_diff < min_lum_diff)
+    {
+        min_lum_diff = lum_diff;
+        dir_with_lowest_lum_diff = dir;
+    }
+    
+    dir = vec2(0, 1);
+    lum_moved = lum(fetch(coord + dir));
+    lum_diff = abs(lum_moved - lum_center);
+    if (lum_diff < min_lum_diff)
+    {
+        min_lum_diff = lum_diff;
+        dir_with_lowest_lum_diff = dir;
+    }
+    
+    dir = vec2(-1, 1);
+    lum_moved = lum(fetch(coord + dir));
+    lum_diff = abs(lum_moved - lum_center);
+    if (lum_diff < min_lum_diff)
+    {
+        min_lum_diff = lum_diff;
+        dir_with_lowest_lum_diff = dir;
+    }
+    
+    dir = vec2(-1, 0);
+    lum_moved = lum(fetch(coord + dir));
+    lum_diff = abs(lum_moved - lum_center);
+    if (lum_diff < min_lum_diff)
+    {
+        min_lum_diff = lum_diff;
+        dir_with_lowest_lum_diff = dir;
+    }
+    
+    dir = vec2(-1, -1);
+    lum_moved = lum(fetch(coord + dir));
+    lum_diff = abs(lum_moved - lum_center);
+    if (lum_diff < min_lum_diff)
+    {
+        min_lum_diff = lum_diff;
+        dir_with_lowest_lum_diff = dir;
+    }
+    
+    dir = vec2(0, -1);
+    lum_moved = lum(fetch(coord + dir));
+    lum_diff = abs(lum_moved - lum_center);
+    if (lum_diff < min_lum_diff)
+    {
+        min_lum_diff = lum_diff;
+        dir_with_lowest_lum_diff = dir;
+    }
+    
+    dir = vec2(1, -1);
+    lum_moved = lum(fetch(coord + dir));
+    lum_diff = abs(lum_moved - lum_center);
+    if (lum_diff < min_lum_diff)
+    {
+        min_lum_diff = lum_diff;
+        dir_with_lowest_lum_diff = dir;
+    }
+    
+    return dir_with_lowest_lum_diff;
+}
+
+vec2 get_final_tangent(vec2 coord)
+{
+    vec2 tangent = figure_out_tangent2(gl_FragCoord.xy);
+
+    vec2 grad = fetch_gradient(gl_FragCoord.xy);
+    return tangent * step(.0005, dot(grad, grad));
+}
+
+// keep following the tangent on both sides and average out the
+// colors along the path
+vec3 fxaa1(vec2 coord)
+{
+    vec2 curr_coord = coord;
+    vec3 col = fetch(curr_coord);
+    for (int i = 0; i < 3; i++)
+    {
+        curr_coord += get_final_tangent(curr_coord);
+        col += fetch(curr_coord);
+    }
+    curr_coord = coord;
+    for (int i = 0; i < 3; i++)
+    {
+        curr_coord -= get_final_tangent(curr_coord);
+        col += fetch(curr_coord);
+    }
+    col /= 7.;
+    return col;
+}
+
+// keep following the tangent on both sides and average out the
+// colors along the path, but don't recalculate the tangent at every step.
+// this basically just a directional blur along the tangnet.
+vec3 fxaa2(vec2 coord)
+{
+    vec2 tang = get_final_tangent(coord);
+    float tang_len_sq = dot(tang, tang);
+    if (tang_len_sq < 0.0002)
+    {
+        return fetch(coord);
+    }
+    tang /= sqrt(tang_len_sq);
+
+    vec3 col = vec3(0);
+    for (int i = -10; i <= 10; i++)
+    {
+        col += fetch(coord + .5 * float(i) * tang);
+    }
+    col /= 21.;
+    return col;
+}
+
+// end of FXAA-like algorithms
+/*--------------------------------------------------------*/
+
+
 
 void main()
 {
-    vec4 data0 = texture(diffuse_metallic, v_texcoord);
-    vec4 data1 = texture(normal_roughness, v_texcoord);
-
-    vec3 diffuse = pow(data0.rgb, vec3(2.2));
-    float metallic = data0.a;
-    vec3 world_normal = spherical_to_cartesian(
-        vec3(1., PI * (data1.xy * 2. - 1.))
-    );
-    float roughness = data1.b;
-    bool pixel_is_lit = data1.a > .5;
-
-    float depth = texture(depth_sampler, v_texcoord).x;
-    float depth_lin = linearize_depth(depth);
-
-    // calculate world position
-    // https://stackoverflow.com/questions/38938498/how-do-i-convert-gl-fragcoord-to-a-world-space-point-in-a-fragment-shader
-    vec4 ndc = vec4(
-        2. * gl_FragCoord.xy / vec2(textureSize(diffuse_metallic, 0)) - 1.,
-        depth,
-        1
-    );
-    vec4 clip = inv_view_proj * ndc;
-    vec3 world_pos = clip.xyz / clip.w;
-
     vec3 col = vec3(0);
-    if (render_mode == RENDER_MODE_LIT && pixel_is_lit)
+    if (do_nothing != 0)
     {
-        for (int i = 0; i < lights.length(); i++)
-        {
-            Light light = lights[i];
-            float light_type = light.data0.w;
-            vec3 light_col = light.data0.xyz;
-            vec3 light_pos_or_dir = light.data1.xyz;
+        col = texture(lpass_color, v_texcoord).rgb;
+    }
+    else
+    {
+        // FXAA
+        col = fxaa2(gl_FragCoord.xy);
 
-            if (abs(light_type - LIGHT_TYPE_AMBIENT) < .1)
-            {
-                col += mix(diffuse * light_col, light_col, .2);
-            }
-            else if (abs(light_type - LIGHT_TYPE_POINT) < .1)
-            {
-                vec3 light_dir = light_pos_or_dir - world_pos;
-                float light_dist = length(light_dir);
-                light_dir /= light_dist;
-                
-                col += cook_torrance(
-                    mix(diffuse, .3 * diffuse, metallic),
-                    mix(vec3(.5), diffuse, metallic),
-                    world_normal,
-                    light_dir,
-                    normalize(cam_pos - world_pos),
-                    light_col / (light_dist * light_dist),
-                    roughness
-                );
-            }
-            else if (abs(light_type - LIGHT_TYPE_DIRECTIONAL) < .1)
-            {
-                col += cook_torrance(
-                    mix(diffuse, .3 * diffuse, metallic),
-                    mix(vec3(.5), diffuse, metallic),
-                    world_normal,
-                    light_pos_or_dir,
-                    normalize(cam_pos - world_pos),
-                    light_col,
-                    roughness
-                );
-            }
-        }
-        col = flim_transform(col, 0., false);
+        // vignette
+        vec2 uv01 = gl_FragCoord.xy / vec2(textureSize(lpass_color, 0));
+        col *= smoothstep(.707, .4, distance(uv01, vec2(.5))) * .2 + .8;
+
+        // color grading
+        col = asc_cdl(
+            col,
+            1.1 * vec3(1, .95, .97),
+            vec3(0, 0, .004),
+            1.05 * vec3(1, .97, 1)
+        );
+
+        // flim
+        col = flim_transform(col, .2, false);
+
+        // dither (per-frame noise)
+        col += hash(uvec2(gl_FragCoord.xy) + 84367u * global_frame_idx) / 255.;
     }
-    else if (render_mode == RENDER_MODE_LIT && !pixel_is_lit)
-    {
-        col = diffuse;
-    }
-    else if (render_mode == RENDER_MODE_DIFFUSE && pixel_is_lit)
-    {
-        col = diffuse;
-    }
-    else if (render_mode == RENDER_MODE_NORMAL && pixel_is_lit)
-    {
-        col = world_normal * .5 + .5;
-    }
-    else if (render_mode == RENDER_MODE_METALLIC_ROUGHNESS && pixel_is_lit)
-    {
-        col = vec3(metallic, roughness, 0);
-    }
-    else if (render_mode == RENDER_MODE_DEPTH)
-    {
-        col = vec3(depth);
-    }
-    else if (render_mode == RENDER_MODE_POSITION_DERIVED && pixel_is_lit)
-    {
-        col = max(world_pos, 0.);
-    }
-    
     out_col = vec4(native_view_transform(col), 1);
 }

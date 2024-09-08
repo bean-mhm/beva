@@ -58,14 +58,14 @@ namespace beva_demo_03_deferred_rendering
             && texcoord == other.texcoord;
     }
 
-    const bv::VertexInputBindingDescription LightingPassVertex::binding{
+    const bv::VertexInputBindingDescription FlatVertex::binding{
         .binding = 0,
-        .stride = sizeof(LightingPassVertex),
+        .stride = sizeof(FlatVertex),
         .input_rate = VK_VERTEX_INPUT_RATE_VERTEX
     };
 
     static const std::vector<bv::VertexInputAttributeDescription>
-        gbuffer_attributes
+        gpass_vert_attributes
     {
         bv::VertexInputAttributeDescription{
             .location = 0,
@@ -88,23 +88,23 @@ namespace beva_demo_03_deferred_rendering
     };
 
     static const std::vector<bv::VertexInputAttributeDescription>
-        deferred_attributes
+        flat_vert_attributes
     {
         bv::VertexInputAttributeDescription{
             .location = 0,
             .binding = 0,
             .format = VK_FORMAT_R32G32_SFLOAT,
-            .offset = offsetof(LightingPassVertex, pos)
+            .offset = offsetof(FlatVertex, pos)
     },
         bv::VertexInputAttributeDescription{
             .location = 1,
             .binding = 0,
             .format = VK_FORMAT_R32G32_SFLOAT,
-            .offset = offsetof(LightingPassVertex, texcoord)
+            .offset = offsetof(FlatVertex, texcoord)
     }
     };
 
-    static const std::vector<LightingPassVertex> quad_vertices{
+    static const std::vector<FlatVertex> quad_vertices{
         { .pos = { -1.f, 1.f }, .texcoord = { 0.f, 1.f } }, // bl
         { .pos = { 1.f, 1.f }, .texcoord = { 1.f, 1.f } }, // br
         { .pos = { 1.f, -1.f }, .texcoord = { 1.f, 0.f } }, // tr
@@ -470,11 +470,11 @@ namespace beva_demo_03_deferred_rendering
 
         auto vert_shader_module = bv::ShaderModule::create(
             app.device,
-            std::move(read_file("./shaders/demo_03_gbuf_vert.spv"))
+            std::move(read_file("./shaders/demo_03_gpass_vert.spv"))
         );
         auto frag_shader_module = bv::ShaderModule::create(
             app.device,
-            std::move(read_file("./shaders/demo_03_gbuf_frag.spv"))
+            std::move(read_file("./shaders/demo_03_gpass_frag.spv"))
         );
 
         std::vector<bv::ShaderStage> shader_stages;
@@ -495,7 +495,7 @@ namespace beva_demo_03_deferred_rendering
 
         bv::VertexInputState vertex_input_state{
             .binding_descriptions = { GeometryPassVertex::binding },
-            .attribute_descriptions = gbuffer_attributes
+            .attribute_descriptions = gpass_vert_attributes
         };
 
         bv::InputAssemblyState input_assembly_state{
@@ -739,18 +739,74 @@ namespace beva_demo_03_deferred_rendering
 
     void LightingPassRecreatables::init(App& app)
     {
+        auto sc_extent = app.swapchain->config().image_extent;
+
+        // color image
+
+        app.create_image(
+            sc_extent.width,
+            sc_extent.height,
+            1,
+            VK_SAMPLE_COUNT_1_BIT,
+            LPASS_COLOR_FORMAT,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            color_img,
+            color_img_mem
+        );
+        color_imgview = app.create_image_view(
+            color_img,
+            LPASS_COLOR_FORMAT,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            1
+        );
+
+        auto layout_tran_cmd_buf = app.begin_single_time_commands(true);
+        app.transition_image_layout(
+            layout_tran_cmd_buf,
+            color_img,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            1
+        );
+        app.end_single_time_commands(layout_tran_cmd_buf);
+
+        // sampler
+        color_img_sampler = bv::Sampler::create(
+            app.device,
+            {
+                .flags = 0,
+                .mag_filter = VK_FILTER_LINEAR,
+                .min_filter = VK_FILTER_LINEAR,
+                .mipmap_mode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+                .address_mode_u = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
+                .address_mode_v = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
+                .address_mode_w = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
+                .mip_lod_bias = 0.f,
+                .anisotropy_enable = false,
+                .max_anisotropy = 1.,
+                .compare_enable = false,
+                .compare_op = VK_COMPARE_OP_ALWAYS,
+                .min_lod = 0.,
+                .max_lod = VK_LOD_CLAMP_NONE,
+                .border_color = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+                .unnormalized_coordinates = false
+            }
+        );
+
         // render pass
 
         bv::Attachment color_attachment{
             .flags = 0,
-            .format = app.swapchain->config().image_format,
+            .format = LPASS_COLOR_FORMAT,
             .samples = VK_SAMPLE_COUNT_1_BIT,
             .load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .store_op = VK_ATTACHMENT_STORE_OP_STORE,
             .stencil_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencil_store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE,
             .initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .final_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+            .final_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         };
 
         bv::AttachmentReference color_attachment_ref{
@@ -789,30 +845,31 @@ namespace beva_demo_03_deferred_rendering
         );
 
         // framebuffers
-
-        auto sc_extent = app.swapchain->config().image_extent;
-
-        bv::clear(swapchain_framebufs);
         for (size_t i = 0; i < app.swapchain_imgviews.size(); i++)
         {
-            swapchain_framebufs.push_back(bv::Framebuffer::create(
+            framebuf = bv::Framebuffer::create(
                 app.device,
                 {
                     .flags = 0,
                     .render_pass = render_pass,
-                    .attachments = { app.swapchain_imgviews[i] },
+                    .attachments = { color_imgview },
                     .width = sc_extent.width,
                     .height = sc_extent.height,
                     .layers = 1
                 }
-            ));
+            );
         }
     }
 
     void LightingPassRecreatables::cleanup()
     {
-        bv::clear(swapchain_framebufs);
+        framebuf = nullptr;
         render_pass = nullptr;
+
+        color_img_sampler = nullptr;
+        color_imgview = nullptr;
+        color_img = nullptr;
+        color_img_mem = nullptr;
     }
 
     LightingPass::LightingPass(App& app)
@@ -893,11 +950,11 @@ namespace beva_demo_03_deferred_rendering
 
         auto vert_shader_module = bv::ShaderModule::create(
             app.device,
-            std::move(read_file("./shaders/demo_03_def_vert.spv"))
+            std::move(read_file("./shaders/demo_03_flat_vert.spv"))
         );
         auto frag_shader_module = bv::ShaderModule::create(
             app.device,
-            std::move(read_file("./shaders/demo_03_def_frag.spv"))
+            std::move(read_file("./shaders/demo_03_lpass_frag.spv"))
         );
 
         std::vector<bv::ShaderStage> shader_stages;
@@ -917,8 +974,8 @@ namespace beva_demo_03_deferred_rendering
             });
 
         bv::VertexInputState vertex_input_state{
-            .binding_descriptions = { LightingPassVertex::binding },
-            .attribute_descriptions = deferred_attributes
+            .binding_descriptions = { FlatVertex::binding },
+            .attribute_descriptions = flat_vert_attributes
         };
 
         bv::InputAssemblyState input_assembly_state{
@@ -967,19 +1024,6 @@ namespace beva_demo_03_deferred_rendering
             .sample_mask = {},
             .alpha_to_coverage_enable = false,
             .alpha_to_one_enable = false
-        };
-
-        bv::DepthStencilState depth_stencil_state{
-            .flags = 0,
-            .depth_test_enable = true,
-            .depth_write_enable = true,
-            .depth_compare_op = VK_COMPARE_OP_LESS,
-            .depth_bounds_test_enable = false,
-            .stencil_test_enable = false,
-            .front = {},
-            .back = {},
-            .min_depth_bounds = 0.f,
-            .max_depth_bounds = 1.f
         };
 
         bv::ColorBlendAttachment color_blend_attachment{
@@ -1034,7 +1078,7 @@ namespace beva_demo_03_deferred_rendering
                 .viewport_state = viewport_state,
                 .rasterization_state = rasterization_state,
                 .multisample_state = multisample_state,
-                .depth_stencil_state = depth_stencil_state,
+                .depth_stencil_state = std::nullopt,
                 .color_blend_state = color_blend_state,
                 .dynamic_states = dynamic_states,
                 .layout = pipeline_layout,
@@ -1180,6 +1224,333 @@ namespace beva_demo_03_deferred_rendering
         }
     }
 
+    FxaaPassRecreatables::FxaaPassRecreatables(App& app)
+    {
+        init(app);
+    }
+
+    FxaaPassRecreatables::~FxaaPassRecreatables()
+    {
+        cleanup();
+    }
+
+    void FxaaPassRecreatables::init(App& app)
+    {
+        // render pass
+
+        bv::Attachment color_attachment{
+            .flags = 0,
+            .format = app.swapchain->config().image_format,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .store_op = VK_ATTACHMENT_STORE_OP_STORE,
+            .stencil_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .stencil_store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .final_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+        };
+
+        bv::AttachmentReference color_attachment_ref{
+            .attachment = 0,
+            .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        };
+
+        bv::Subpass subpass{
+            .flags = 0,
+            .pipeline_bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS,
+            .input_attachments = {},
+            .color_attachments = { color_attachment_ref },
+            .resolve_attachments = {},
+            .depth_stencil_attachment = std::nullopt,
+            .preserve_attachment_indices = {}
+        };
+
+        bv::SubpassDependency dependency{
+            .src_subpass = VK_SUBPASS_EXTERNAL,
+            .dst_subpass = 0,
+            .src_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .dst_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .src_access_mask = 0,
+            .dst_access_mask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            .dependency_flags = 0
+        };
+
+        render_pass = bv::RenderPass::create(
+            app.device,
+            {
+                .flags = 0,
+                .attachments = { color_attachment },
+                .subpasses = { subpass },
+                .dependencies = { dependency }
+            }
+        );
+
+        // framebuffers
+
+        auto sc_extent = app.swapchain->config().image_extent;
+
+        bv::clear(swapchain_framebufs);
+        for (size_t i = 0; i < app.swapchain_imgviews.size(); i++)
+        {
+            swapchain_framebufs.push_back(bv::Framebuffer::create(
+                app.device,
+                {
+                    .flags = 0,
+                    .render_pass = render_pass,
+                    .attachments = { app.swapchain_imgviews[i] },
+                    .width = sc_extent.width,
+                    .height = sc_extent.height,
+                    .layers = 1
+                }
+            ));
+        }
+    }
+
+    void FxaaPassRecreatables::cleanup()
+    {
+        bv::clear(swapchain_framebufs);
+        render_pass = nullptr;
+    }
+
+    FxaaPass::FxaaPass(App& app)
+        : recreatables(app)
+    {
+        // descriptor set layout
+
+        bv::DescriptorSetLayoutBinding sampler0_layout_binding{
+            .binding = 0,
+            .descriptor_type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptor_count = 1,
+            .stage_flags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .immutable_samplers = {}
+        };
+
+        descriptor_set_layout = bv::DescriptorSetLayout::create(
+            app.device,
+            {
+                .flags = 0,
+                .bindings = { sampler0_layout_binding }
+            }
+        );
+
+        // graphics pipeline
+
+        auto vert_shader_module = bv::ShaderModule::create(
+            app.device,
+            std::move(read_file("./shaders/demo_03_flat_vert.spv"))
+        );
+        auto frag_shader_module = bv::ShaderModule::create(
+            app.device,
+            std::move(read_file("./shaders/demo_03_fxaa_frag.spv"))
+        );
+
+        std::vector<bv::ShaderStage> shader_stages;
+        shader_stages.push_back(bv::ShaderStage{
+            .flags = {},
+            .stage = VK_SHADER_STAGE_VERTEX_BIT,
+            .module = vert_shader_module,
+            .entry_point = "main",
+            .specialization_info = std::nullopt
+            });
+        shader_stages.push_back(bv::ShaderStage{
+            .flags = {},
+            .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .module = frag_shader_module,
+            .entry_point = "main",
+            .specialization_info = std::nullopt
+            });
+
+        bv::VertexInputState vertex_input_state{
+            .binding_descriptions = { FlatVertex::binding },
+            .attribute_descriptions = flat_vert_attributes
+        };
+
+        bv::InputAssemblyState input_assembly_state{
+            .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+            .primitive_restart_enable = false
+        };
+
+        auto sc_extent = app.swapchain->config().image_extent;
+
+        bv::Viewport viewport{
+            .x = 0.f,
+            .y = 0.f,
+            .width = (float)sc_extent.width,
+            .height = (float)sc_extent.height,
+            .min_depth = 0.f,
+            .max_depth = 1.f
+        };
+
+        bv::Rect2d scissor{
+            .offset = { 0, 0 },
+            .extent = sc_extent
+        };
+
+        bv::ViewportState viewport_state{
+            .viewports = { viewport },
+            .scissors = { scissor }
+        };
+
+        bv::RasterizationState rasterization_state{
+            .depth_clamp_enable = false,
+            .rasterizer_discard_enable = false,
+            .polygon_mode = VK_POLYGON_MODE_FILL,
+            .cull_mode = VK_CULL_MODE_BACK_BIT,
+            .front_face = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+            .depth_bias_enable = false,
+            .depth_bias_constant_factor = 0.f,
+            .depth_bias_clamp = 0.f,
+            .depth_bias_slope_factor = 0.f,
+            .line_width = 1.f
+        };
+
+        bv::MultisampleState multisample_state{
+            .rasterization_samples = VK_SAMPLE_COUNT_1_BIT,
+            .sample_shading_enable = false,
+            .min_sample_shading = 1.f,
+            .sample_mask = {},
+            .alpha_to_coverage_enable = false,
+            .alpha_to_one_enable = false
+        };
+
+        bv::ColorBlendAttachment color_blend_attachment{
+            .blend_enable = false,
+            .src_color_blend_factor = VK_BLEND_FACTOR_ONE,
+            .dst_color_blend_factor = VK_BLEND_FACTOR_ZERO,
+            .color_blend_op = VK_BLEND_OP_ADD,
+            .src_alpha_blend_factor = VK_BLEND_FACTOR_ONE,
+            .dst_alpha_blend_factor = VK_BLEND_FACTOR_ZERO,
+            .alpha_blend_op = VK_BLEND_OP_ADD,
+            .color_write_mask =
+            VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+            | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
+        };
+
+        bv::ColorBlendState color_blend_state{
+            .flags = 0,
+            .logic_op_enable = false,
+            .logic_op = VK_LOGIC_OP_COPY,
+            .attachments = { color_blend_attachment },
+            .blend_constants = { 0.f, 0.f, 0.f, 0.f }
+        };
+
+        bv::DynamicStates dynamic_states{
+            VK_DYNAMIC_STATE_VIEWPORT,
+            VK_DYNAMIC_STATE_SCISSOR
+        };
+
+        bv::PushConstantRange push_constants{
+            .stage_flags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .offset = 0,
+            .size = sizeof(frag_push_constants)
+        };
+
+        pipeline_layout = bv::PipelineLayout::create(
+            app.device,
+            {
+                .flags = 0,
+                .set_layouts = { descriptor_set_layout },
+                .push_constant_ranges = { push_constants }
+            }
+        );
+
+        graphics_pipeline = bv::GraphicsPipeline::create(
+            app.device,
+            {
+                .flags = 0,
+                .stages = shader_stages,
+                .vertex_input_state = vertex_input_state,
+                .input_assembly_state = input_assembly_state,
+                .tessellation_state = std::nullopt,
+                .viewport_state = viewport_state,
+                .rasterization_state = rasterization_state,
+                .multisample_state = multisample_state,
+                .depth_stencil_state = std::nullopt,
+                .color_blend_state = color_blend_state,
+                .dynamic_states = dynamic_states,
+                .layout = pipeline_layout,
+                .render_pass = recreatables.render_pass,
+                .subpass_index = 0,
+                .base_pipeline = std::nullopt
+            }
+        );
+
+        vert_shader_module = nullptr;
+        frag_shader_module = nullptr;
+
+        // descriptor pool
+
+        std::vector<bv::DescriptorPoolSize> pool_sizes;
+        pool_sizes.push_back({
+            .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptor_count = App::MAX_FRAMES_IN_FLIGHT
+            });
+
+        descriptor_pool = bv::DescriptorPool::create(
+            app.device,
+            {
+                .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+                .max_sets = App::MAX_FRAMES_IN_FLIGHT,
+                .pool_sizes = pool_sizes
+            }
+        );
+
+        // descriptor sets
+        recreate_descriptor_sets(app);
+    }
+
+    FxaaPass::~FxaaPass()
+    {
+        descriptor_pool = nullptr;
+
+        graphics_pipeline = nullptr;
+        pipeline_layout = nullptr;
+        descriptor_set_layout = nullptr;
+    }
+
+    void FxaaPass::recreate(App& app)
+    {
+        recreatables.cleanup();
+        recreatables.init(app);
+
+        recreate_descriptor_sets(app);
+    }
+
+    void FxaaPass::recreate_descriptor_sets(App& app)
+    {
+        bv::clear(descriptor_sets);
+        descriptor_sets = bv::DescriptorPool::allocate_sets(
+            descriptor_pool,
+            App::MAX_FRAMES_IN_FLIGHT,
+            std::vector<bv::DescriptorSetLayoutPtr>(
+                App::MAX_FRAMES_IN_FLIGHT,
+                descriptor_set_layout
+            )
+        );
+
+        for (size_t i = 0; i < App::MAX_FRAMES_IN_FLIGHT; i++)
+        {
+            bv::DescriptorImageInfo sampler0_image_info{
+                .sampler = app.lpass->recreatables.color_img_sampler,
+                .image_view = app.lpass->recreatables.color_imgview,
+                .image_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            };
+
+            std::vector<bv::WriteDescriptorSet> descriptor_writes;
+            descriptor_writes.push_back({
+                .dst_set = descriptor_sets[i],
+                .dst_binding = 0,
+                .dst_array_element = 0,
+                .descriptor_count = 1,
+                .descriptor_type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                .image_infos = { sampler0_image_info },
+                .buffer_infos = {},
+                .texel_buffer_views = {}
+                });
+            bv::DescriptorSet::update_sets(app.device, descriptor_writes, {});
+        }
+    }
+
     void App::run()
     {
         try
@@ -1271,6 +1642,7 @@ namespace beva_demo_03_deferred_rendering
 
     void App::cleanup()
     {
+        fxaa_pass = nullptr;
         lpass = nullptr;
         gpass = nullptr;
 
@@ -2150,6 +2522,7 @@ namespace beva_demo_03_deferred_rendering
     {
         gpass = std::make_shared<GeometryPass>(*this);
         lpass = std::make_shared<LightingPass>(*this);
+        fxaa_pass = std::make_shared<FxaaPass>(*this);
     }
 
     void App::create_command_buffers()
@@ -2348,6 +2721,7 @@ namespace beva_demo_03_deferred_rendering
         }
 
         frame_idx = (frame_idx + 1) % MAX_FRAMES_IN_FLIGHT;
+        global_frame_idx++;
     }
 
     void App::cleanup_swapchain()
@@ -2373,6 +2747,7 @@ namespace beva_demo_03_deferred_rendering
 
         gpass->recreate(*this);
         lpass->recreate(*this);
+        fxaa_pass->recreate(*this);
     }
 
     bv::CommandBufferPtr App::begin_single_time_commands(
@@ -2776,7 +3151,7 @@ namespace beva_demo_03_deferred_rendering
         // geometry pass
 
         std::array<VkClearValue, 3> gpass_clear_vals{};
-        gpass_clear_vals[0].color = { { .15f, .16f, .2f, 0.f } };
+        gpass_clear_vals[0].color = { { .159f, .168f, .196f, 0.f } };
         gpass_clear_vals[1].color = { { 0.f, 0.f, 0.f, 0.f } };
         gpass_clear_vals[2].depthStencil = { 1.f, 0 };
 
@@ -2867,10 +3242,7 @@ namespace beva_demo_03_deferred_rendering
             .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
             .pNext = nullptr,
             .renderPass = lpass->recreatables.render_pass->handle(),
-
-            .framebuffer =
-            lpass->recreatables.swapchain_framebufs[img_idx]->handle(),
-
+            .framebuffer = lpass->recreatables.framebuf->handle(),
             .renderArea = VkRect2D{
                 .offset = { 0, 0 },
                 .extent = bv::Extent2d_to_vk(swapchain->config().image_extent)
@@ -2923,6 +3295,87 @@ namespace beva_demo_03_deferred_rendering
             0,
             sizeof(lpass->frag_push_constants),
             &lpass->frag_push_constants
+        );
+
+        vkCmdDraw(
+            cmd_buf->handle(),
+            (uint32_t)quad_vertices.size(),
+            1,
+            0,
+            0
+        );
+
+        vkCmdEndRenderPass(cmd_buf->handle());
+
+        // FXAA (+ post processing) pass
+
+        VkRenderPassBeginInfo fxaa_pass_render_pass_info{
+            .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+            .pNext = nullptr,
+            .renderPass = fxaa_pass->recreatables.render_pass->handle(),
+
+            .framebuffer =
+            fxaa_pass->recreatables.swapchain_framebufs[img_idx]->handle(),
+
+            .renderArea = VkRect2D{
+                .offset = { 0, 0 },
+                .extent = bv::Extent2d_to_vk(swapchain->config().image_extent)
+        },
+            .clearValueCount = 0,
+            .pClearValues = nullptr
+        };
+        vkCmdBeginRenderPass(
+            cmd_buf->handle(),
+            &fxaa_pass_render_pass_info,
+            VK_SUBPASS_CONTENTS_INLINE
+        );
+
+        vkCmdBindPipeline(
+            cmd_buf->handle(),
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            fxaa_pass->graphics_pipeline->handle()
+        );
+
+        VkBuffer fxaa_pass_vk_vertex_bufs[]{ quad_vertex_buf->handle() };
+        VkDeviceSize fxaa_pass_vb_offsets[] = { 0 };
+        vkCmdBindVertexBuffers(
+            cmd_buf->handle(),
+            0,
+            1,
+            fxaa_pass_vk_vertex_bufs,
+            fxaa_pass_vb_offsets
+        );
+
+        vkCmdSetViewport(cmd_buf->handle(), 0, 1, &viewport);
+        vkCmdSetScissor(cmd_buf->handle(), 0, 1, &scissor);
+
+        auto fxaa_pass_vk_descriptor_set =
+            fxaa_pass->descriptor_sets[frame_idx]->handle();
+        vkCmdBindDescriptorSets(
+            cmd_buf->handle(),
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            fxaa_pass->pipeline_layout->handle(),
+            0,
+            1,
+            &fxaa_pass_vk_descriptor_set,
+            0,
+            nullptr
+        );
+
+        fxaa_pass->frag_push_constants = {
+            .do_nothing =
+            lpass->frag_push_constants.render_mode != RenderMode::Lit
+            ? 1 : 0,
+
+            .global_frame_idx = (uint32_t)global_frame_idx
+        };
+        vkCmdPushConstants(
+            cmd_buf->handle(),
+            fxaa_pass->pipeline_layout->handle(),
+            VK_SHADER_STAGE_FRAGMENT_BIT,
+            0,
+            sizeof(fxaa_pass->frag_push_constants),
+            &fxaa_pass->frag_push_constants
         );
 
         vkCmdDraw(
