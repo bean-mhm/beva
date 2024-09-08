@@ -129,8 +129,8 @@ Devices, swapchains, vertex buffers, that sort of stuff.
 
 This demo builds on top of the first one and implements uniform buffers,
 textures, depth buffering, mipmaps, multisampling, instanced rendering, and push
-constants. It uses an external library to load an OBJ model. The model is from
-[PolyHaven.com](https://polyhaven.com).
+constants. It uses an external library to load an OBJ model.
+[The model is from PolyHaven.com.](https://polyhaven.com/a/korean_public_payphone_01)
 
 ## 02: Wave Simulation
 ![beva demo](images/demo-02.png)
@@ -138,6 +138,8 @@ constants. It uses an external library to load an OBJ model. The model is from
 This demo uses a compute shader to drive a wave simulation. It uses shader
 storage images for the simulation and specialization constants to send
 local invocation sizes to the compute shader at runtime without recompiling it.
+
+The wave simulation code is mostly based on [this shadertoy.](https://www.shadertoy.com/view/mdScW1)
 
 ## 03: Deferred Rendering
 ![beva demo](images/demo-03.png)
@@ -157,12 +159,15 @@ The geometry pass is what renders to the G-Buffer. A lighting pass then draws a
 full-screen quad and samples the the G-Buffer images to render a properly lit
 scene. It uses a shader storage buffer object (SSBO) to read and use an array of
 lights updated from the CPU. Finally, a post processing pass samples the output
-from the lighting pass to apply FXAA-like antialiasing and some post processing.
+from the lighting pass to apply FXAA-like antialiasing, some post processing,
+and [flim](https://github.com/bean-mhm/flim), my filmic color transform.
 
 Deferred rendering is most useful when you have a lot of lights, or a lot of
 overdraw such that the lighting calculations for a pixel get completely
 discarded as another one is drawn on top of it. None of these are a problem is
 the extremely simple "scene" in this demo, though.
+
+[The 3D model in this demo is from PolyHaven.com.](https://polyhaven.com/a/korean_fire_extinguisher_01)
 
 ## Note
 
