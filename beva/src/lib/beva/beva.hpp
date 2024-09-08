@@ -1736,7 +1736,7 @@ namespace bv
         }
 
         // if _allocator == nullptr, this will return nullptr, otherwise it will
-        // return the address of _vk_instance which contains function pointers
+        // return the address of _vk_allocator which contains function pointers
         // for callbacks.
         const VkAllocationCallbacks* vk_allocator_ptr() const;
 
