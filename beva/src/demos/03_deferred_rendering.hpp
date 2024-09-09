@@ -25,6 +25,12 @@ namespace beva_demo_03_deferred_rendering
     static constexpr float DEPTH_NEAR = .01f;
     static constexpr float DEPTH_FAR = 10.f;
 
+    static constexpr glm::vec3 DEFAULT_CAM_POS{ 0.f, -.9f, .35f };
+    static constexpr glm::vec2 DEFAULT_CAM_DIR_SPHERICAL{
+        glm::pi<float>() / 2.f + glm::radians(4.f),
+        glm::pi<float>() / 2.f
+    };
+
     enum class RenderMode : int32_t
     {
         Lit,
@@ -87,7 +93,7 @@ namespace beva_demo_03_deferred_rendering
     struct LightingPassFragPushConstants
     {
         glm::mat4 inv_view_proj{ 1 };
-        glm::vec3 cam_pos{ 0.f, -.9f, .35f };
+        glm::vec3 cam_pos = DEFAULT_CAM_POS;
         float z_near = DEPTH_NEAR;
         float z_far = DEPTH_FAR;
         RenderMode render_mode = RenderMode::Lit;
@@ -375,10 +381,7 @@ namespace beva_demo_03_deferred_rendering
         bool mouse_down = false;
         bool drag_mode = false;
 
-        glm::vec2 cam_dir_spherical{
-            glm::pi<float>() / 2.f + glm::radians(4.f),
-            glm::pi<float>() / 2.f
-        };
+        glm::vec2 cam_dir_spherical = DEFAULT_CAM_DIR_SPHERICAL;
 
         void init_window();
         void init_context();
