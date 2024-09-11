@@ -2367,7 +2367,7 @@ namespace bv
 
                 std::vector<QueueFamily> queue_families;
                 queue_families.reserve(vk_queue_families.size());
-                for (size_t i = 0; i < vk_queue_families.size(); i++)
+                for (uint32_t i = 0; i < vk_queue_families.size(); i++)
                 {
                     const VkQueueFamilyProperties& vk_queue_family =
                         vk_queue_families[i];
@@ -4534,7 +4534,7 @@ namespace bv
 
             VkResult vk_result = vkWaitForFences(
                 lock_wptr(fences[0]->device())->handle(),
-                vk_fences.size(),
+                (uint32_t)vk_fences.size(),
                 vk_fences.data(),
                 wait_all,
                 timeout
