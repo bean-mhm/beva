@@ -192,13 +192,13 @@ namespace bv
     )
     {
         return PhysicalDeviceLimits{
-            .max_image_dimension1d =
+            .max_image_dimension_1d =
             vk_limits.maxImageDimension1D,
 
-            .max_image_dimension2d =
+            .max_image_dimension_2d =
             vk_limits.maxImageDimension2D,
 
-            .max_image_dimension3d =
+            .max_image_dimension_3d =
             vk_limits.maxImageDimension3D,
 
             .max_image_dimension_cube =
@@ -519,13 +519,13 @@ namespace bv
     )
     {
         return PhysicalDeviceSparseProperties{
-            .residency_standard2d_block_shape =
+            .residency_standard_2d_block_shape =
             (bool)vk_properties.residencyStandard2DBlockShape,
 
-            .residency_standard2d_multisample_block_shape =
+            .residency_standard_2d_multisample_block_shape =
             (bool)vk_properties.residencyStandard2DMultisampleBlockShape,
 
-            .residency_standard3d_block_shape =
+            .residency_standard_3d_block_shape =
             (bool)vk_properties.residencyStandard3DBlockShape,
 
             .residency_aligned_mip_size =
@@ -708,10 +708,10 @@ namespace bv
             .sparse_residency_buffer =
             (bool)vk_features.sparseResidencyBuffer,
 
-            .sparse_residency_image2d =
+            .sparse_residency_image_2d =
             (bool)vk_features.sparseResidencyImage2D,
 
-            .sparse_residency_image3d =
+            .sparse_residency_image_3d =
             (bool)vk_features.sparseResidencyImage3D,
 
             .sparse_residency2_samples =
@@ -881,10 +881,10 @@ namespace bv
             features.sparse_residency_buffer,
 
             .sparseResidencyImage2D =
-            features.sparse_residency_image2d,
+            features.sparse_residency_image_2d,
 
             .sparseResidencyImage3D =
-            features.sparse_residency_image3d,
+            features.sparse_residency_image_3d,
 
             .sparseResidency2Samples =
             features.sparse_residency2_samples,

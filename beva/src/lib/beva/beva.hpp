@@ -405,9 +405,9 @@ namespace bv
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
     struct PhysicalDeviceLimits
     {
-        uint32_t max_image_dimension1d;
-        uint32_t max_image_dimension2d;
-        uint32_t max_image_dimension3d;
+        uint32_t max_image_dimension_1d;
+        uint32_t max_image_dimension_2d;
+        uint32_t max_image_dimension_3d;
         uint32_t max_image_dimension_cube;
         uint32_t max_image_array_layers;
         uint32_t max_texel_buffer_elements;
@@ -520,9 +520,9 @@ namespace bv
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceSparseProperties.html
     struct PhysicalDeviceSparseProperties
     {
-        bool residency_standard2d_block_shape : 1;
-        bool residency_standard2d_multisample_block_shape : 1;
-        bool residency_standard3d_block_shape : 1;
+        bool residency_standard_2d_block_shape : 1;
+        bool residency_standard_2d_multisample_block_shape : 1;
+        bool residency_standard_3d_block_shape : 1;
         bool residency_aligned_mip_size : 1;
         bool residency_non_resident_strict : 1;
     };
@@ -598,8 +598,8 @@ namespace bv
         bool shader_resource_min_lod : 1 = false;
         bool sparse_binding : 1 = false;
         bool sparse_residency_buffer : 1 = false;
-        bool sparse_residency_image2d : 1 = false;
-        bool sparse_residency_image3d : 1 = false;
+        bool sparse_residency_image_2d : 1 = false;
+        bool sparse_residency_image_3d : 1 = false;
         bool sparse_residency2_samples : 1 = false;
         bool sparse_residency4_samples : 1 = false;
         bool sparse_residency8_samples : 1 = false;
