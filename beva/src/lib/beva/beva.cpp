@@ -1,12 +1,9 @@
 #include "beva.hpp"
 
-namespace bv
-{
-
-    // define a derived class named ClassName_public_ctor that lets us use the
-    // previously private constructors (actually protected, just go with it) as
-    // public ones so that they can be used in std::make_shared() or whatever
-    // else.
+// define a derived class named ClassName_public_ctor that lets us use the
+// previously private constructors (actually protected, just go with it) as
+// public ones so that they can be used in std::make_shared() or whatever
+// else.
 #define _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(ClassName) \
     class ClassName##_public_ctor : public ClassName \
     { \
@@ -14,7 +11,10 @@ namespace bv
         template<typename... Args> ClassName##_public_ctor(Args&&... args) \
             : ClassName(std::forward<Args>(args)...) \
         {} \
-    };
+    }
+
+namespace bv
+{
 
     _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(PhysicalDevice);
     _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(Context);

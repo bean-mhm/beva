@@ -17,6 +17,21 @@
 #include "vulkan/vulkan.h"
 #include "vulkan/vk_enum_string_helper.h"
 
+#define _BV_DELETE_DEFAULT_CTOR(ClassName) ClassName() = delete
+
+#define _BV_ALLOW_MOVE_ONLY(ClassName) \
+ClassName(const ClassName& other) = delete; \
+ClassName& operator=(const ClassName& other) = delete; \
+ClassName(ClassName&& other) = default; \
+ClassName& operator=(ClassName&& other) = default
+
+#define _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(ClassName) \
+_BV_DELETE_DEFAULT_CTOR(ClassName); _BV_ALLOW_MOVE_ONLY(ClassName)
+
+#define _BV_DEFINE_SMART_PTR_TYPE_ALIASES(ClassName) \
+    using ClassName##Ptr = std::shared_ptr<ClassName>; \
+    using ClassName##WPtr = std::weak_ptr<ClassName>
+
 namespace bv
 {
 
@@ -49,10 +64,6 @@ namespace bv
     class DescriptorPool;
     class BufferView;
     class PipelineCache;
-
-#define _BV_DEFINE_SMART_PTR_TYPE_ALIASES(ClassName) \
-    using ClassName##Ptr = std::shared_ptr<ClassName>; \
-    using ClassName##WPtr = std::weak_ptr<ClassName>;
 
     // smart pointer type aliases
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(Allocator);
@@ -1585,11 +1596,6 @@ namespace bv
     class PhysicalDevice
     {
     public:
-        PhysicalDevice() = delete;
-        PhysicalDevice(const PhysicalDevice& other) = default;
-        PhysicalDevice(PhysicalDevice&& other) = default;
-        PhysicalDevice& operator= (const PhysicalDevice& other) = default;
-
         constexpr VkPhysicalDevice handle() const
         {
             return _handle;
@@ -1692,8 +1698,12 @@ namespace bv
     class Context
     {
     public:
-        Context() = delete;
+        _BV_DELETE_DEFAULT_CTOR(Context);
+
         Context(const Context& other) = delete;
+        Context& operator=(const Context& other) = delete;
+        Context& operator=(Context&& other) = default;
+
         Context(Context&& other) noexcept;
 
         // it's best to keep at least one external reference to the allocator so
@@ -1772,8 +1782,7 @@ namespace bv
     class DebugMessenger
     {
     public:
-        DebugMessenger(const DebugMessenger& other) = delete;
-        DebugMessenger(DebugMessenger&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(DebugMessenger);
 
         static DebugMessengerPtr create(
             const ContextPtr& context,
@@ -1833,9 +1842,7 @@ namespace bv
     class Surface
     {
     public:
-        Surface() = delete;
-        Surface(const Surface& other) = delete;
-        Surface(Surface&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(Surface);
 
         // create a surface based on a user-provided handle. this lets the user
         // write their own little surface creation implementation based on the
@@ -1875,9 +1882,7 @@ namespace bv
     class Queue
     {
     public:
-        Queue() = delete;
-        Queue(const Queue& other) = delete;
-        Queue(Queue&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(Queue);
 
         constexpr const DeviceWPtr& device() const
         {
@@ -1941,9 +1946,7 @@ namespace bv
     class Device
     {
     public:
-        Device() = delete;
-        Device(const Device& other) = delete;
-        Device(Device&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(Device);
 
         static DevicePtr create(
             const ContextPtr& context,
@@ -2002,9 +2005,7 @@ namespace bv
     class Image
     {
     public:
-        Image() = delete;
-        Image(const Image& other) = delete;
-        Image(Image&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(Image);
 
         // this will make sure the requested format is supported with the
         // provided parameters. it will also fetch and store the memory
@@ -2080,9 +2081,7 @@ namespace bv
     class Swapchain
     {
     public:
-        Swapchain() = delete;
-        Swapchain(const Swapchain& other) = delete;
-        Swapchain(Swapchain&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(Swapchain);
 
         // this will fetch and store the swapchain images automatically
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateSwapchainKHR.html
@@ -2157,9 +2156,7 @@ namespace bv
     class ImageView
     {
     public:
-        ImageView() = delete;
-        ImageView(const ImageView& other) = delete;
-        ImageView(ImageView&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(ImageView);
 
         static ImageViewPtr create(
             const DevicePtr& device,
@@ -2209,9 +2206,7 @@ namespace bv
     class ShaderModule
     {
     public:
-        ShaderModule() = delete;
-        ShaderModule(const ShaderModule& other) = delete;
-        ShaderModule(ShaderModule&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(ShaderModule);
 
         static ShaderModulePtr create(
             const DevicePtr& device,
@@ -2243,9 +2238,7 @@ namespace bv
     class Sampler
     {
     public:
-        Sampler() = delete;
-        Sampler(const Sampler& other) = delete;
-        Sampler(Sampler&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(Sampler);
 
         static SamplerPtr create(
             const DevicePtr& device,
@@ -2286,9 +2279,7 @@ namespace bv
     class DescriptorSetLayout
     {
     public:
-        DescriptorSetLayout() = delete;
-        DescriptorSetLayout(const DescriptorSetLayout& other) = delete;
-        DescriptorSetLayout(DescriptorSetLayout&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(DescriptorSetLayout);
 
         static DescriptorSetLayoutPtr create(
             const DevicePtr& device,
@@ -2329,9 +2320,7 @@ namespace bv
     class PipelineLayout
     {
     public:
-        PipelineLayout() = delete;
-        PipelineLayout(const PipelineLayout& other) = delete;
-        PipelineLayout(PipelineLayout&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(PipelineLayout);
 
         static PipelineLayoutPtr create(
             const DevicePtr& device,
@@ -2372,9 +2361,7 @@ namespace bv
     class RenderPass
     {
     public:
-        RenderPass() = delete;
-        RenderPass(const RenderPass& other) = delete;
-        RenderPass(RenderPass&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(RenderPass);
 
         static RenderPassPtr create(
             const DevicePtr& device,
@@ -2416,9 +2403,7 @@ namespace bv
     class GraphicsPipeline
     {
     public:
-        GraphicsPipeline() = delete;
-        GraphicsPipeline(const GraphicsPipeline& other) = delete;
-        GraphicsPipeline(GraphicsPipeline&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(GraphicsPipeline);
 
         static GraphicsPipelinePtr create(
             const DevicePtr& device,
@@ -2468,9 +2453,7 @@ namespace bv
     class ComputePipeline
     {
     public:
-        ComputePipeline() = delete;
-        ComputePipeline(const ComputePipeline& other) = delete;
-        ComputePipeline(ComputePipeline&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(ComputePipeline);
 
         static ComputePipelinePtr create(
             const DevicePtr& device,
@@ -2519,9 +2502,7 @@ namespace bv
     class Framebuffer
     {
     public:
-        Framebuffer() = delete;
-        Framebuffer(const Framebuffer& other) = delete;
-        Framebuffer(Framebuffer&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(Framebuffer);
 
         static FramebufferPtr create(
             const DevicePtr& device,
@@ -2562,9 +2543,7 @@ namespace bv
     class CommandBuffer
     {
     public:
-        CommandBuffer() = delete;
-        CommandBuffer(const CommandBuffer& other) = delete;
-        CommandBuffer(CommandBuffer&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(CommandBuffer);
 
         constexpr const CommandPoolWPtr& pool() const
         {
@@ -2605,9 +2584,7 @@ namespace bv
     class CommandPool
     {
     public:
-        CommandPool() = delete;
-        CommandPool(const CommandPool& other) = delete;
-        CommandPool(CommandPool&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(CommandPool);
 
         static CommandPoolPtr create(
             const DevicePtr& device,
@@ -2663,9 +2640,7 @@ namespace bv
     class Semaphore
     {
     public:
-        Semaphore() = delete;
-        Semaphore(const Semaphore& other) = delete;
-        Semaphore(Semaphore&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(Semaphore);
 
         static SemaphorePtr create(const DevicePtr& device);
 
@@ -2694,9 +2669,7 @@ namespace bv
     class Fence
     {
     public:
-        Fence() = delete;
-        Fence(const Fence& other) = delete;
-        Fence(Fence&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(Fence);
 
         static FencePtr create(
             const DevicePtr& device,
@@ -2746,9 +2719,7 @@ namespace bv
     class Buffer
     {
     public:
-        Buffer() = delete;
-        Buffer(const Buffer& other) = delete;
-        Buffer(Buffer&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(Buffer);
 
         // this will automatically fetch and store the memory requirements
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateBuffer.html
@@ -2805,9 +2776,7 @@ namespace bv
     class DeviceMemory
     {
     public:
-        DeviceMemory() = delete;
-        DeviceMemory(const DeviceMemory& other) = delete;
-        DeviceMemory(DeviceMemory&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(DeviceMemory);
 
         static DeviceMemoryPtr allocate(
             const DevicePtr& device,
@@ -2867,9 +2836,7 @@ namespace bv
     class DescriptorSet
     {
     public:
-        DescriptorSet() = delete;
-        DescriptorSet(const DescriptorSet& other) = delete;
-        DescriptorSet(DescriptorSet&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(DescriptorSet);
 
         constexpr const DescriptorPoolWPtr& pool() const
         {
@@ -2907,9 +2874,7 @@ namespace bv
     class DescriptorPool
     {
     public:
-        DescriptorPool() = delete;
-        DescriptorPool(const DescriptorPool& other) = delete;
-        DescriptorPool(DescriptorPool&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(DescriptorPool);
 
         static DescriptorPoolPtr create(
             const DevicePtr& device,
@@ -2965,9 +2930,7 @@ namespace bv
     class BufferView
     {
     public:
-        BufferView() = delete;
-        BufferView(const BufferView& other) = delete;
-        BufferView(BufferView&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(BufferView);
 
         static BufferViewPtr create(
             const DevicePtr& device,
@@ -3016,9 +2979,7 @@ namespace bv
     class PipelineCache
     {
     public:
-        PipelineCache() = delete;
-        PipelineCache(const PipelineCache& other) = delete;
-        PipelineCache(PipelineCache&& other) = default;
+        _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(PipelineCache);
 
         static PipelineCachePtr create(
             const DevicePtr& device,
