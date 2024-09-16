@@ -5449,7 +5449,7 @@ namespace bv
 
             return i;
         }
-        throw std::runtime_error("failed to find a suitable memory type");
+        throw Error("failed to find a suitable memory type");
     }
 
     MemoryRegion::MemoryRegion(const bv::DeviceMemoryPtr& mem)
@@ -5475,7 +5475,7 @@ namespace bv
     {
         if (region->mapped == nullptr)
         {
-            throw std::runtime_error("unmappable memory");
+            throw Error("unmappable memory");
         }
         return (void*)((uint8_t*)region->mapped + offset());
     }
@@ -5776,9 +5776,7 @@ namespace bv
     {
         if (!p_user_data)
         {
-            throw std::runtime_error(
-                "Vulkan allocation callback called with no user data"
-            );
+            throw Error("Vulkan allocation callback called with no user data");
         }
 
         Allocator* allocator = (Allocator*)p_user_data;
@@ -5799,7 +5797,7 @@ namespace bv
     {
         if (!p_user_data)
         {
-            throw std::runtime_error(
+            throw Error(
                 "Vulkan reallocation callback called with no user data"
             );
         }
@@ -5820,7 +5818,7 @@ namespace bv
     {
         if (!p_user_data)
         {
-            throw std::runtime_error(
+            throw Error(
                 "Vulkan free callback called with no user data"
             );
         }
@@ -5838,7 +5836,7 @@ namespace bv
     {
         if (!p_user_data)
         {
-            throw std::runtime_error(
+            throw Error(
                 "Vulkan internal allocation notification called with no user "
                 "data"
             );
@@ -5861,7 +5859,7 @@ namespace bv
     {
         if (!p_user_data)
         {
-            throw std::runtime_error(
+            throw Error(
                 "Vulkan internal free notification called with no user data"
             );
         }
@@ -5883,9 +5881,7 @@ namespace bv
     {
         if (!p_user_data)
         {
-            throw std::runtime_error(
-                "Vulkan debug callback called with no user data"
-            );
+            throw Error("Vulkan debug callback called with no user data");
         }
 
         DebugMessenger* messenger = (DebugMessenger*)p_user_data;

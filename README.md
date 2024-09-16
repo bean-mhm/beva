@@ -110,9 +110,9 @@ creating a new one if none were found. It will also take care of alignment
 requirements. These operations are all thread safe and use a mutex under the
 hood.
 
-A `MemoryChunk` will mark its corresponding blocks as free once its destructor
-is called. `MemoryBank::allocate()` will check for empty regions and delete them
-when needed.
+A `MemoryChunk` will mark its corresponding blocks as free upon destruction.
+`MemoryBank::allocate()` will check for empty regions and delete them when
+needed.
 
 Additionally, you can call `mapped()` and `flush()` on a `MemoryChunk` if it was
 allocated from a host visible region. Note that you can pass the required memory
@@ -207,10 +207,3 @@ discarded as another one is drawn on top of it. None of these are a problem is
 the extremely simple "scene" in this demo, though.
 
 [The 3D model in this demo is from PolyHaven.com.](https://polyhaven.com/a/korean_fire_extinguisher_01)
-
-## Note
-
-These demos don't necessarily follow the best practices for making larger
-applications. Buffer and image memory management is very naive (not using beva's memory management classes), and the code
-could certainly be rewritten to be much more organized. These are just there to
-show you how beva can be used.
