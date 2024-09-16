@@ -207,3 +207,8 @@ discarded as another one is drawn on top of it. None of these are a problem is
 the extremely simple "scene" in this demo, though.
 
 [The 3D model in this demo is from PolyHaven.com.](https://polyhaven.com/a/korean_fire_extinguisher_01)
+
+## Note
+
+These demos don't necessarily follow the best practices for making larger
+applications. They are just there to show you how beva can be used.
