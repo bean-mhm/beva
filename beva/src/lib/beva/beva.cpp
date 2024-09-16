@@ -13,6 +13,9 @@
         {} \
     }
 
+// round up integer division
+#define _BV_IDIV_CEIL(a, b) (((a) + (b) - 1) / (b))
+
 namespace bv
 {
 
@@ -43,6 +46,9 @@ namespace bv
     _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(DescriptorPool);
     _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(BufferView);
     _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(PipelineCache);
+
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(MemoryRegion);
+    _BV_DEFINE_DERIVED_WITH_PUBLIC_CONSTRUCTOR(MemoryChunk);
 
 #define _BV_LOCK_WPTR_OR_RETURN(wptr, locked_name) \
     if (wptr.expired()) \
@@ -130,6 +136,8 @@ namespace bv
     }
 
 #pragma endregion
+
+#pragma region data-only structs and enums
 
     std::string Version::to_string() const
     {
@@ -1775,6 +1783,10 @@ namespace bv
         };
     }
 
+#pragma endregion
+
+#pragma region error handling
+
     Error::Error()
         : message("no error information provided"),
         _vk_result(std::nullopt),
@@ -1816,6 +1828,10 @@ namespace bv
         }
         return s;
     }
+
+#pragma endregion
+
+#pragma region classes and object wrappers
 
     std::vector<ExtensionProperties> PhysicalDevice::fetch_available_extensions(
         const std::string& layer_name
@@ -5371,6 +5387,10 @@ namespace bv
         : _device(device), _flags(flags)
     {}
 
+#pragma endregion
+
+#pragma region helper functions
+
     std::string cstr_to_std(const char* cstr)
     {
         return (cstr == nullptr) ? std::string() : std::string(cstr);
@@ -5395,6 +5415,345 @@ namespace bv
             || format == VK_FORMAT_D24_UNORM_S8_UINT
             || format == VK_FORMAT_D32_SFLOAT_S8_UINT;
     }
+
+#pragma endregion
+
+#pragma region memory management
+
+    static uint32_t find_memory_type_idx(
+        const bv::PhysicalDevice& physical_device,
+        uint32_t supported_type_bits,
+        VkMemoryPropertyFlags required_properties,
+        VkDeviceSize required_size
+    )
+    {
+        const auto& mem_props = physical_device.memory_properties();
+        for (uint32_t i = 0; i < mem_props.memory_types.size(); i++)
+        {
+            bool has_required_properties =
+                (required_properties & mem_props.memory_types[i].property_flags)
+                == required_properties;
+
+            if (!(supported_type_bits & (1 << i)) || !has_required_properties)
+            {
+                continue;
+            }
+
+            VkDeviceSize heap_size = mem_props.memory_heaps[
+                mem_props.memory_types[i].heap_index
+            ].size;
+            if (required_size > heap_size)
+            {
+                continue;
+            }
+
+            return i;
+        }
+        throw std::runtime_error("failed to find a suitable memory type");
+    }
+
+    MemoryRegion::MemoryRegion(const bv::DeviceMemoryPtr& mem)
+        : mem(mem)
+    {}
+
+    const bv::DeviceMemoryPtr& MemoryChunk::memory() const
+    {
+        return region->mem;
+    }
+
+    void* MemoryChunk::mapped()
+    {
+        if (region->mapped == nullptr)
+        {
+            throw std::runtime_error("unmappable memory");
+        }
+        return (void*)((uint8_t*)region->mapped + offset());
+    }
+
+    void MemoryChunk::flush()
+    {
+        if (region->mapped != nullptr)
+        {
+            region->mem->flush_mapped_range(0, VK_WHOLE_SIZE);
+        }
+    }
+
+    MemoryChunk::~MemoryChunk()
+    {
+        std::scoped_lock lock(*mutex);
+
+        // set the block bits to free
+        uint64_t start_block_idx = offset() / block_size;
+        uint64_t end_block_idx = _BV_IDIV_CEIL(offset() + size(), block_size);
+        for (size_t i = start_block_idx; i < end_block_idx; i++)
+        {
+            region->blocks[i] = false;
+        }
+    }
+
+    MemoryChunk::MemoryChunk(
+        const std::shared_ptr<std::mutex>& mutex,
+        const std::shared_ptr<MemoryRegion>& region,
+        VkDeviceSize offset,
+        VkDeviceSize size,
+        VkDeviceSize block_size
+    )
+        : mutex(mutex),
+        region(region),
+        _offset(offset),
+        _size(size),
+        block_size(block_size)
+    {}
+
+    MemoryBank::MemoryBank(
+        const bv::DevicePtr& device,
+        VkDeviceSize block_size,
+        VkDeviceSize min_region_size
+    )
+        : _device(device),
+        mutex(std::make_shared<std::mutex>()),
+        _block_size(block_size),
+        _min_region_size(min_region_size)
+    {}
+
+    MemoryBank::~MemoryBank()
+    {
+        std::scoped_lock lock(*mutex);
+    }
+
+    std::shared_ptr<MemoryChunk> MemoryBank::allocate(
+        const bv::MemoryRequirements& requirements,
+        VkMemoryPropertyFlags required_properties
+    )
+    {
+        std::scoped_lock lock(*mutex);
+
+        // make sure the chunk size is divisible by the block size
+        uint64_t chunk_size = requirements.size;
+        if (chunk_size % block_size() != 0)
+        {
+            chunk_size += block_size() - (chunk_size % block_size());
+        }
+
+        uint64_t n_blocks_in_chunk = _BV_IDIV_CEIL(chunk_size, block_size());
+
+        for (auto& region : regions)
+        {
+            // check if region is large enough
+            if (chunk_size > region->mem->config().allocation_size)
+            {
+                continue;
+            }
+
+            // check if region has the right memory type index
+            if (!(
+                requirements.memory_type_bits
+                & (1 << region->mem->config().memory_type_index)
+                ))
+            {
+                continue;
+            }
+
+            // try to find a free range and return a chunk if found
+            uint64_t start_block_idx = 0;
+            while (true)
+            {
+                while (start_block_idx < region->blocks.size()
+                    && region->blocks[start_block_idx])
+                {
+                    start_block_idx++;
+                }
+                if (start_block_idx >= region->blocks.size())
+                {
+                    break;
+                }
+
+                uint64_t end_block_idx = start_block_idx + 1;
+                while (end_block_idx < region->blocks.size()
+                    && !region->blocks[end_block_idx])
+                {
+                    end_block_idx++;
+                }
+
+                uint64_t n_free_blocks = end_block_idx - start_block_idx;
+
+                // if we have found a free and usable block range
+                if (n_free_blocks >= n_blocks_in_chunk)
+                {
+                    // figure out the byte offset in the region
+                    VkDeviceSize offs = start_block_idx * block_size();
+
+                    // adjust the offset if it doesn't meet the alignment
+                    // requirements
+                    if (offs % requirements.alignment != 0)
+                    {
+                        offs +=
+                            requirements.alignment
+                            - (offs % requirements.alignment);
+                    }
+
+                    // recalculate the start block index
+                    start_block_idx = offs / block_size();
+
+                    // if the start block index is now stepping into the
+                    // end of the range, we'll restart the search.
+                    if (start_block_idx >= end_block_idx)
+                    {
+                        continue;
+                    }
+
+                    // recalculate the new number of free blocks
+                    n_free_blocks = end_block_idx - start_block_idx;
+
+                    // if the new number of free blocks is no longer large
+                    // enough, we'll restart the search.
+                    if (n_free_blocks < n_blocks_in_chunk)
+                    {
+                        start_block_idx = end_block_idx;
+                        continue;
+                    }
+
+                    // set the block bits to allocated
+                    for (size_t i = start_block_idx;
+                        i < start_block_idx + n_blocks_in_chunk;
+                        i++)
+                    {
+                        region->blocks[i] = true;
+                    }
+
+                    // delete empty regions
+                    delete_empty_regions();
+
+                    // return a new chunk based on the region
+                    return std::make_shared<MemoryChunk_public_ctor>(
+                        mutex,
+                        region,
+                        offs,
+                        chunk_size,
+                        block_size()
+                    );
+                }
+
+                // continue the search
+                start_block_idx = end_block_idx;
+            }
+        }
+
+        // couldn't find a usable range in any of the regions, so we'll create
+        // a new region and use it instead.
+
+        // figure out the allocation size and make sure it's divisible by the
+        // block size.
+        VkDeviceSize region_size = std::max(chunk_size, min_region_size());
+        if (region_size % block_size() != 0)
+        {
+            region_size += block_size() - (region_size % block_size());
+        }
+
+        // find suitable memory type index
+        uint32_t memory_type_idx = find_memory_type_idx(
+            device()->physical_device(),
+            requirements.memory_type_bits,
+            required_properties,
+            region_size
+        );
+
+        // allocate memory
+        auto mem = bv::DeviceMemory::allocate(
+            device(),
+            {
+                .allocation_size = region_size,
+                .memory_type_index = memory_type_idx
+            }
+        );
+
+        // create a region based on that memory
+        auto new_region = std::make_shared<MemoryRegion_public_ctor>(mem);
+
+        // setup the block bitset for the region
+        new_region->blocks.resize(
+            _BV_IDIV_CEIL(region_size, block_size()),
+            false
+        );
+        for (size_t i = 0; i < n_blocks_in_chunk; i++)
+        {
+            new_region->blocks[i] = true;
+        }
+
+        // map the memory if it's mappable
+        bool is_mappable =
+            (required_properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+            || (required_properties & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        if (is_mappable)
+        {
+            new_region->mapped = mem->map(0, VK_WHOLE_SIZE);
+        }
+
+        // delete empty regions
+        delete_empty_regions();
+
+        // add the region to our regions vector
+        regions.push_back(new_region);
+
+        // return a new chunk based on the region
+        return std::make_shared<MemoryChunk_public_ctor>(
+            mutex,
+            new_region,
+            0,
+            chunk_size,
+            block_size()
+        );
+    }
+
+    std::string MemoryBank::to_string()
+    {
+        std::scoped_lock lock(*mutex);
+
+        std::string s = std::format(
+            "-----------------------------------------\n"
+            "memory bank status\n"
+            "  n. regions: {}\n"
+            "  block size: {}\n",
+            regions.size(),
+            block_size()
+        );
+        for (size_t i = 0; i < regions.size(); i++)
+        {
+            const auto& region = regions[i];
+            s += std::format(
+                "-----------------------------------------\n"
+                "region {}\n"
+                "  size: {}\n"
+                "  mapped: {}\n"
+                "  blocks: {} blocks allocated out of {}\n",
+                i,
+                region->mem->config().allocation_size,
+                region->mapped != nullptr,
+                region->blocks.count(),
+                region->blocks.size()
+            );
+        }
+        s += "-----------------------------------------\n\n";
+        return s;
+    }
+
+    void MemoryBank::delete_empty_regions()
+    {
+        for (size_t i = 0; i < regions.size();)
+        {
+            if (regions[i]->blocks.none())
+            {
+                regions.erase(regions.begin() + i);
+            }
+            else
+            {
+                i++;
+            }
+        }
+
+    }
+
+#pragma endregion
 
 #pragma region Vulkan callbacks
 
