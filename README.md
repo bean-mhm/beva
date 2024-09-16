@@ -211,4 +211,6 @@ the extremely simple "scene" in this demo, though.
 ## Note
 
 These demos don't necessarily follow the best practices for making larger
-applications. They are just there to show you how beva can be used.
+applications. There is minimal separation of concerns (everything is forced into
+a single class), no sampler sharing (every image has its own sampler), and other
+flaws. These demos are just there to show you how beva itself can be used.
