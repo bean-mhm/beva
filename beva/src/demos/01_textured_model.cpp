@@ -108,6 +108,7 @@ namespace beva_demo_01_textured_model
         create_surface();
         pick_physical_device();
         create_logical_device();
+        create_memory_bank();
         create_swapchain();
         create_render_pass();
         create_descriptor_set_layout();
@@ -185,6 +186,7 @@ namespace beva_demo_01_textured_model
 
         render_pass = nullptr;
 
+        mem_bank = nullptr;
         device = nullptr;
         surface = nullptr;
         debug_messenger = nullptr;
@@ -474,6 +476,11 @@ namespace beva_demo_01_textured_model
 
         presentation_queue =
             bv::Device::retrieve_queue(device, presentation_family_idx, 0);
+    }
+
+    void App::create_memory_bank()
+    {
+        mem_bank = bv::MemoryBank::create(device);
     }
 
     void App::create_swapchain()
@@ -1013,7 +1020,7 @@ namespace beva_demo_01_textured_model
         // upload to staging buffer and free
 
         bv::BufferPtr staging_buf;
-        bv::DeviceMemoryPtr staging_buf_mem;
+        bv::MemoryChunkPtr staging_buf_mem;
         create_buffer(
             size,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1025,7 +1032,13 @@ namespace beva_demo_01_textured_model
             staging_buf_mem
         );
 
-        staging_buf_mem->upload((void*)pixels, size);
+        void* mapped = staging_buf_mem->mapped();
+        std::copy(
+            (uint8_t*)pixels,
+            (uint8_t*)pixels + size,
+            (uint8_t*)mapped
+        );
+        staging_buf_mem->flush();
         stbi_image_free(pixels);
 
         // create image
@@ -1181,7 +1194,7 @@ namespace beva_demo_01_textured_model
         VkDeviceSize size = sizeof(vertices[0]) * vertices.size();
 
         bv::BufferPtr staging_buf;
-        bv::DeviceMemoryPtr staging_buf_mem;
+        bv::MemoryChunkPtr staging_buf_mem;
         create_buffer(
             size,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1193,7 +1206,13 @@ namespace beva_demo_01_textured_model
             staging_buf_mem
         );
 
-        staging_buf_mem->upload((void*)vertices.data(), size);
+        void* mapped = staging_buf_mem->mapped();
+        std::copy(
+            vertices.data(),
+            vertices.data() + vertices.size(),
+            (Vertex*)mapped
+        );
+        staging_buf_mem->flush();
 
         create_buffer(
             size,
@@ -1219,7 +1238,7 @@ namespace beva_demo_01_textured_model
         VkDeviceSize size = sizeof(indices[0]) * indices.size();
 
         bv::BufferPtr staging_buf;
-        bv::DeviceMemoryPtr staging_buf_mem;
+        bv::MemoryChunkPtr staging_buf_mem;
         create_buffer(
             size,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1231,7 +1250,13 @@ namespace beva_demo_01_textured_model
             staging_buf_mem
         );
 
-        staging_buf_mem->upload((void*)indices.data(), size);
+        void* mapped = staging_buf_mem->mapped();
+        std::copy(
+            indices.data(),
+            indices.data() + indices.size(),
+            (uint32_t*)mapped
+        );
+        staging_buf_mem->flush();
 
         create_buffer(
             size,
@@ -1257,7 +1282,7 @@ namespace beva_demo_01_textured_model
         VkDeviceSize size = sizeof(instances[0]) * instances.size();
 
         bv::BufferPtr staging_buf;
-        bv::DeviceMemoryPtr staging_buf_mem;
+        bv::MemoryChunkPtr staging_buf_mem;
         create_buffer(
             size,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1269,7 +1294,13 @@ namespace beva_demo_01_textured_model
             staging_buf_mem
         );
 
-        staging_buf_mem->upload((void*)instances.data(), size);
+        void* mapped = staging_buf_mem->mapped();
+        std::copy(
+            instances.data(),
+            instances.data() + instances.size(),
+            (Instance*)mapped
+        );
+        staging_buf_mem->flush();
 
         create_buffer(
             size,
@@ -1315,7 +1346,7 @@ namespace beva_demo_01_textured_model
                 uniform_bufs_mem[i]
             );
 
-            uniform_bufs_mapped[i] = uniform_bufs_mem[i]->map(0, size);
+            uniform_bufs_mapped[i] = uniform_bufs_mem[i]->mapped();
         }
     }
 
@@ -1623,10 +1654,9 @@ namespace beva_demo_01_textured_model
         VkImageUsageFlags usage,
         VkMemoryPropertyFlags memory_properties,
         bv::ImagePtr& out_image,
-        bv::DeviceMemoryPtr& out_image_memory
+        bv::MemoryChunkPtr& out_memory_chunk
     )
     {
-        // create image
         bv::Extent3d extent{
             .width = width,
             .height = height,
@@ -1650,21 +1680,11 @@ namespace beva_demo_01_textured_model
             }
         );
 
-        // create memory
-        uint32_t memory_type_idx = find_memory_type_idx(
-            out_image->memory_requirements().memory_type_bits,
+        out_memory_chunk = mem_bank->allocate(
+            out_image->memory_requirements(),
             memory_properties
         );
-        out_image_memory = bv::DeviceMemory::allocate(
-            device,
-            {
-                .allocation_size = out_image->memory_requirements().size,
-                .memory_type_index = memory_type_idx
-            }
-        );
-
-        // bind memory
-        out_image->bind_memory(out_image_memory, 0);
+        out_memory_chunk->bind(out_image);
     }
 
     void App::transition_image_layout(
@@ -1953,10 +1973,9 @@ namespace beva_demo_01_textured_model
         VkBufferUsageFlags usage,
         VkMemoryPropertyFlags memory_properties,
         bv::BufferPtr& out_buffer,
-        bv::DeviceMemoryPtr& out_buffer_memory
+        bv::MemoryChunkPtr& out_memory_chunk
     )
     {
-        // create buffer
         out_buffer = bv::Buffer::create(
             device,
             {
@@ -1968,21 +1987,11 @@ namespace beva_demo_01_textured_model
             }
         );
 
-        // create memory
-        uint32_t memory_type_idx = find_memory_type_idx(
-            out_buffer->memory_requirements().memory_type_bits,
+        out_memory_chunk = mem_bank->allocate(
+            out_buffer->memory_requirements(),
             memory_properties
         );
-        out_buffer_memory = bv::DeviceMemory::allocate(
-            device,
-            {
-                .allocation_size = out_buffer->memory_requirements().size,
-                .memory_type_index = memory_type_idx
-            }
-        );
-
-        // bind memory
-        out_buffer->bind_memory(out_buffer_memory, 0);
+        out_memory_chunk->bind(out_buffer);
     }
 
     void App::copy_buffer(

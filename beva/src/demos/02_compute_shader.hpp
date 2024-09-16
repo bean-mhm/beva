@@ -69,6 +69,7 @@ namespace beva_demo_02_compute_shader
         bv::DevicePtr device = nullptr;
         bv::QueuePtr graphics_compute_queue = nullptr;
         bv::QueuePtr presentation_queue = nullptr;
+        bv::MemoryBankPtr mem_bank = nullptr;
         bv::SwapchainPtr swapchain = nullptr;
         std::vector<bv::ImageViewPtr> swapchain_imgviews;
 
@@ -87,11 +88,11 @@ namespace beva_demo_02_compute_shader
         std::vector<bv::FramebufferPtr> swapchain_framebufs;
 
         std::vector<bv::ImagePtr> storage_imgs;
-        std::vector<bv::DeviceMemoryPtr> storage_imgs_mem;
+        std::vector<bv::MemoryChunkPtr> storage_imgs_mem;
         std::vector<bv::ImageViewPtr> storage_imgviews;
 
         bv::BufferPtr vertex_buf = nullptr;
-        bv::DeviceMemoryPtr vertex_buf_mem = nullptr;
+        bv::MemoryChunkPtr vertex_buf_mem = nullptr;
 
         bv::DescriptorPoolPtr graphics_descriptor_pool = nullptr;
         std::vector<bv::DescriptorSetPtr> graphics_descriptor_sets;
@@ -122,6 +123,7 @@ namespace beva_demo_02_compute_shader
         void create_surface();
         void pick_physical_device();
         void create_logical_device();
+        void create_memory_bank();
         void create_swapchain();
 
         void create_render_pass();
@@ -185,7 +187,7 @@ namespace beva_demo_02_compute_shader
             VkImageUsageFlags usage,
             VkMemoryPropertyFlags memory_properties,
             bv::ImagePtr& out_image,
-            bv::DeviceMemoryPtr& out_image_memory
+            bv::MemoryChunkPtr& out_memory_chunk
         );
 
         bv::ImageViewPtr create_image_view(
@@ -200,7 +202,7 @@ namespace beva_demo_02_compute_shader
             VkBufferUsageFlags usage,
             VkMemoryPropertyFlags memory_properties,
             bv::BufferPtr& out_buffer,
-            bv::DeviceMemoryPtr& out_buffer_memory
+            bv::MemoryChunkPtr& out_memory_chunk
         );
 
         void copy_buffer(

@@ -83,6 +83,7 @@ namespace beva_demo_02_compute_shader
         create_surface();
         pick_physical_device();
         create_logical_device();
+        create_memory_bank();
         create_swapchain();
 
         create_render_pass();
@@ -154,6 +155,7 @@ namespace beva_demo_02_compute_shader
 
         render_pass = nullptr;
 
+        mem_bank = nullptr;
         device = nullptr;
         surface = nullptr;
         debug_messenger = nullptr;
@@ -454,6 +456,11 @@ namespace beva_demo_02_compute_shader
 
         presentation_queue =
             bv::Device::retrieve_queue(device, presentation_family_idx, 0);
+    }
+
+    void App::create_memory_bank()
+    {
+        mem_bank = bv::MemoryBank::create(device);
     }
 
     void App::create_swapchain()
@@ -1016,7 +1023,7 @@ namespace beva_demo_02_compute_shader
         VkDeviceSize size = sizeof(vertices[0]) * vertices.size();
 
         bv::BufferPtr staging_buf;
-        bv::DeviceMemoryPtr staging_buf_mem;
+        bv::MemoryChunkPtr staging_buf_mem;
         create_buffer(
             size,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1028,7 +1035,13 @@ namespace beva_demo_02_compute_shader
             staging_buf_mem
         );
 
-        staging_buf_mem->upload((void*)vertices.data(), size);
+        void* mapped = staging_buf_mem->mapped();
+        std::copy(
+            vertices.data(),
+            vertices.data() + vertices.size(),
+            (Vertex*)mapped
+        );
+        staging_buf_mem->flush();
 
         create_buffer(
             size,
@@ -1373,10 +1386,9 @@ namespace beva_demo_02_compute_shader
         VkImageUsageFlags usage,
         VkMemoryPropertyFlags memory_properties,
         bv::ImagePtr& out_image,
-        bv::DeviceMemoryPtr& out_image_memory
+        bv::MemoryChunkPtr& out_memory_chunk
     )
     {
-        // create image
         bv::Extent3d extent{
             .width = width,
             .height = height,
@@ -1400,21 +1412,11 @@ namespace beva_demo_02_compute_shader
             }
         );
 
-        // create memory
-        uint32_t memory_type_idx = find_memory_type_idx(
-            out_image->memory_requirements().memory_type_bits,
+        out_memory_chunk = mem_bank->allocate(
+            out_image->memory_requirements(),
             memory_properties
         );
-        out_image_memory = bv::DeviceMemory::allocate(
-            device,
-            {
-                .allocation_size = out_image->memory_requirements().size,
-                .memory_type_index = memory_type_idx
-            }
-        );
-
-        // bind memory
-        out_image->bind_memory(out_image_memory, 0);
+        out_memory_chunk->bind(out_image);
     }
 
     bv::ImageViewPtr App::create_image_view(
@@ -1450,10 +1452,9 @@ namespace beva_demo_02_compute_shader
         VkBufferUsageFlags usage,
         VkMemoryPropertyFlags memory_properties,
         bv::BufferPtr& out_buffer,
-        bv::DeviceMemoryPtr& out_buffer_memory
+        bv::MemoryChunkPtr& out_memory_chunk
     )
     {
-        // create buffer
         out_buffer = bv::Buffer::create(
             device,
             {
@@ -1465,21 +1466,11 @@ namespace beva_demo_02_compute_shader
             }
         );
 
-        // create memory
-        uint32_t memory_type_idx = find_memory_type_idx(
-            out_buffer->memory_requirements().memory_type_bits,
+        out_memory_chunk = mem_bank->allocate(
+            out_buffer->memory_requirements(),
             memory_properties
         );
-        out_buffer_memory = bv::DeviceMemory::allocate(
-            device,
-            {
-                .allocation_size = out_buffer->memory_requirements().size,
-                .memory_type_index = memory_type_idx
-            }
-        );
-
-        // bind memory
-        out_buffer->bind_memory(out_buffer_memory, 0);
+        out_memory_chunk->bind(out_buffer);
     }
 
     void App::copy_buffer(

@@ -135,17 +135,17 @@ namespace beva_demo_03_deferred_rendering
             VK_FORMAT_R16G16B16A16_UNORM;
 
         bv::ImagePtr diffuse_metallic_img = nullptr;
-        bv::DeviceMemoryPtr diffuse_metallic_mem = nullptr;
+        bv::MemoryChunkPtr diffuse_metallic_mem = nullptr;
         bv::ImageViewPtr diffuse_metallic_view = nullptr;
         bv::SamplerPtr diffuse_metallic_sampler = nullptr;
 
         bv::ImagePtr normal_roughness_img = nullptr;
-        bv::DeviceMemoryPtr normal_roughness_mem = nullptr;
+        bv::MemoryChunkPtr normal_roughness_mem = nullptr;
         bv::ImageViewPtr normal_roughness_view = nullptr;
         bv::SamplerPtr normal_roughness_sampler = nullptr;
 
         bv::ImagePtr depth_img = nullptr;
-        bv::DeviceMemoryPtr depth_img_mem = nullptr;
+        bv::MemoryChunkPtr depth_img_mem = nullptr;
         bv::ImageViewPtr depth_imgview = nullptr;
         bv::SamplerPtr depth_sampler = nullptr;
 
@@ -166,7 +166,7 @@ namespace beva_demo_03_deferred_rendering
     struct GeometryPass
     {
         std::vector<bv::BufferPtr> uniform_bufs;
-        std::vector<bv::DeviceMemoryPtr> uniform_bufs_mem;
+        std::vector<bv::MemoryChunkPtr> uniform_bufs_mem;
         std::vector<void*> uniform_bufs_mapped;
 
         bv::DescriptorSetLayoutPtr descriptor_set_layout = nullptr;
@@ -190,7 +190,7 @@ namespace beva_demo_03_deferred_rendering
             VK_FORMAT_R16G16B16A16_SFLOAT;
 
         bv::ImagePtr color_img = nullptr;
-        bv::DeviceMemoryPtr color_img_mem = nullptr;
+        bv::MemoryChunkPtr color_img_mem = nullptr;
         bv::ImageViewPtr color_imgview = nullptr;
         bv::SamplerPtr color_img_sampler = nullptr;
 
@@ -213,7 +213,7 @@ namespace beva_demo_03_deferred_rendering
         std::array<Light, 4> lights;
 
         std::vector<bv::BufferPtr> light_bufs;
-        std::vector<bv::DeviceMemoryPtr> light_bufs_mem;
+        std::vector<bv::MemoryChunkPtr> light_bufs_mem;
         std::vector<void*> light_bufs_mapped;
 
         bv::DescriptorSetLayoutPtr descriptor_set_layout = nullptr;
@@ -324,6 +324,7 @@ namespace beva_demo_03_deferred_rendering
         bv::DevicePtr device = nullptr;
         bv::QueuePtr graphics_queue = nullptr;
         bv::QueuePtr presentation_queue = nullptr;
+        bv::MemoryBankPtr mem_bank = nullptr;
         bv::CommandPoolPtr cmd_pool = nullptr;
         bv::CommandPoolPtr transient_cmd_pool = nullptr;
 
@@ -331,12 +332,12 @@ namespace beva_demo_03_deferred_rendering
         std::vector<bv::ImageViewPtr> swapchain_imgviews;
 
         bv::ImagePtr tex_diffuse_metallic_img = nullptr;
-        bv::DeviceMemoryPtr tex_diffuse_metallic_mem = nullptr;
+        bv::MemoryChunkPtr tex_diffuse_metallic_mem = nullptr;
         bv::ImageViewPtr tex_diffuse_metallic_view = nullptr;
         bv::SamplerPtr tex_diffuse_metallic_sampler = nullptr;
 
         bv::ImagePtr tex_normal_roughness_img = nullptr;
-        bv::DeviceMemoryPtr tex_normal_roughness_mem = nullptr;
+        bv::MemoryChunkPtr tex_normal_roughness_mem = nullptr;
         bv::ImageViewPtr tex_normal_roughness_view = nullptr;
         bv::SamplerPtr tex_normal_roughness_sampler = nullptr;
 
@@ -344,13 +345,13 @@ namespace beva_demo_03_deferred_rendering
         std::vector<uint32_t> indices;
 
         bv::BufferPtr vertex_buf = nullptr;
-        bv::DeviceMemoryPtr vertex_buf_mem = nullptr;
+        bv::MemoryChunkPtr vertex_buf_mem = nullptr;
 
         bv::BufferPtr index_buf = nullptr;
-        bv::DeviceMemoryPtr index_buf_mem = nullptr;
+        bv::MemoryChunkPtr index_buf_mem = nullptr;
 
         bv::BufferPtr quad_vertex_buf = nullptr;
-        bv::DeviceMemoryPtr quad_vertex_buf_mem = nullptr;
+        bv::MemoryChunkPtr quad_vertex_buf_mem = nullptr;
 
         // geometry pass, lighting pass, and FXAA (+ post processing) pass
         std::shared_ptr<GeometryPass> gpass = nullptr;
@@ -389,6 +390,7 @@ namespace beva_demo_03_deferred_rendering
         void create_surface();
         void pick_physical_device();
         void create_logical_device();
+        void create_memory_bank();
         void create_command_pools();
         void create_swapchain();
 
@@ -444,7 +446,7 @@ namespace beva_demo_03_deferred_rendering
             VkImageUsageFlags usage,
             VkMemoryPropertyFlags memory_properties,
             bv::ImagePtr& out_image,
-            bv::DeviceMemoryPtr& out_image_memory
+            bv::MemoryChunkPtr& out_memory_chunk
         );
 
         // when one of old_layout or new_layout is
@@ -481,7 +483,7 @@ namespace beva_demo_03_deferred_rendering
             VkBufferUsageFlags usage,
             VkMemoryPropertyFlags memory_properties,
             bv::BufferPtr& out_buffer,
-            bv::DeviceMemoryPtr& out_buffer_memory
+            bv::MemoryChunkPtr& out_memory_chunk
         );
 
         void copy_buffer(

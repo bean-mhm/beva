@@ -96,6 +96,7 @@ namespace beva_demo_01_textured_model
         bv::DevicePtr device = nullptr;
         bv::QueuePtr graphics_queue = nullptr;
         bv::QueuePtr presentation_queue = nullptr;
+        bv::MemoryBankPtr mem_bank = nullptr;
         bv::SwapchainPtr swapchain = nullptr;
         std::vector<bv::ImageViewPtr> swapchain_imgviews;
         bv::RenderPassPtr render_pass = nullptr;
@@ -107,18 +108,18 @@ namespace beva_demo_01_textured_model
         bv::CommandPoolPtr transient_cmd_pool = nullptr;
 
         bv::ImagePtr color_img = nullptr;
-        bv::DeviceMemoryPtr color_img_mem = nullptr;
+        bv::MemoryChunkPtr color_img_mem = nullptr;
         bv::ImageViewPtr color_imgview = nullptr;
 
         bv::ImagePtr depth_img = nullptr;
-        bv::DeviceMemoryPtr depth_img_mem = nullptr;
+        bv::MemoryChunkPtr depth_img_mem = nullptr;
         bv::ImageViewPtr depth_imgview = nullptr;
 
         std::vector<bv::FramebufferPtr> swapchain_framebufs;
 
         uint32_t texture_mip_levels = 1;
         bv::ImagePtr texture_img = nullptr;
-        bv::DeviceMemoryPtr texture_img_mem = nullptr;
+        bv::MemoryChunkPtr texture_img_mem = nullptr;
         bv::ImageViewPtr texture_imgview = nullptr;
         bv::SamplerPtr texture_sampler = nullptr;
 
@@ -126,16 +127,16 @@ namespace beva_demo_01_textured_model
         std::vector<uint32_t> indices;
 
         bv::BufferPtr vertex_buf = nullptr;
-        bv::DeviceMemoryPtr vertex_buf_mem = nullptr;
+        bv::MemoryChunkPtr vertex_buf_mem = nullptr;
 
         bv::BufferPtr index_buf = nullptr;
-        bv::DeviceMemoryPtr index_buf_mem = nullptr;
+        bv::MemoryChunkPtr index_buf_mem = nullptr;
 
         bv::BufferPtr instance_buf = nullptr;
-        bv::DeviceMemoryPtr instance_buf_mem = nullptr;
+        bv::MemoryChunkPtr instance_buf_mem = nullptr;
 
         std::vector<bv::BufferPtr> uniform_bufs;
-        std::vector<bv::DeviceMemoryPtr> uniform_bufs_mem;
+        std::vector<bv::MemoryChunkPtr> uniform_bufs_mem;
         std::vector<void*> uniform_bufs_mapped;
 
         bv::DescriptorPoolPtr descriptor_pool = nullptr;
@@ -163,6 +164,7 @@ namespace beva_demo_01_textured_model
         void create_surface();
         void pick_physical_device();
         void create_logical_device();
+        void create_memory_bank();
         void create_swapchain();
         void create_render_pass();
         void create_descriptor_set_layout();
@@ -223,7 +225,7 @@ namespace beva_demo_01_textured_model
             VkImageUsageFlags usage,
             VkMemoryPropertyFlags memory_properties,
             bv::ImagePtr& out_image,
-            bv::DeviceMemoryPtr& out_image_memory
+            bv::MemoryChunkPtr& out_memory_chunk
         );
 
         // when new_layout is VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, the
@@ -273,7 +275,7 @@ namespace beva_demo_01_textured_model
             VkBufferUsageFlags usage,
             VkMemoryPropertyFlags memory_properties,
             bv::BufferPtr& out_buffer,
-            bv::DeviceMemoryPtr& out_buffer_memory
+            bv::MemoryChunkPtr& out_memory_chunk
         );
 
         void copy_buffer(

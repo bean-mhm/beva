@@ -51,6 +51,7 @@ namespace beva_demo_00_first_triangle
         bv::DevicePtr device = nullptr;
         bv::QueuePtr graphics_queue = nullptr;
         bv::QueuePtr presentation_queue = nullptr;
+        bv::MemoryBankPtr mem_bank = nullptr;
         bv::SwapchainPtr swapchain = nullptr;
         std::vector<bv::ImageViewPtr> swapchain_imgviews;
         bv::RenderPassPtr render_pass = nullptr;
@@ -62,7 +63,7 @@ namespace beva_demo_00_first_triangle
         bv::CommandPoolPtr transient_cmd_pool = nullptr;
 
         bv::BufferPtr vertex_buf = nullptr;
-        bv::DeviceMemoryPtr vertex_buf_mem = nullptr;
+        bv::MemoryChunkPtr vertex_buf_mem = nullptr;
 
         // "per frame" stuff (as in frames in flight)
         std::vector<bv::CommandBufferPtr> cmd_bufs;
@@ -82,6 +83,7 @@ namespace beva_demo_00_first_triangle
         void create_surface();
         void pick_physical_device();
         void create_logical_device();
+        void create_memory_bank();
         void create_swapchain();
         void create_render_pass();
         void create_swapchain_framebuffers();
@@ -122,7 +124,7 @@ namespace beva_demo_00_first_triangle
             VkBufferUsageFlags usage,
             VkMemoryPropertyFlags memory_properties,
             bv::BufferPtr& out_buffer,
-            bv::DeviceMemoryPtr& out_buffer_memory
+            bv::MemoryChunkPtr& out_memory_chunk
         );
 
         void copy_buffer(

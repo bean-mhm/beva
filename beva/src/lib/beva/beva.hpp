@@ -3844,6 +3844,9 @@ namespace bv
     class DescriptorPool;
     class BufferView;
     class PipelineCache;
+    class MemoryRegion;
+    class MemoryChunk;
+    class MemoryBank;
 
     // smart pointer type aliases
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(Allocator);
@@ -3873,6 +3876,9 @@ namespace bv
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(DescriptorPool);
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(BufferView);
     _BV_DEFINE_SMART_PTR_TYPE_ALIASES(PipelineCache);
+    _BV_DEFINE_SMART_PTR_TYPE_ALIASES(MemoryRegion);
+    _BV_DEFINE_SMART_PTR_TYPE_ALIASES(MemoryChunk);
+    _BV_DEFINE_SMART_PTR_TYPE_ALIASES(MemoryBank);
 
 #pragma region data-only structs and enums
 
@@ -6884,14 +6890,14 @@ namespace bv
 
     protected:
         std::shared_ptr<std::mutex> mutex;
-        std::shared_ptr<MemoryRegion> region;
+        MemoryRegionPtr region;
         VkDeviceSize _offset;
         VkDeviceSize _size;
         VkDeviceSize block_size;
 
         MemoryChunk(
             const std::shared_ptr<std::mutex>& mutex,
-            const std::shared_ptr<MemoryRegion>& region,
+            const MemoryRegionPtr& region,
             VkDeviceSize offset,
             VkDeviceSize size,
             VkDeviceSize block_size
@@ -6904,12 +6910,11 @@ namespace bv
     public:
         _BV_DELETE_DEFAULT_CTOR_AND_ALLOW_MOVE_ONLY(MemoryBank);
 
-        MemoryBank(
-            const bv::DevicePtr& device,
+        static MemoryBankPtr create(
+            const DevicePtr& device,
             VkDeviceSize block_size = 1024,
             VkDeviceSize min_region_size = 268'435'456
         );
-        ~MemoryBank();
 
         constexpr const bv::DevicePtr& device() const
         {
@@ -6926,7 +6931,7 @@ namespace bv
             return _min_region_size;
         }
 
-        std::shared_ptr<MemoryChunk> allocate(
+        MemoryChunkPtr allocate(
             const bv::MemoryRequirements& requirements,
             VkMemoryPropertyFlags required_properties
         );
@@ -6934,13 +6939,21 @@ namespace bv
         // returns a string description of its status including the regions
         std::string to_string();
 
-    private:
+        ~MemoryBank();
+
+    protected:
         bv::DevicePtr _device;
-        std::vector<std::shared_ptr<MemoryRegion>> regions;
+        std::vector<MemoryRegionPtr> regions;
         std::shared_ptr<std::mutex> mutex;
 
         VkDeviceSize _block_size;
         VkDeviceSize _min_region_size;
+
+        MemoryBank(
+            const bv::DevicePtr& device,
+            VkDeviceSize block_size,
+            VkDeviceSize min_region_size
+        );
 
         void delete_empty_regions();
 

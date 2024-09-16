@@ -425,7 +425,7 @@ namespace beva_demo_03_deferred_rendering
                 uniform_bufs[i],
                 uniform_bufs_mem[i]
             );
-            uniform_bufs_mapped[i] = uniform_bufs_mem[i]->map(0, ubo_size);
+            uniform_bufs_mapped[i] = uniform_bufs_mem[i]->mapped();
         }
 
         // descriptor set layout
@@ -896,7 +896,7 @@ namespace beva_demo_03_deferred_rendering
                 light_bufs[i],
                 light_bufs_mem[i]
             );
-            light_bufs_mapped[i] = light_bufs_mem[i]->map(0, light_buf_size);
+            light_bufs_mapped[i] = light_bufs_mem[i]->mapped();
         }
 
         // descriptor set layout
@@ -1581,6 +1581,7 @@ namespace beva_demo_03_deferred_rendering
         create_surface();
         pick_physical_device();
         create_logical_device();
+        create_memory_bank();
         create_command_pools();
         create_swapchain();
 
@@ -1676,6 +1677,7 @@ namespace beva_demo_03_deferred_rendering
 
         transient_cmd_pool = nullptr;
         cmd_pool = nullptr;
+        mem_bank = nullptr;
         device = nullptr;
         surface = nullptr;
         debug_messenger = nullptr;
@@ -1948,6 +1950,11 @@ namespace beva_demo_03_deferred_rendering
             bv::Device::retrieve_queue(device, presentation_family_idx, 0);
     }
 
+    void App::create_memory_bank()
+    {
+        mem_bank = bv::MemoryBank::create(device);
+    }
+
     void App::create_command_pools()
     {
         cmd_pool = bv::CommandPool::create(
@@ -2179,7 +2186,7 @@ namespace beva_demo_03_deferred_rendering
         // upload to staging buffer and free
 
         bv::BufferPtr staging_buf;
-        bv::DeviceMemoryPtr staging_buf_mem;
+        bv::MemoryChunkPtr staging_buf_mem;
         create_buffer(
             total_size,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -2191,7 +2198,7 @@ namespace beva_demo_03_deferred_rendering
             staging_buf_mem
         );
 
-        void* mapped = staging_buf_mem->map(0, total_size);
+        void* mapped = staging_buf_mem->mapped();
         std::copy(
             (uint8_t*)diffuse_metallic_pixels,
             (uint8_t*)diffuse_metallic_pixels + diffuse_metallic_size,
@@ -2202,8 +2209,7 @@ namespace beva_demo_03_deferred_rendering
             (uint8_t*)normal_roughness_pixels + normal_roughness_size,
             (uint8_t*)mapped + diffuse_metallic_size
         );
-        staging_buf_mem->flush_mapped_range(0, VK_WHOLE_SIZE);
-        staging_buf_mem->unmap();
+        staging_buf_mem->flush();
 
         stbi_image_free(diffuse_metallic_pixels);
         stbi_image_free(normal_roughness_pixels);
@@ -2409,7 +2415,7 @@ namespace beva_demo_03_deferred_rendering
         VkDeviceSize size = sizeof(vertices[0]) * vertices.size();
 
         bv::BufferPtr staging_buf;
-        bv::DeviceMemoryPtr staging_buf_mem;
+        bv::MemoryChunkPtr staging_buf_mem;
         create_buffer(
             size,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -2421,7 +2427,13 @@ namespace beva_demo_03_deferred_rendering
             staging_buf_mem
         );
 
-        staging_buf_mem->upload((void*)vertices.data(), size);
+        void* mapped = staging_buf_mem->mapped();
+        std::copy(
+            vertices.data(),
+            vertices.data() + vertices.size(),
+            (GeometryPassVertex*)mapped
+        );
+        staging_buf_mem->flush();
 
         create_buffer(
             size,
@@ -2447,7 +2459,7 @@ namespace beva_demo_03_deferred_rendering
         VkDeviceSize size = sizeof(indices[0]) * indices.size();
 
         bv::BufferPtr staging_buf;
-        bv::DeviceMemoryPtr staging_buf_mem;
+        bv::MemoryChunkPtr staging_buf_mem;
         create_buffer(
             size,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -2459,7 +2471,13 @@ namespace beva_demo_03_deferred_rendering
             staging_buf_mem
         );
 
-        staging_buf_mem->upload((void*)indices.data(), size);
+        void* mapped = staging_buf_mem->mapped();
+        std::copy(
+            indices.data(),
+            indices.data() + indices.size(),
+            (uint32_t*)mapped
+        );
+        staging_buf_mem->flush();
 
         create_buffer(
             size,
@@ -2485,7 +2503,7 @@ namespace beva_demo_03_deferred_rendering
         VkDeviceSize size = sizeof(quad_vertices[0]) * quad_vertices.size();
 
         bv::BufferPtr staging_buf;
-        bv::DeviceMemoryPtr staging_buf_mem;
+        bv::MemoryChunkPtr staging_buf_mem;
         create_buffer(
             size,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -2497,7 +2515,13 @@ namespace beva_demo_03_deferred_rendering
             staging_buf_mem
         );
 
-        staging_buf_mem->upload((void*)quad_vertices.data(), size);
+        void* mapped = staging_buf_mem->mapped();
+        std::copy(
+            quad_vertices.data(),
+            quad_vertices.data() + quad_vertices.size(),
+            (FlatVertex*)mapped
+        );
+        staging_buf_mem->flush();
 
         create_buffer(
             size,
@@ -2592,10 +2616,7 @@ namespace beva_demo_03_deferred_rendering
             lpass->lights.data() + lpass->lights.size(),
             (Light*)lpass->light_bufs_mapped[frame_idx]
         );
-        lpass->light_bufs_mem[frame_idx]->flush_mapped_range(
-            0,
-            sizeof(lpass->lights[0]) * lpass->lights.size()
-        );
+        lpass->light_bufs_mem[frame_idx]->flush();
     }
 
     void App::update_camera()
@@ -2824,10 +2845,9 @@ namespace beva_demo_03_deferred_rendering
         VkImageUsageFlags usage,
         VkMemoryPropertyFlags memory_properties,
         bv::ImagePtr& out_image,
-        bv::DeviceMemoryPtr& out_image_memory
+        bv::MemoryChunkPtr& out_memory_chunk
     )
     {
-        // create image
         bv::Extent3d extent{
             .width = width,
             .height = height,
@@ -2851,21 +2871,11 @@ namespace beva_demo_03_deferred_rendering
             }
         );
 
-        // create memory
-        uint32_t memory_type_idx = find_memory_type_idx(
-            out_image->memory_requirements().memory_type_bits,
+        out_memory_chunk = mem_bank->allocate(
+            out_image->memory_requirements(),
             memory_properties
         );
-        out_image_memory = bv::DeviceMemory::allocate(
-            device,
-            {
-                .allocation_size = out_image->memory_requirements().size,
-                .memory_type_index = memory_type_idx
-            }
-        );
-
-        // bind memory
-        out_image->bind_memory(out_image_memory, 0);
+        out_memory_chunk->bind(out_image);
     }
 
     void App::transition_image_layout(
@@ -3088,10 +3098,9 @@ namespace beva_demo_03_deferred_rendering
         VkBufferUsageFlags usage,
         VkMemoryPropertyFlags memory_properties,
         bv::BufferPtr& out_buffer,
-        bv::DeviceMemoryPtr& out_buffer_memory
+        bv::MemoryChunkPtr& out_memory_chunk
     )
     {
-        // create buffer
         out_buffer = bv::Buffer::create(
             device,
             {
@@ -3103,21 +3112,11 @@ namespace beva_demo_03_deferred_rendering
             }
         );
 
-        // create memory
-        uint32_t memory_type_idx = find_memory_type_idx(
-            out_buffer->memory_requirements().memory_type_bits,
+        out_memory_chunk = mem_bank->allocate(
+            out_buffer->memory_requirements(),
             memory_properties
         );
-        out_buffer_memory = bv::DeviceMemory::allocate(
-            device,
-            {
-                .allocation_size = out_buffer->memory_requirements().size,
-                .memory_type_index = memory_type_idx
-            }
-        );
-
-        // bind memory
-        out_buffer->bind_memory(out_buffer_memory, 0);
+        out_memory_chunk->bind(out_buffer);
     }
 
     void App::copy_buffer(
