@@ -8,7 +8,12 @@ little functionality from the original API and keeps the low-level design.
 The `beva.hpp` header (which is the only one) uses the `bv` namespace and
 contains 4 different regions.
 
-1. __Data-only structs and enums:__ This region provides tiny wrappers for
+1. __dynamic\_bitset:__ This regions contains a copy of the
+[dynamic_bitset](https://github.com/pinam45/dynamic_bitset/blob/ac60c9e6c534db7457ca6af02fdedbe74ad60968/include/sul/dynamic_bitset.hpp)
+library by [pinam45](https://github.com/pinam45/). Dynamic bitsets are used for
+memory management in beva.
+
+2. __Data-only structs and enums:__ This region provides tiny wrappers for
 Vulkan structs that use STL containers and types like `std::vector`,
 `std::array`, `std::string`, and `std::optional` instead of raw pointers and
 arrays. These structs also hide away useless fields like flags that are reserved
@@ -17,15 +22,20 @@ region also contains `Version`, a wrapper around the `VK_MAKE_API_VERSION` and
 `VK_API_VERSION_XXXX` macros used for encoding and decoding versions in
 integers.
 
-2. __Error handling:__ beva throws exceptions of type `Error` for error
+3. __Error handling:__ beva throws exceptions of type `Error` for error
 handling. `Error` can be constructed from a message and an optional `VkResult`
 and provides a `to_string()` function with descriptions for every `VkResult`
 based on the Vulkan specification.
 
-3. __Classes and object wrappers:__ Contains wrapper classes for Vulkan objects.
+4. __Classes and object wrappers:__ Contains wrapper classes for Vulkan objects.
 This will be further explained below.
 
-4. __Helper functions:__ This is self explanatory.
+5. __Helper functions:__ This is self explanatory.
+
+6. __Memory management:__ This region contains helper classes for managing
+device memory allocations and splitting them into several chunks for different
+images and buffers in a thread-safe manner. This will be further explained
+below.
 
 In the header, you'll find comments containing links to the Khronos manual above
 wrapper structs, classes, and functions. I encourage you to read them to
@@ -79,6 +89,35 @@ invoked, it will first check if the weak pointer to the device has expired and
 do nothing if so. However, if you call a member function on the fence that needs
 to use the device, an `Error` will be thrown complaining about the weak pointer
 having expired.
+
+# Memory Management
+
+| Term | Description |
+| - | - |
+| Block | A small portion of a device memory, by default 1024 bytes. |
+| Region | A huge amount of allocated device memory which acts as a memory arena for virtually allocating chunks. A region also contains a bitset to represent which blocks are allocated. |
+| Chunk | A virtually allocated range inside a memory region. |
+| Bank | Manages a list of memory regions and provides logic for allocating new chunks. |
+
+beva provides `MemoryBank` for device memory management. A `MemoryBank` manages
+a list of `MemoryRegions` internally. A `MemoryRegion` simply contains a
+`DeviceMemory` and a bitset to represent which blocks are allocated.
+
+You can call `MemoryBank::allocate()` to get a `MemoryChunk` that you can bind
+to your image or buffer using its `bind()` functions. `MemoryBank::allocate()`
+will automatically handle finding a free range inside a compatible region, or
+creating a new one if none were found. It will also take care of alignment
+requirements. These operations are all thread safe and use a mutex under the
+hood.
+
+A `MemoryChunk` will mark its corresponding blocks as free once its destructor
+is called. `MemoryBank::allocate()` will check for empty regions and delete them
+when needed.
+
+Additionally, you can call `mapped()` and `flush()` on a `MemoryChunk` if it was
+allocated from a host visible region. Note that you can pass the required memory
+properties (like host visible or device local) as an argument to
+`MemoryBank::allocate()`.
 
 # Expectations
 
@@ -172,6 +211,6 @@ the extremely simple "scene" in this demo, though.
 ## Note
 
 These demos don't necessarily follow the best practices for making larger
-applications. Buffer and image memory management is very naive, and the code
+applications. Buffer and image memory management is very naive (not using beva's memory management classes), and the code
 could certainly be rewritten to be much more organized. These are just there to
 show you how beva can be used.
