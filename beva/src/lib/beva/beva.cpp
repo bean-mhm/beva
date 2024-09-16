@@ -5461,6 +5461,16 @@ namespace bv
         return region->mem;
     }
 
+    void MemoryChunk::bind(bv::BufferPtr& buffer)
+    {
+        buffer->bind_memory(memory(), offset());
+    }
+
+    void MemoryChunk::bind(bv::ImagePtr& image)
+    {
+        image->bind_memory(memory(), offset());
+    }
+
     void* MemoryChunk::mapped()
     {
         if (region->mapped == nullptr)

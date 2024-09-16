@@ -6874,6 +6874,9 @@ namespace bv
             return _size;
         }
 
+        void bind(bv::BufferPtr& buffer);
+        void bind(bv::ImagePtr& image);
+
         void* mapped();
         void flush();
 
