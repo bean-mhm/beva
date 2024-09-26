@@ -1824,13 +1824,13 @@ namespace beva_demo_03_deferred_rendering
                 continue;
             }
 
-            auto swapchain_support = pdev.fetch_swapchain_support(surface);
-            if (!swapchain_support.has_value())
+            auto sc_support = pdev.fetch_swapchain_support(surface);
+            if (!sc_support.has_value())
             {
                 continue;
             }
-            if (swapchain_support->present_modes.empty()
-                || swapchain_support->surface_formats.empty())
+            if (sc_support->present_modes.empty()
+                || sc_support->surface_formats.empty())
             {
                 continue;
             }
