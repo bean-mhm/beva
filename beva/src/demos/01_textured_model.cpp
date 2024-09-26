@@ -319,27 +319,26 @@ namespace beva_demo_01_textured_model
     void App::pick_physical_device()
     {
         // make a list of devices we approve of
-        auto all_physical_devices = context->fetch_physical_devices(surface);
+        auto all_physical_devices = context->fetch_physical_devices();
         std::vector<bv::PhysicalDevice> supported_physical_devices;
         for (const auto& pdev : all_physical_devices)
         {
-            if (!pdev.queue_family_indices().graphics.has_value())
-            {
-                continue;
-            }
-            if (!pdev.queue_family_indices().presentation.has_value())
-            {
-                continue;
-            }
-
-            if (!pdev.swapchain_support().has_value())
+            if (pdev.find_queue_family_indices(
+                VK_QUEUE_GRAPHICS_BIT,
+                0,
+                surface
+            ).empty())
             {
                 continue;
             }
 
-            const auto& swapchain_support = pdev.swapchain_support().value();
-            if (swapchain_support.present_modes.empty()
-                || swapchain_support.surface_formats.empty())
+            auto swapchain_support = pdev.fetch_swapchain_support(surface);
+            if (!swapchain_support.has_value())
+            {
+                continue;
+            }
+            if (swapchain_support->present_modes.empty()
+                || swapchain_support->surface_formats.empty())
             {
                 continue;
             }
@@ -436,27 +435,20 @@ namespace beva_demo_01_textured_model
 
     void App::create_logical_device()
     {
-        graphics_family_idx =
-            physical_device->queue_family_indices().graphics.value();
-
-        presentation_family_idx =
-            physical_device->queue_family_indices().presentation.value();
-
-        std::set<uint32_t> unique_queue_family_indices = {
-            graphics_family_idx,
-            presentation_family_idx
-        };
+        graphics_present_family_idx =
+            physical_device->find_first_queue_family_index(
+                VK_QUEUE_GRAPHICS_BIT,
+                0,
+                surface
+            );
 
         std::vector<bv::QueueRequest> queue_requests;
-        for (auto family_idx : unique_queue_family_indices)
-        {
-            queue_requests.push_back(bv::QueueRequest{
-                .flags = 0,
-                .queue_family_index = family_idx,
-                .num_queues_to_create = 1,
-                .priorities = { 1.f }
-                });
-        }
+        queue_requests.push_back(bv::QueueRequest{
+            .flags = 0,
+            .queue_family_index = graphics_present_family_idx,
+            .num_queues_to_create = 1,
+            .priorities = { 1.f }
+            });
 
         bv::PhysicalDeviceFeatures enabled_features{};
         enabled_features.sampler_anisotropy = true;
@@ -471,11 +463,8 @@ namespace beva_demo_01_textured_model
             }
         );
 
-        graphics_queue =
-            bv::Device::retrieve_queue(device, graphics_family_idx, 0);
-
-        presentation_queue =
-            bv::Device::retrieve_queue(device, presentation_family_idx, 0);
+        graphics_present_queue =
+            bv::Device::retrieve_queue(device, graphics_present_family_idx, 0);
     }
 
     void App::create_memory_bank()
@@ -485,17 +474,15 @@ namespace beva_demo_01_textured_model
 
     void App::create_swapchain()
     {
-        physical_device->update_swapchain_support(surface);
-        if (!physical_device->swapchain_support().has_value())
+        auto sc_support = physical_device->fetch_swapchain_support(surface);
+        if (!sc_support.has_value())
         {
-            throw std::runtime_error("presentation no longer supported");
+            throw std::runtime_error("presentation not supported");
         }
-        const auto& swapchain_support =
-            physical_device->swapchain_support().value();
 
         bv::SurfaceFormat surface_format;
         bool found_surface_format = false;
-        for (const auto& sfmt : swapchain_support.surface_formats)
+        for (const auto& sfmt : sc_support->surface_formats)
         {
             if (sfmt.color_space == VK_COLORSPACE_SRGB_NONLINEAR_KHR)
             {
@@ -509,7 +496,7 @@ namespace beva_demo_01_textured_model
             throw std::runtime_error("no supported surface format");
         }
 
-        bv::Extent2d extent = swapchain_support.capabilities.current_extent;
+        bv::Extent2d extent = sc_support->capabilities.current_extent;
         if (extent.width == 0
             || extent.width == std::numeric_limits<uint32_t>::max()
             || extent.height == 0
@@ -525,40 +512,25 @@ namespace beva_demo_01_textured_model
 
             extent.width = std::clamp(
                 extent.width,
-                swapchain_support.capabilities.min_image_extent.width,
-                swapchain_support.capabilities.max_image_extent.width
+                sc_support->capabilities.min_image_extent.width,
+                sc_support->capabilities.max_image_extent.width
             );
             extent.height = std::clamp(
                 extent.height,
-                swapchain_support.capabilities.min_image_extent.height,
-                swapchain_support.capabilities.max_image_extent.height
+                sc_support->capabilities.min_image_extent.height,
+                sc_support->capabilities.max_image_extent.height
             );
         }
 
         uint32_t image_count =
-            swapchain_support.capabilities.min_image_count + 1;
-        if (swapchain_support.capabilities.max_image_count > 0
-            && image_count > swapchain_support.capabilities.max_image_count)
+            sc_support->capabilities.min_image_count + 1;
+        if (sc_support->capabilities.max_image_count > 0
+            && image_count > sc_support->capabilities.max_image_count)
         {
-            image_count = swapchain_support.capabilities.max_image_count;
+            image_count = sc_support->capabilities.max_image_count;
         }
 
-        VkSharingMode image_sharing_mode;
-        std::vector<uint32_t> queue_family_indices;
-        if (graphics_family_idx != presentation_family_idx)
-        {
-            image_sharing_mode = VK_SHARING_MODE_CONCURRENT;
-            queue_family_indices = {
-                graphics_family_idx,
-                presentation_family_idx
-            };
-        }
-        else
-        {
-            image_sharing_mode = VK_SHARING_MODE_EXCLUSIVE;
-        }
-
-        auto pre_transform = swapchain_support.capabilities.current_transform;
+        auto pre_transform = sc_support->capabilities.current_transform;
 
         // create swapchain
         swapchain = bv::Swapchain::create(
@@ -572,8 +544,8 @@ namespace beva_demo_01_textured_model
                 .image_extent = extent,
                 .image_array_layers = 1,
                 .image_usage = { VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT },
-                .image_sharing_mode = image_sharing_mode,
-                .queue_family_indices = queue_family_indices,
+                .image_sharing_mode = VK_SHARING_MODE_EXCLUSIVE,
+                .queue_family_indices = {},
                 .pre_transform = pre_transform,
                 .composite_alpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
                 .present_mode = VK_PRESENT_MODE_FIFO_KHR,
@@ -895,14 +867,14 @@ namespace beva_demo_01_textured_model
             device,
             {
                 .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-                .queue_family_index = graphics_family_idx
+                .queue_family_index = graphics_present_family_idx
             }
         );
         transient_cmd_pool = bv::CommandPool::create(
             device,
             {
                 .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
-                .queue_family_index = graphics_family_idx
+                .queue_family_index = graphics_present_family_idx
             }
         );
     }
@@ -1490,7 +1462,7 @@ namespace beva_demo_01_textured_model
         cmd_bufs[frame_idx]->reset(0);
         record_command_buffer(cmd_bufs[frame_idx], img_idx, elapsed);
 
-        graphics_queue->submit(
+        graphics_present_queue->submit(
             { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT },
             { semaphs_image_available[frame_idx] },
             { cmd_bufs[frame_idx] },
@@ -1501,7 +1473,7 @@ namespace beva_demo_01_textured_model
         VkResult present_vk_result;
         try
         {
-            presentation_queue->present(
+            graphics_present_queue->present(
                 { semaphs_render_finished[frame_idx] },
                 swapchain,
                 img_idx,
@@ -1581,10 +1553,10 @@ namespace beva_demo_01_textured_model
     )
     {
         cmd_buf->end();
-        graphics_queue->submit({}, {}, { cmd_buf }, {}, fence);
+        graphics_present_queue->submit({}, {}, { cmd_buf }, {}, fence);
         if (fence == nullptr)
         {
-            graphics_queue->wait_idle();
+            graphics_present_queue->wait_idle();
         }
         cmd_buf = nullptr;
     }

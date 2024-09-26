@@ -94,8 +94,7 @@ namespace beva_demo_01_textured_model
         bv::SurfacePtr surface = nullptr;
         std::optional<bv::PhysicalDevice> physical_device;
         bv::DevicePtr device = nullptr;
-        bv::QueuePtr graphics_queue = nullptr;
-        bv::QueuePtr presentation_queue = nullptr;
+        bv::QueuePtr graphics_present_queue = nullptr;
         bv::MemoryBankPtr mem_bank = nullptr;
         bv::SwapchainPtr swapchain = nullptr;
         std::vector<bv::ImageViewPtr> swapchain_imgviews;
@@ -148,8 +147,7 @@ namespace beva_demo_01_textured_model
         std::vector<bv::SemaphorePtr> semaphs_render_finished;
         std::vector<bv::FencePtr> fences_in_flight;
 
-        uint32_t graphics_family_idx = 0;
-        uint32_t presentation_family_idx = 0;
+        uint32_t graphics_present_family_idx = 0;
 
         bool framebuf_resized = false;
         uint32_t frame_idx = 0;

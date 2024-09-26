@@ -288,35 +288,33 @@ namespace beva_demo_02_compute_shader
     void App::pick_physical_device()
     {
         // make a list of devices we approve of
-        auto all_physical_devices = context->fetch_physical_devices(surface);
+        auto all_physical_devices = context->fetch_physical_devices();
         std::vector<bv::PhysicalDevice> supported_physical_devices;
         for (const auto& pdev : all_physical_devices)
         {
-            bool has_graphics_compute_family = false;
-            for (const auto& family : pdev.queue_families())
-            {
-                if ((family.queue_flags & VK_QUEUE_GRAPHICS_BIT)
-                    && (family.queue_flags & VK_QUEUE_COMPUTE_BIT))
-                {
-                    has_graphics_compute_family = true;
-                    break;
-                }
-            }
-            if (!has_graphics_compute_family) continue;
-
-            if (!pdev.queue_family_indices().presentation.has_value())
+            if (pdev.find_queue_family_indices(
+                VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT
+            ).empty())
             {
                 continue;
             }
 
-            if (!pdev.swapchain_support().has_value())
+            if (pdev.find_queue_family_indices(
+                0,
+                0,
+                surface
+            ).empty())
             {
                 continue;
             }
 
-            const auto& swapchain_support = pdev.swapchain_support().value();
-            if (swapchain_support.present_modes.empty()
-                || swapchain_support.surface_formats.empty())
+            auto swapchain_support = pdev.fetch_swapchain_support(surface);
+            if (!swapchain_support.has_value())
+            {
+                continue;
+            }
+            if (swapchain_support->present_modes.empty()
+                || swapchain_support->surface_formats.empty())
             {
                 continue;
             }
@@ -408,19 +406,17 @@ namespace beva_demo_02_compute_shader
 
     void App::create_logical_device()
     {
-        const auto& families = physical_device.value().queue_families();
-        for (uint32_t i = 0; i < families.size(); i++)
-        {
-            if ((families[i].queue_flags & VK_QUEUE_GRAPHICS_BIT)
-                && (families[i].queue_flags & VK_QUEUE_COMPUTE_BIT))
-            {
-                graphics_compute_family_idx = i;
-                break;
-            }
-        }
+        graphics_compute_family_idx =
+            physical_device->find_first_queue_family_index(
+                VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT
+            );
 
         presentation_family_idx =
-            physical_device->queue_family_indices().presentation.value();
+            physical_device->find_first_queue_family_index(
+                0,
+                0,
+                surface
+            );
 
         std::set<uint32_t> unique_queue_family_indices = {
             graphics_compute_family_idx,
@@ -465,17 +461,15 @@ namespace beva_demo_02_compute_shader
 
     void App::create_swapchain()
     {
-        physical_device->update_swapchain_support(surface);
-        if (!physical_device->swapchain_support().has_value())
+        auto sc_support = physical_device->fetch_swapchain_support(surface);
+        if (!sc_support.has_value())
         {
-            throw std::runtime_error("presentation no longer supported");
+            throw std::runtime_error("presentation not supported");
         }
-        const auto& swapchain_support =
-            physical_device->swapchain_support().value();
 
         bv::SurfaceFormat surface_format;
         bool found_surface_format = false;
-        for (const auto& sfmt : swapchain_support.surface_formats)
+        for (const auto& sfmt : sc_support->surface_formats)
         {
             if (sfmt.color_space == VK_COLORSPACE_SRGB_NONLINEAR_KHR)
             {
@@ -489,7 +483,7 @@ namespace beva_demo_02_compute_shader
             throw std::runtime_error("no supported surface format");
         }
 
-        bv::Extent2d extent = swapchain_support.capabilities.current_extent;
+        bv::Extent2d extent = sc_support->capabilities.current_extent;
         if (extent.width == 0
             || extent.width == std::numeric_limits<uint32_t>::max()
             || extent.height == 0
@@ -505,22 +499,22 @@ namespace beva_demo_02_compute_shader
 
             extent.width = std::clamp(
                 extent.width,
-                swapchain_support.capabilities.min_image_extent.width,
-                swapchain_support.capabilities.max_image_extent.width
+                sc_support->capabilities.min_image_extent.width,
+                sc_support->capabilities.max_image_extent.width
             );
             extent.height = std::clamp(
                 extent.height,
-                swapchain_support.capabilities.min_image_extent.height,
-                swapchain_support.capabilities.max_image_extent.height
+                sc_support->capabilities.min_image_extent.height,
+                sc_support->capabilities.max_image_extent.height
             );
         }
 
         uint32_t image_count =
-            swapchain_support.capabilities.min_image_count + 1;
-        if (swapchain_support.capabilities.max_image_count > 0
-            && image_count > swapchain_support.capabilities.max_image_count)
+            sc_support->capabilities.min_image_count + 1;
+        if (sc_support->capabilities.max_image_count > 0
+            && image_count > sc_support->capabilities.max_image_count)
         {
-            image_count = swapchain_support.capabilities.max_image_count;
+            image_count = sc_support->capabilities.max_image_count;
         }
 
         VkSharingMode image_sharing_mode;
@@ -538,7 +532,7 @@ namespace beva_demo_02_compute_shader
             image_sharing_mode = VK_SHARING_MODE_EXCLUSIVE;
         }
 
-        auto pre_transform = swapchain_support.capabilities.current_transform;
+        auto pre_transform = sc_support->capabilities.current_transform;
 
         // create swapchain
         swapchain = bv::Swapchain::create(

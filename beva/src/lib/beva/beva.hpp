@@ -4436,34 +4436,15 @@ namespace bv
     VkExtent2D Extent2d_to_vk(const Extent2d& extent_2d);
 
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkQueueFamilyProperties.html
-    // presentation_support: 
     struct QueueFamily
     {
         VkQueueFlags queue_flags;
         uint32_t queue_count;
         uint32_t timestamp_valid_bits;
         Extent3d min_image_transfer_granularity;
-        bool surface_support;
     };
 
-    QueueFamily QueueFamily_from_vk(
-        const VkQueueFamilyProperties& vk_family,
-        VkBool32 vk_surface_support
-    );
-
-    // index of the first queue family that supports the corresponding set of
-    // operations
-    struct QueueFamilyIndices
-    {
-        std::optional<uint32_t> graphics;
-        std::optional<uint32_t> presentation;
-        std::optional<uint32_t> compute;
-        std::optional<uint32_t> transfer;
-        std::optional<uint32_t> sparse_binding;
-        std::optional<uint32_t> protected_;
-        std::optional<uint32_t> video_decode;
-        std::optional<uint32_t> optical_flow_nv;
-    };
+    QueueFamily QueueFamily_from_vk(const VkQueueFamilyProperties& vk_family);
 
     // provided by VK_KHR_surface
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceCapabilitiesKHR.html
@@ -5408,30 +5389,10 @@ namespace bv
             return _queue_families;
         }
 
-        constexpr const QueueFamilyIndices& queue_family_indices() const
-        {
-            return _queue_family_indices;
-        }
-
-        // this will only have a value if:
-        // - the VK_KHR_swapchain extension is available
-        // - a surface was provided to Context::fetch_physical_devices()
-        const std::optional<SwapchainSupport>& swapchain_support() const
-        {
-            return _swapchain_support;
-        }
-
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEnumerateDeviceExtensionProperties.html
         std::vector<ExtensionProperties> fetch_available_extensions(
             const std::string& layer_name = ""
         ) const;
-
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceCapabilitiesKHR.html
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceFormatsKHR.html
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfacePresentModesKHR.html
-        void update_swapchain_support(
-            const SurfacePtr& surface
-        );
 
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceFormatProperties.html
         FormatProperties fetch_format_properties(VkFormat format) const;
@@ -5455,6 +5416,33 @@ namespace bv
             VkImageCreateFlags flags
         ) const;
 
+        // this will only have a value if the VK_KHR_swapchain extension is
+        // available and surface is not nullptr.
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceCapabilitiesKHR.html
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceFormatsKHR.html
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfacePresentModesKHR.html
+        std::optional<SwapchainSupport> fetch_swapchain_support(
+            const SurfacePtr& surface
+        ) const;
+
+        // find indices of queue families that meet the provided criteria
+        // surface support: https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceSupportKHR.html
+        std::vector<uint32_t> find_queue_family_indices(
+            VkQueueFlags must_support,
+            VkQueueFlags must_not_support = 0,
+            const SurfacePtr& must_support_surface = nullptr,
+            uint32_t min_queue_count = 1
+        ) const;
+
+        // find index of the first queue family that meets the provided
+        // criteria. throws Error if not found.
+        uint32_t find_first_queue_family_index(
+            VkQueueFlags must_support,
+            VkQueueFlags must_not_support = 0,
+            const SurfacePtr& must_support_surface = nullptr,
+            uint32_t min_queue_count = 1
+        ) const;
+
     protected:
         VkPhysicalDevice _handle = nullptr;
 
@@ -5462,16 +5450,13 @@ namespace bv
         PhysicalDeviceFeatures _features;
         PhysicalDeviceMemoryProperties _memory_properties;
         std::vector<QueueFamily> _queue_families;
-        QueueFamilyIndices _queue_family_indices;
-        std::optional<SwapchainSupport> _swapchain_support;
 
         PhysicalDevice(
             VkPhysicalDevice handle,
             const PhysicalDeviceProperties& properties,
             const PhysicalDeviceFeatures& features,
             const PhysicalDeviceMemoryProperties& memory_properties,
-            const std::vector<QueueFamily>& queue_families,
-            const QueueFamilyIndices& queue_family_indices
+            const std::vector<QueueFamily>& queue_families
         );
 
         friend class Context;
@@ -5541,10 +5526,7 @@ namespace bv
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceFeatures.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceMemoryProperties.html
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceQueueFamilyProperties.html
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceSurfaceSupportKHR.html
-        std::vector<PhysicalDevice> fetch_physical_devices(
-            const SurfacePtr& surface = nullptr
-        ) const;
+        std::vector<PhysicalDevice> fetch_physical_devices() const;
 
         ~Context();
 

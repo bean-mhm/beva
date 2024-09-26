@@ -952,10 +952,7 @@ namespace bv
         };
     }
 
-    QueueFamily QueueFamily_from_vk(
-        const VkQueueFamilyProperties& vk_family,
-        VkBool32 vk_surface_support
-    )
+    QueueFamily QueueFamily_from_vk(const VkQueueFamilyProperties& vk_family)
     {
         return QueueFamily{
             .queue_flags = vk_family.queueFlags,
@@ -963,8 +960,7 @@ namespace bv
             .timestamp_valid_bits = vk_family.timestampValidBits,
             .min_image_transfer_granularity = Extent3d_from_vk(
                 vk_family.minImageTransferGranularity
-            ),
-            .surface_support = (bool)vk_surface_support
+            )
         };
     }
 
@@ -1884,36 +1880,103 @@ namespace bv
         }
     }
 
-    void PhysicalDevice::update_swapchain_support(
-        const SurfacePtr& surface
-    )
+    FormatProperties PhysicalDevice::fetch_format_properties(
+        VkFormat format
+    ) const
     {
-        _swapchain_support = std::nullopt;
+        VkFormatProperties vk_properties;
+        vkGetPhysicalDeviceFormatProperties(
+            handle(),
+            format,
+            &vk_properties
+        );
+        return FormatProperties_from_vk(vk_properties);
+    }
 
+    std::optional<VkFormat> PhysicalDevice::find_supported_image_format(
+        const std::vector<VkFormat>& candidates,
+        VkImageTiling tiling,
+        VkFormatFeatureFlags features
+    ) const
+    {
+        for (VkFormat format : candidates)
+        {
+            auto props = fetch_format_properties(format);
+            if (tiling == VK_IMAGE_TILING_LINEAR
+                && (props.linear_tiling_features & features) == features)
+            {
+                return format;
+            }
+            else if (tiling == VK_IMAGE_TILING_OPTIMAL
+                && (props.optimal_tiling_features & features) == features)
+            {
+                return format;
+            }
+        }
+        return std::nullopt;
+    }
+
+    ImageFormatProperties PhysicalDevice::fetch_image_format_properties(
+        VkFormat format,
+        VkImageType type,
+        VkImageTiling tiling,
+        VkImageUsageFlags usage,
+        VkImageCreateFlags flags
+    ) const
+    {
+        try
+        {
+            VkImageFormatProperties vk_properties;
+            VkResult vk_result = vkGetPhysicalDeviceImageFormatProperties(
+                handle(),
+                format,
+                type,
+                tiling,
+                usage,
+                flags,
+                &vk_properties
+            );
+            if (vk_result != VK_SUCCESS)
+            {
+                throw Error(vk_result);
+            }
+            return ImageFormatProperties_from_vk(vk_properties);
+        }
+        catch (const Error& e)
+        {
+            throw Error(
+                "failed to fetch image format properties: " + e.to_string(),
+                e.vk_result(),
+                true
+            );
+        }
+    }
+
+    std::optional<SwapchainSupport> PhysicalDevice::fetch_swapchain_support(
+        const SurfacePtr& surface
+    ) const
+    {
         if (surface == nullptr)
         {
-            return;
+            return std::nullopt;
         }
 
         try
         {
             // check for extension
+            auto available_extensions = fetch_available_extensions();
+            bool has_extension = false;
+            for (const auto& ext : available_extensions)
             {
-                auto available_extensions = fetch_available_extensions();
-
-                bool has_extension = false;
-                for (const auto& ext : available_extensions)
+                if (ext.name == VK_KHR_SWAPCHAIN_EXTENSION_NAME)
                 {
-                    if (ext.name == VK_KHR_SWAPCHAIN_EXTENSION_NAME)
-                    {
-                        has_extension = true;
-                        break;
-                    }
+                    has_extension = true;
+                    break;
                 }
-                if (!has_extension)
-                {
-                    return;
-                }
+            }
+            if (!has_extension)
+            {
+                return std::nullopt;
             }
 
             VkSurfaceCapabilitiesKHR vk_capabilities;
@@ -1995,7 +2058,7 @@ namespace bv
                 }
             }
 
-            _swapchain_support = SwapchainSupport{
+            return SwapchainSupport{
                 .capabilities = SurfaceCapabilities_from_vk(vk_capabilities),
                 .surface_formats = surface_formats,
                 .present_modes = present_modes
@@ -2004,83 +2067,94 @@ namespace bv
         catch (const Error& e)
         {
             throw Error(
-                "failed to update swapchain support details: " + e.to_string(),
+                "failed to fetch swapchain support details: " + e.to_string(),
                 e.vk_result(),
                 true
             );
         }
     }
 
-    FormatProperties PhysicalDevice::fetch_format_properties(
-        VkFormat format
-    ) const
-    {
-        VkFormatProperties vk_properties;
-        vkGetPhysicalDeviceFormatProperties(
-            handle(),
-            format,
-            &vk_properties
-        );
-        return FormatProperties_from_vk(vk_properties);
-    }
-
-    std::optional<VkFormat> PhysicalDevice::find_supported_image_format(
-        const std::vector<VkFormat>& candidates,
-        VkImageTiling tiling,
-        VkFormatFeatureFlags features
-    ) const
-    {
-        for (VkFormat format : candidates)
-        {
-            auto props = fetch_format_properties(format);
-            if (tiling == VK_IMAGE_TILING_LINEAR
-                && (props.linear_tiling_features & features) == features)
-            {
-                return format;
-            }
-            else if (tiling == VK_IMAGE_TILING_OPTIMAL
-                && (props.optimal_tiling_features & features) == features)
-            {
-                return format;
-            }
-        }
-        return std::nullopt;
-    }
-
-    ImageFormatProperties PhysicalDevice::fetch_image_format_properties(
-        VkFormat format,
-        VkImageType type,
-        VkImageTiling tiling,
-        VkImageUsageFlags usage,
-        VkImageCreateFlags flags
+    std::vector<uint32_t> PhysicalDevice::find_queue_family_indices(
+        VkQueueFlags must_support,
+        VkQueueFlags must_not_support,
+        const SurfacePtr& must_support_surface,
+        uint32_t min_queue_count
     ) const
     {
         try
         {
-            VkImageFormatProperties vk_properties;
-            VkResult vk_result = vkGetPhysicalDeviceImageFormatProperties(
-                handle(),
-                format,
-                type,
-                tiling,
-                usage,
-                flags,
-                &vk_properties
-            );
-            if (vk_result != VK_SUCCESS)
+            std::vector<uint32_t> indices;
+            for (size_t i = 0; i < queue_families().size(); i++)
             {
-                throw Error(vk_result);
+                const auto& fam = queue_families()[i];
+                if ((fam.queue_flags & must_support) != must_support)
+                {
+                    continue;
+                }
+                if ((fam.queue_flags & must_not_support) != 0)
+                {
+                    continue;
+                }
+                if (must_support_surface != nullptr)
+                {
+                    VkBool32 vk_surface_support = VK_FALSE;
+                    VkResult vk_result = vkGetPhysicalDeviceSurfaceSupportKHR(
+                        handle(),
+                        (uint32_t)i,
+                        must_support_surface->handle(),
+                        &vk_surface_support
+                    );
+                    if (vk_result != VK_SUCCESS)
+                    {
+                        throw Error(
+                            "failed to check physical device's surface support",
+                            vk_result,
+                            false
+                        );
+                    }
+
+                    if (!vk_surface_support)
+                    {
+                        continue;
+                    }
+                }
+                if (min_queue_count > 0 && fam.queue_count < min_queue_count)
+                {
+                    continue;
+                }
+
+                indices.push_back(i);
             }
-            return ImageFormatProperties_from_vk(vk_properties);
+            return indices;
         }
         catch (const Error& e)
         {
             throw Error(
-                "failed to fetch image format properties: " + e.to_string(),
+                "failed to find queue family indices: " + e.to_string(),
                 e.vk_result(),
                 true
             );
         }
+    }
+
+    uint32_t PhysicalDevice::find_first_queue_family_index(
+        VkQueueFlags must_support,
+        VkQueueFlags must_not_support,
+        const SurfacePtr& must_support_surface,
+        uint32_t min_queue_count
+    ) const
+    {
+        auto indices = find_queue_family_indices(
+            must_support,
+            must_not_support,
+            must_support_surface,
+            min_queue_count
+        );
+        if (indices.empty())
+        {
+            throw Error("no queue family meets the required criteria");
+        }
+        return indices[0];
     }
 
     PhysicalDevice::PhysicalDevice(
@@ -2088,15 +2162,13 @@ namespace bv
         const PhysicalDeviceProperties& properties,
         const PhysicalDeviceFeatures& features,
         const PhysicalDeviceMemoryProperties& memory_properties,
-        const std::vector<QueueFamily>& queue_families,
-        const QueueFamilyIndices& queue_family_indices
+        const std::vector<QueueFamily>& queue_families
     )
         : _handle(handle),
         _properties(properties),
         _features(features),
         _memory_properties(memory_properties),
-        _queue_families(queue_families),
-        _queue_family_indices(queue_family_indices)
+        _queue_families(queue_families)
     {}
 
     Context::Context(Context&& other) noexcept
@@ -2318,9 +2390,7 @@ namespace bv
         return &_vk_allocator;
     }
 
-    std::vector<PhysicalDevice> Context::fetch_physical_devices(
-        const SurfacePtr& surface
-    ) const
+    std::vector<PhysicalDevice> Context::fetch_physical_devices() const
     {
         try
         {
@@ -2380,106 +2450,11 @@ namespace bv
                     vk_queue_families.data()
                 );
 
-                QueueFamilyIndices queue_family_indices;
-
                 std::vector<QueueFamily> queue_families;
                 queue_families.reserve(vk_queue_families.size());
-                for (uint32_t i = 0; i < vk_queue_families.size(); i++)
+                for (const auto& vk_family : vk_queue_families)
                 {
-                    const VkQueueFamilyProperties& vk_queue_family =
-                        vk_queue_families[i];
-
-                    VkBool32 vk_surface_support = VK_FALSE;
-                    if (surface != nullptr)
-                    {
-                        vk_result = vkGetPhysicalDeviceSurfaceSupportKHR(
-                            vk_physical_device,
-                            (uint32_t)i,
-                            surface->handle(),
-                            &vk_surface_support
-                        );
-                        if (vk_result != VK_SUCCESS)
-                        {
-                            throw Error(
-                                "failed to check physical device's surface "
-                                "support",
-                                vk_result,
-                                false
-                            );
-                        }
-                    }
-
-                    auto queue_family = QueueFamily_from_vk(
-                        vk_queue_family,
-                        vk_surface_support
-                    );
-
-                    if ((queue_family.queue_flags & VK_QUEUE_GRAPHICS_BIT)
-                        && !queue_family_indices.graphics.has_value())
-                    {
-                        queue_family_indices.graphics = i;
-                    }
-                    if (queue_family.surface_support
-                        && !queue_family_indices.presentation.has_value())
-                    {
-                        queue_family_indices.presentation = i;
-                    }
-                    if ((queue_family.queue_flags & VK_QUEUE_COMPUTE_BIT)
-                        && !queue_family_indices.compute.has_value())
-                    {
-                        queue_family_indices.compute = i;
-                    }
-                    if ((queue_family.queue_flags & VK_QUEUE_TRANSFER_BIT)
-                        && !queue_family_indices.transfer.has_value())
-                    {
-                        queue_family_indices.transfer = i;
-                    }
-                    if ((queue_family.queue_flags
-                        & VK_QUEUE_SPARSE_BINDING_BIT)
-                        && !queue_family_indices.sparse_binding.has_value())
-                    {
-                        queue_family_indices.sparse_binding = i;
-                    }
-                    if ((queue_family.queue_flags & VK_QUEUE_PROTECTED_BIT)
-                        && !queue_family_indices.protected_.has_value())
-                    {
-                        queue_family_indices.protected_ = i;
-                    }
-                    if ((queue_family.queue_flags
-                        & VK_QUEUE_VIDEO_DECODE_BIT_KHR)
-                        && !queue_family_indices.video_decode.has_value())
-                    {
-                        queue_family_indices.video_decode = i;
-                    }
-                    if ((queue_family.queue_flags
-                        & VK_QUEUE_OPTICAL_FLOW_BIT_NV)
-                        && !queue_family_indices.optical_flow_nv.has_value())
-                    {
-                        queue_family_indices.optical_flow_nv = i;
-                    }
-
-                    bool supports_both_graphics_and_presentation =
-                        (queue_family.queue_flags & VK_QUEUE_GRAPHICS_BIT)
-                        && queue_family.surface_support;
-
-                    bool already_have_shared_graphics_and_presentation_indices =
-                        (
-                            queue_family_indices.graphics.has_value()
-                            && queue_family_indices.presentation.has_value()
-                            )
-                        && (
-                            queue_family_indices.graphics.value()
-                            == queue_family_indices.presentation.value()
-                            );
-
-                    if (supports_both_graphics_and_presentation &&
-                        !already_have_shared_graphics_and_presentation_indices)
-                    {
-                        queue_family_indices.graphics = i;
-                        queue_family_indices.presentation = i;
-                    }
-
-                    queue_families.push_back(queue_family);
+                    queue_families.push_back(QueueFamily_from_vk(vk_family));
                 }
 
                 physical_devices.push_back(PhysicalDevice(
@@ -2487,11 +2462,8 @@ namespace bv
                     properties,
                     features,
                     memory_properties,
-                    queue_families,
-                    queue_family_indices
+                    queue_families
                 ));
-
-                physical_devices.back().update_swapchain_support(surface);
             }
 
             return physical_devices;
@@ -4175,26 +4147,19 @@ namespace bv
                 vk_inheritance = VkCommandBufferInheritanceInfo{
                     .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
                     .pNext = nullptr,
-
-                    .renderPass =
-                    lock_wptr(inheritance.value().render_pass)->handle(),
-
-                    .subpass = inheritance.value().subpass_index,
+                    .renderPass = lock_wptr(inheritance->render_pass)->handle(),
+                    .subpass = inheritance->subpass_index,
 
                     .framebuffer =
-                    inheritance.value().framebuffer.has_value()
+                    inheritance->framebuffer.has_value()
                     ? lock_wptr(
-                        inheritance.value().framebuffer.value()
+                        inheritance->framebuffer.value()
                     )->handle()
                     : nullptr,
 
-                    .occlusionQueryEnable =
-                    inheritance.value().occlusion_query_enable,
-
-                    .queryFlags = inheritance.value().query_flags,
-
-                    .pipelineStatistics =
-                    inheritance.value().pipeline_statistics
+                    .occlusionQueryEnable = inheritance->occlusion_query_enable,
+                    .queryFlags = inheritance->query_flags,
+                    .pipelineStatistics = inheritance->pipeline_statistics
                 };
             }
 
