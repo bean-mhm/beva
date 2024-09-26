@@ -45,8 +45,8 @@ learn how to use them properly.
 
 beva provides `Context` for instance management. A `Device` can then
 be created with that context. Finally, normal objects like `Image` can be
-created within that device. These classes include member functions covering
-common usage of them, for example, `Device::retrieve_queue()` or
+created within that device. These classes include static and member functions
+covering common usage of them, for example, `Device::retrieve_queue()` or
 `CommandBuffer::begin()`.
 
 For convenience, some classes automatically fetch and store commonly used
@@ -63,17 +63,15 @@ memory allocator for the Vulkan driver to use. You can use
 `Device` based on it, and every object created and destroyed within that
 `Device`.
 
-## More On Context
+## Context and Physical Devices
 
-`Context` provides a `fetch_physical_devices()` function that can take an
-optional `Surface` as an argument. This function returns a vector of
+`Context` provides `fetch_physical_devices()` which returns a vector of
 `PhysicalDevice` objects already containing information such as device
-properties, features, memory properties, and queue families, as well as
-swapchain support details (formats, present modes, etc.) if a surface was
-provided.
-
-`Context` also provides static functions for getting a list of available
-layers or extensions.
+properties, features, memory properties, and queue families. Additionally,
+`PhysicalDevice` provides several member functions for fetching information
+like swapchain support details for a surface (formats, present modes, etc.),
+available device extensions, and image and buffer format properties, as well as
+functions for finding queue families that meet the provided criteria.
 
 # RAII & Smart Pointers
 
